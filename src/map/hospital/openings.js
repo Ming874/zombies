@@ -4,6 +4,11 @@ import { DIRS, ARROW } from './shell.js';
 import { revealFor } from './style.js';
 import { buildLeaves } from './leaves.js';
 import { buildFacade } from './facade.js';
+import hospitalPack from '../../interact/packs/hospital.js';
+
+// 劇情包會上鎖的區域(src/interact/doors.js 的鎖只關得住掛在鉸鍊上的門扇):通往這些區域的門洞兩扇都要掛著,不倒、不缺
+const LOCKS = hospitalPack.items.filter((i) => i.kind === 'lock' && i.door);
+const SEALED = new Set(LOCKS.map((i) => i.door)), SEALED_OUT = new Set(LOCKS.filter((i) => i.outer).map((i) => i.door)); // outer:外門也鎖
 
 // 門(門框、門楣、門扇的各種狀態)、窗(窗框、玻璃狀態、木板封窗、百葉、窗簾、鐵條)、
 // 欄杆/櫃台/矮牆/女兒牆、鐵欄杆與圍籬(含灌木)、電梯。全部放在牆格/門格內,不擋通道。
@@ -97,7 +102,11 @@ export function buildDoors(K) {
       }
       // 門扇
       if (style === 'none') continue;
-      const roomB = sb.kind === 'room' && sb.zone?.theme !== 'corridor' && !d.outB ? true : sa.kind === 'room' && sa.zone?.theme !== 'corridor' && !d.outA ? false : R() < 0.5;
+      const sealed = d.outA || d.outB ? SEALED_OUT.has(sa.zone?.id) || SEALED_OUT.has(sb.zone?.id) : SEALED.has(sa.zone?.id) || SEALED.has(sb.zone?.id);
+      // 兩側都不是房間:門扇隨機掛在其中一面牆線。會上鎖的多格門洞每一格都照第一格(那一格的第一個亂數),
+      // 不然相鄰兩格的門扇一前一後,關著也能斜著鑽過去(三樓走廊 ↔ 屋頂);這一格的亂數照樣用掉一個,後面的門扇狀態不變
+      const side = () => { const own = R() < 0.5; return sealed && !runStart ? prng(hashStr(d.axis === 'z' ? `door${li},${d.run[0]},${r}` : `door${li},${c},${d.run[0]}`))() < 0.5 : own; };
+      const roomB = sb.kind === 'room' && sb.zone?.theme !== 'corridor' && !d.outB ? true : sa.kind === 'room' && sa.zone?.theme !== 'corridor' && !d.outA ? false : side();
       const dirRoom = roomB ? 1 : -1, wf = roomB ? w1 : w0;
       fbox(null, u0 + 0.03, y, wf - 0.07, u1 - 0.03, y + 0.008, wf + 0.07, style === 'fire' || style === 'metal' || style === 'cell' ? 'kick' : 'alu'); // 門檻(金屬壓條)
       // 全部做成雙扇門(關上時封住 2m 門洞,中間留 6mm 門縫)。門扇是可轉動的實例(src/map/hospital/leaves.js),
@@ -111,6 +120,7 @@ export function buildDoors(K) {
         let state = R.pick(['flat', 'flat', 'flat', 'room', 'room', 'ajar', 'fallen', 'none']);
         if (style === 'glass') state = R.pick(['flat', 'room', 'none', 'ajar']);
         if (dynamic) state = style === 'cell' ? R.pick(['room', 'ajar', 'ajar']) : R.pick(['flat', 'room']);
+        if (sealed && (state === 'fallen' || state === 'none')) state = 'flat'; // 會上鎖的門洞:少一扇,鎖就只關得住半個門洞(207 曾經可以直接走進去)
         if (state === 'none') continue;
         // 方向向量(局部 u,w)
         let du, dw, hu = uh + sgn * 0.035, hw = wf;

@@ -6,7 +6,7 @@
 // 物件格式:
 //   { id: 'h.ix.…', kind, zone: 區域 id, mount: 'wall' | 'floor' | 'surface' | 'auto',
 //     near: 'door' | 'corner' | 區域 id | null, why: 一句話(誰放的、為什麼), ...參數 }
-// kind 與參數見互動引擎的清單;本包額外帶的欄位(keypad.power、circuit.initial)寫在 items_doc.extensions。
+// kind 與參數見互動引擎的清單;本包額外帶的欄位(keypad.power、circuit.initial、lock.outer)寫在 items_doc.extensions。
 // 2F 沒有護理站區域:護理站的東西一律放在 f2_corridor,near: 'f2_ward_207'。
 //
 // 目標鏈(STORY_v2 §4.7、HOSPITAL_CLUES_v2 §5;步驟與區域解鎖在 src/story/objectives.js):
@@ -22,7 +22,8 @@ const items = [
   // ================================================================== 劇情進度才開的區域(src/story/objectives.js 設旗標;鎖著的門導航繞過)
   // 三樓的門禁:配電盤恢復(h.gen.on)之後才有電;太平間:查出 207 的門怎麼開之後,清理隊的鎖才打得開。
   // (監控室自己的門禁卡鎖寫在後面,會蓋掉這一條,所以要排在它前面)
-  { id: 'h.lock.3f', kind: 'lock', zone: 'f3_corridor', door: 'f3_corridor', item: null, flag: 'h.area.3f', text: '三樓 · 門鎖沒有電（先修好 B1 的配電盤）', unlockText: '',
+  // outer:連通往屋頂的外門也鎖(不然從逃生梯上屋頂就能走進三樓走廊)
+  { id: 'h.lock.3f', kind: 'lock', zone: 'f3_corridor', door: 'f3_corridor', outer: true, item: null, flag: 'h.area.3f', text: '三樓 · 門鎖沒有電（先修好 B1 的配電盤）', unlockText: '',
     why: '大新的三樓門禁接在配電盤上；七月初一招魂燈第一次點亮時跳電，門全鎖著。' },
   { id: 'h.lock.morgue', kind: 'lock', zone: 'b1_morgue', door: 'b1_morgue', item: null, flag: 'h.area.morgue', text: '太平間 · 被大新清理隊鎖住了（先去二樓查 207 的門）', unlockText: '',
     why: '大新清理隊鎖了太平間（裡面有甦醒失敗的人）；工務的保險絲備品在 5 號冰櫃。' },
@@ -258,6 +259,7 @@ export default {
     extensions: {
       'keypad.power': '本包新增：鍵盤需要這條迴路的旗標才有電（監控室在 h.pwr.monitor 之前是黑的）。引擎不支援時可以忽略。',
       'circuit.initial': '本包新增：開局就通電的迴路（207 的燈）。',
+      'lock.outer': '本包新增：連通往戶外（屋頂）的外門也一起鎖（src/interact/doors.js；場景 openings.js 讓這些門洞兩扇都在）。',
       'fusebox.capacity': 'capacity 寫 \'fuses\'；加急單以上請引擎改成 2（§5.2「加急條款」）。',
       'h.ix.slip': 'H-EV2 若由電梯事件放出回收單，請沿用 h.s02，不要另生一張。',
       H10: '207 號病歷正本由劇情在 R10 擊倒無名氏後放在 207 床墊底下（按住 E 2 秒），不在本包。',

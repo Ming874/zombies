@@ -6,7 +6,9 @@ import { Model, T } from '../kit.js';
 // 特別的那一支(spec.special = 'callback'):掛掉之後幾秒又響起來,一次比一次近。
 // 響鈴時機:靠近(ring:'near')、緊張空檔(ring:'tension',由導演挑一支你附近但看不到的)、旗標(ring:'flag:xxx')、
 // 靈異系統正在響的電話(game.horror.ringing)也可以在這裡接起來。
+// 同時有好幾支在響 = 同一條醫院線路:接起任何一支,其他全部停;別支上的來電改由接起來的那一支接到(見 answer)。
 const BEIGE = 0xd8cdb4, DARK = 0x2a2b2c, GRAY = 0x8d9190, STEEL = 0xa9adae;
+const onLine = (l) => !/^對講機/.test(l?.who || ''); // 對講機的話(金水伯)只在對講機上說,不會從別支電話出來
 const RING_KIND = { wall: 'bell', desk: 'trill', nurse: 'trill', pay: 'payphone', anchor: 'bell' };
 const POOL = { wall: 'PHONE.ring', desk: 'PHONE.ring', nurse: 'PHONE.nurse', pay: 'PHONE.payphone', anchor: 'PHONE.ring' };
 
@@ -191,9 +193,21 @@ function makePhone(api, o) {
     lift() { if (hs) hs.set(hsI, ZERO); ixs.pickup(null); },
     down() { if (hs) hs.set(hsI, hsM); ixs.hangup(pos); },
     tones() { ixs.dialTone(false); ixs.busyTone(false); ixs.offHook(false); ixs.lineNoise(false); },
+    // 別支電話被接起來了:這一支不響了。taken = 被那一支接走的來電(記成用過);沒被接走的劇情來電照「沒接到」處理(過一陣子再響)
+    hush(taken) {
+      this.stopRing(); this.state = 'idle'; this.ghost = false; this.line = null;
+      if (taken?.id) this.used.add(taken.id);
+      else ix.emit('missed', P);
+    },
     answer() {
-      const ghost = this.ghost, wasRinging = this.state === 'ringing';
-      let ln = this.line || (wasRinging ? this.pending() : null);
+      const wasRinging = this.state === 'ringing';
+      // 其他同時在響的電話全部停;打來的只有一個人:這一支沒有正在打來的電話時,接到別支上的(王醫師、回撥優先,再來是排定的劇情來電)
+      const others = wasRinging ? [...ix.ringing].filter((Q) => Q !== P && Q.state === 'ringing') : [];
+      let from = null;
+      const take = (pick) => { for (const Q of others) { const l = pick(Q); if (l && onLine(l)) { from = Q; return l; } } return null; };
+      let ln = this.line || take((Q) => Q.line) || (wasRinging ? this.pending() : null) || take((Q) => Q.pending());
+      const ghost = this.ghost || others.some((Q) => Q.ghost);
+      for (const Q of others) Q.hush(Q === from ? ln : null);
       this.stopRing();
       this.lift();
       this.state = 'call'; this.offT = 0; this.ghost = false; this.line = null; this.end = 'dead'; this._ended = false;

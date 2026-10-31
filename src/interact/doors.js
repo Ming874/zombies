@@ -288,9 +288,24 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
   // ---------- 鎖 ----------
   // 劇情包的 lock({ door: zoneId, item, flag, text, consume })在建構時鎖上;劇情代理在執行期用 api.lock / api.unlock(見下面)。
   // 上鎖:門扇關上、碰撞盒擋導航(殭屍繞路);解鎖:碰撞盒重建(導航局部重建排進佇列)、喀一聲 + 一行提示。
+  // 鎖住的門洞要整個封住:場景這個門洞只掛了一扇(另一扇倒在地上或沒有)時,缺口補一面只擋移動的隱形牆
+  // (子彈、視線、聲音穿過;導航繞過),解鎖時拿掉。openings.js 已讓劇情包的鎖都有兩扇,這裡是執行期上鎖的保險。
+  function seal(w) {
+    for (const b of w.gap || []) world.removeBox(b);
+    w.gap = null;
+    if (!locked(w) || w.leaves.length !== 1) return;
+    const l = w.leaves[0], c = Math.cos(l.closed), s = -Math.sin(l.closed), th = Math.max(0.1, (l.t || 0.06) + 0.04);
+    const hx = l.axis === 'z' ? 2 * w.cx - l.group.position.x : l.group.position.x; // 另一扇的鉸鍊:以門洞中心對稱,門扇朝反方向
+    const hz = l.axis === 'z' ? l.group.position.z : 2 * w.cz - l.group.position.z;
+    const b = world.addBox(hx - (c * l.lw) / 2, hz - (s * l.lw) / 2, Math.abs(c) * l.lw + Math.abs(s) * th, Math.abs(s) * l.lw + Math.abs(c) * th, l.lh, l.y);
+    b.moveOnly = true;
+    w.gap = [b];
+    console.warn('[interact] 上鎖的門洞只有一扇門,缺口用隱形牆封住', w.key);
+  }
   function openLock(w, { feedback = true, text = null, open = false, by = null } = {}) {
     if (!w.lock || w.lock.open) return false;
     w.lock.open = true;
+    seal(w);
     for (const l of w.leaves) colliders(l);
     if (feedback) {
       ixs.lockerOpen(pos(w));
@@ -311,10 +326,11 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
   function applyLock(w, spec) {
     w.lock = { ...spec, open: false };
     for (const l of w.leaves) { l.anim = null; anims.delete(l); l.group.rotation.y = l.closed; colliders(l); }
+    seal(w);
     sync(w);
     ix.emit('lock', w);
   }
-  for (const spec of lockSpecs) for (const w of list) if (!w.out && (w.za?.id === spec.door || w.zb?.id === spec.door)) applyLock(w, spec);
+  for (const spec of lockSpecs) for (const w of list) if ((!w.out || spec.outer) && (w.za?.id === spec.door || w.zb?.id === spec.door)) applyLock(w, spec); // outer:外門也鎖
   ix.on('flag', () => { for (const w of list) if (locked(w) && w.lock.flag && ix.flags.has(w.lock.flag)) openLock(w); });
   // 目標 → 門洞:門洞 key('li,c,r',門扇的 door 欄位)、區域 id(門的兩側任一側是這個區域)、門洞物件,或它們的陣列
   const waysOf = (t) => {
@@ -404,11 +420,12 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
         for (const l of w.leaves) { l.anim = null; anims.delete(l); l.group.rotation.y = w.lock ? l.closed : l.init; }
         if (w.lock) w.lock.open = false;
         for (const l of w.leaves) colliders(l);
+        seal(w);
         w.press = 0;
       }
     },
     stats() { let boxes = 0, closed = 0; for (const w of list) { for (const l of w.leaves) boxes += l.boxes.length; if (allClosed(w)) closed++; } return { doorways: list.length, leaves: leaves.length, boxes, closed, barricades: planks.slots.filter(Boolean).length }; },
-    dispose() { for (const l of leaves) { for (const b of l.boxes) world.removeBox(b); l.boxes.length = 0; } game.scene.remove(planks.im); },
+    dispose() { for (const l of leaves) { for (const b of l.boxes) world.removeBox(b); l.boxes.length = 0; } for (const w of list) for (const b of w.gap || []) world.removeBox(b); game.scene.remove(planks.im); },
   };
   for (const l of leaves) l.init = l.group.rotation.y;
   return api;
