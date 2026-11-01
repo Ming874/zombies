@@ -20,7 +20,7 @@ const RITUAL = { near: 2.3, still: 0.9, open: 3.3, step: 1.05 }; // 遺照前幾
 export function installSoul(game, H) {
   const ev = new Map();
   const emit = (k, d) => { for (const f of ev.get(k) || []) { try { f(d); } catch (e) { console.warn('[soul]', e); } } };
-  const fresh = () => ({ n: MAX, red: false, look: 3, muf: false, mufT: 0, acc: 0, stillT: 0, rite: null, riteRest: -1, failT: 0, lostN: 0, log: [] });
+  const fresh = () => ({ n: MAX, red: false, redT: 0, redN: 0, look: 3, muf: false, mufT: 0, acc: 0, stillT: 0, rite: null, riteRest: -1, failT: 0, lostN: 0, log: [] });
   let run = fresh();
   const now = () => game.time || 0;
   const silent = () => { const ph = game.phase; return ph === 'shop' || ph === 'break' || ph === 'wait'; };
@@ -86,6 +86,7 @@ export function installSoul(game, H) {
   function curse(on = true) {
     if (run.red === !!on) return run.red;
     run.red = !!on;
+    run.redT = now() + 8; // 撿起來 8 秒後,她第一次出現在走廊盡頭
     game.ui?.hud?.setSoul?.(run.n, run.red);
     emit(on ? 'curse' : 'uncurse', {});
     return run.red;
@@ -118,7 +119,7 @@ export function installSoul(game, H) {
         run.rite = null; run.riteRest = rest;
         const k = MAX - run.n;
         restore(k, 'shoujing');
-        curse(false);
+        if (run.red) { curse(false); try { game.inventory?.take?.('hongbao'); } catch { /* 略 */ } } // 紅包在遺照前燒掉
         sayAma('好了，乖。阿嬤在。');
         try { sfx.folk?.('ama', p.pos); } catch { /* 冷卻中 */ }
         try { M()?.beat?.('light'); } catch { /* 略 */ }
@@ -145,6 +146,11 @@ export function installSoul(game, H) {
     const step = run.acc; run.acc = 0;
     if ((run.mufT += step) >= 0.5) { run.mufT = 0; keepMuffle(); }
     tickRite(step);
+    // 紅衣的身影(禁忌:撿了紅包):每 28~45 秒在走廊盡頭等你一次(大場面、戰鬥中不出來)
+    if (run.red && now() >= run.redT && H?.events?.fire) {
+      run.redT = now() + 1.5; // 找不到地方站(視線方向 12~26 m 沒有點)就很快再試
+      if (!H.director?.bigActive && !captions.combat() && H.events.fire('redFollow')) { run.redT = now() + 28 + Math.random() * 17; run.redN++; }
+    }
   }
   function reset() {
     const m = M();
@@ -164,7 +170,7 @@ export function installSoul(game, H) {
     get red() { return run.red; },
     get rite() { return run.rite ? { ...run.rite } : null; },
     on(k, f) { if (!ev.has(k)) ev.set(k, new Set()); ev.get(k).add(f); return () => ev.get(k).delete(f); },
-    state: () => ({ fires: run.n, lost: run.n <= 0, red: run.red, rite: run.rite ? { ...run.rite } : null, riteRest: run.riteRest, lostN: run.lostN, muffled: run.muf, log: run.log.slice(-8) }),
+    state: () => ({ fires: run.n, lost: run.n <= 0, red: run.red, redN: run.redN, rite: run.rite ? { ...run.rite } : null, riteRest: run.riteRest, lostN: run.lostN, muffled: run.muf, log: run.log.slice(-8) }),
   };
   game.soul = S;
   game.ui?.hud?.setSoul?.(MAX, false);
