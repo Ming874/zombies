@@ -63,11 +63,12 @@ const STEPS = [
     hints: { xl: '卡在大新的夜班組長身上。\n第五波，他會出來。\n等的時候，先填筆記本。', ama: '在巡房的那個人……身上有卡。' } },
   { id: 'h.s.deduce', act: 4, text: '填好筆記本（J）', why: '弄清楚封院第 7 晚的事', prog: (c) => (c.D.solved() ? QUESTION.m : c.D.filled()), m: QUESTION.m, skip: (c) => c.O.has('h.207.elock') || c.O.has('h.207.unlock'),
     hints: { deduce: 'fill' } },
-  { id: 'h.s.throw', act: 4, text: '到阿嬤的照片前擲筊', why: '問她對不對；對了她會開鎖', cond: (c) => c.D.solved(), skip: (c) => c.O.has('h.207.elock') || c.O.has('h.207.unlock'),
+  // 一句一筊(NARRATIVE N5;src/story/deduce.js):一次問一句,招魂燈熄的時候才能問,一次燈熄問一次;三句都聖筊 = 電子鎖開
+  { id: 'h.s.throw', act: 4, text: '到阿嬤的照片前擲筊', why: '一次問一句，燈熄的時候才能問', prog: (c) => (c.D.okCount ? c.D.okCount() : c.D.solved() ? 3 : 0), m: 3, skip: (c) => c.O.has('h.207.elock') || c.O.has('h.207.unlock'),
     hints: { deduce: 'throw', glint: (c) => c.at('h.ix.memorial') } },
   // 207 兩道鎖:電子鎖(鍵盤 0924 或聖筊)+ 門內的旋鈕(頭七那一夜阿嬤回來轉開);兩道都開了,門自己推開(src/story/climax.js)
   { id: 'h.s.unlock', act: 4, text: '打開 207', why: (c) => (c.O.has('h.207.elock') ? '門從裡面鎖著，等阿嬤回來' : '電子鎖＋門裡的旋鈕'), prog: (c) => (c.O.has('h.207.unlock') ? 2 : (c.O.has('h.207.elock') ? 1 : 0) + (c.O.has('h.207.knob') ? 1 : 0)), m: 2,
-    hints: { xl: (c) => (c.O.has('h.207.elock') ? '門是從裡面鎖的。\n只有裡面的人開得了。我們等。' : '輸入密碼，或去照片前擲筊。\n兩條路都能開電子鎖。'),
+    hints: { xl: (c) => (c.O.has('h.207.elock') ? '門是從裡面鎖的。\n只有裡面的人開得了。我們等。' : '輸入密碼，或去照片前擲筊。\n三句都聖筊，電子鎖也會開。'),
       ama: (c) => (c.O.has('h.207.elock') ? '等阿嬤回來。' : '是她住進來的那一天。'), glint: (c) => (c.O.has('h.207.elock') ? null : c.at('h.ix.keypad')) } },
   { id: 'h.s.boss', act: 4, text: '守住 207', why: '劉家豪要回來關上那扇門', cond: (c) => c.O.has('h.boss10') }, // 「守住 207」那一波(src/story/climax.js)
   { id: 'h.s.enter', act: 4, text: '進 207', why: '阿嬤在枕頭裡留了東西給你', cond: (c) => c.zone === 'f2_ward_207' && (c.D.got('hc.30') || (c.run.in207 = (c.run.in207 || 0) + 0.25) > 1.5), // 要真的走進 207
@@ -225,13 +226,28 @@ export function installObjectives(game) {
     }
     return false;
   }
-  // 筆記本的提示:還有空格 → 哪一類的詞還缺、哪張卡會有;填錯了 → 哪一格不對、該重看哪一張卡;最後在筆記本上把那一格圈起來
+  // 筆記本的提示:
+  //   上一次擲筊那一句不對(笑筊/陰筊)→ 說是第幾句、該重看哪一張卡;第三級打開筆記本指向那張卡(簡單難度才圈出格子)
+  //   還有空格 → 哪一類的詞還缺、哪張卡會有;第三級把那一格圈起來
+  //   一句填好了 → 去照片前問(燈熄的時候)
   function deduceHint(kind, tier, s) {
     const Dd = D(); if (!Dd) return false;
-    const st = Dd.state(), B = QUESTION.blanks, keys = Object.keys(B);
-    if (kind === 'fill' || !st.last || st.last.result === 'sheng') {
-      const b = keys.find((k) => !st.fill[k]);
-      if (!b) { if (tier === 1) c.talk([[XL, '填好了，就去問阿嬤。\n二樓護理站，她的照片前面。', 3.6]], null, { hint: true }); else if (tier >= 3) { const p = s.hints.glint?.(c); if (p) { run.glint = p; run.glintT = 14; } } return true; }
+    const st = Dd.state(), B = QUESTION.blanks, keys = Object.keys(B), SENT = Dd.SENT || [keys], NUM = Dd.NUM || [];
+    const sts = Dd.sentences?.() || [], last = st.last;
+    const wi = last && last.result !== 'sheng' && Number.isInteger(last.i) && !sts[last.i]?.ok ? last.i : -1;
+    if (wi >= 0) { // 上一次問的那一句不對(不說是哪一格)
+      const wrongs = SENT[wi].filter((k) => st.fill[k] !== B[k].answer);
+      if (wrongs.length) {
+        const card = Dd.cards().find((q) => (q.sup || []).some((x) => wrongs.includes(x))) || null, k = NUM[wi] || '';
+        if (tier === 1) c.talk([[XL, card ? `第${k}句……怪怪的。\n你再看一次〈${card.title}〉。` : `第${k}句……怪怪的。再想想。`, 3.6]]);
+        else if (tier === 2) c.ama(`第${k}句……不是這樣。`);
+        else if (diff() === 'easy' || !card) { Dd.hintBlank = wrongs[0]; if (Dd.isOpen) Dd.open(); }
+        else { Dd.hintCard = card.id; if (Dd.isOpen) { Dd.close(false); Dd.open(); } }
+        return true;
+      }
+    }
+    const b = keys.find((k) => !st.fill[k]);
+    if (b && (kind === 'fill' || !Dd.ready?.())) {
       const cat = B[b].cat, have = new Set(Dd.words());
       const card = CARDS.find((q) => !Dd.has(q.id) && (q.words || []).some((w) => WORDS[w]?.cat === cat && !have.has(w)));
       const i = keys.indexOf(b) + 1;
@@ -240,12 +256,9 @@ export function installObjectives(game) {
       else { Dd.hintBlank = b; if (Dd.isOpen) Dd.open(); }
       return true;
     }
-    const wrong = keys.find((k) => st.fill[k] !== B[k].answer);
-    if (!wrong) return false;
-    const i = keys.indexOf(wrong) + 1, card = Dd.cards().find((q) => (q.sup || []).includes(wrong)) || null;
-    if (tier === 1) c.talk([[XL, card ? `第 ${i} 格……怪怪的。你再看一次〈${card.title}〉。` : `第 ${i} 格……怪怪的。再想想。`, 3.6]]);
-    else if (tier === 2) c.ama(`第 ${i} 格……不是這樣。`);
-    else Dd.hintBlank = wrong;
+    // 有一句可以問了:去照片前(燈熄的時候)
+    if (tier === 1) c.talk([[XL, '填好一句，就去問阿嬤。\n二樓護理站，她的照片前面。', 3.6]], null, { hint: true });
+    else if (tier >= 3) { const p = s.hints.glint?.(c); if (p) { run.glint = p; run.glintT = 14; } }
     return true;
   }
 

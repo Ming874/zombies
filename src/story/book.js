@@ -48,6 +48,7 @@ export class Book {
     const g = this.game;
     if (!this.el) this.build();
     if (!this.isOpen && !this.D.hintBlank) this.tab = 'notes'; // 打開時先看〈到目前為止〉
+    if (this.D.hintCard) { this.tab = 'cards'; this.card = this.hot = this.D.hintCard; this.D.hintCard = null; } // 提示第三級:指向那張卡(不圈格子)
     try { g.story?.notes?.bookOpened?.(); } catch { /* 略 */ }
     this.isOpen = true;
     g.bookOpen = true; // input.js:放開滑鼠鎖定時不要叫出暫停選單
@@ -115,18 +116,24 @@ export class Book {
     // ---- 左頁:題目 ----
     const slot = (b) => {
       const B = QUESTION.blanks[b], w = fill[b], i = BL.indexOf(b) + 1;
-      const cls = ['dd-slot', w ? 'full' : 'empty', this.sel === b && !solved ? 'sel' : '', D.hintBlank === b && !solved ? 'hint' : '', dragCat && dragCat === B.cat ? 'drop' : ''].filter(Boolean).join(' ');
+      const lock = solved || !!(D.sentences?.()[D.SENT?.findIndex((bs) => bs.includes(b))]?.ok);
+      const cls = ['dd-slot', w ? 'full' : 'empty', lock ? 'lock' : '', this.sel === b && !lock ? 'sel' : '', D.hintBlank === b && !solved ? 'hint' : '', dragCat && dragCat === B.cat ? 'drop' : ''].filter(Boolean).join(' ');
       return `<button class="${cls}" data-b="${b}" title="${esc(CATS[B.cat])}"><sup>${i}</sup>${w ? esc(WORDS[w].text) : `<em>${esc(CATS[B.cat])}</em>`}</button>`;
     };
-    const sent = QUESTION.sentences.map((s) => `<p>${esc(s).replace(/\{(b\d)\}/g, (_, b) => slot(b))}</p>`).join('');
-    const n = D.filled(), last = st.last;
-    const lastTxt = last ? `上一次：${THROW.name[last.result]}${last.result === 'sheng' ? '' : `，對了 ${last.n} 個，共 ${last.m} 個`}` : '';
-    const hint = solved ? '' : n === QUESTION.m ? '<div class="dd-hint ready">已填好。到 2F 護理站阿嬤的照片前，按住 <kbd>E</kbd> 擲筊（丟兩片筊杯問阿嬤：一正一反＝聖筊＝全對）。</div>'
-      : `<div class="dd-hint">點一個空格，再從右頁挑一個詞（也可以直接拖過去）。線索越多，詞越多。</div>`;
+    // 一句一筊(src/story/deduce.js):聖筊過的那一句蓋上小印、格子鎖住
+    const sts = D.sentences?.() || [];
+    const sent = QUESTION.sentences.map((s, i) => `<p class="${sts[i]?.ok ? 'ok' : ''}">${esc(s).replace(/\{(b\d)\}/g, (_, b) => slot(b))}${sts[i]?.ok && !solved ? '<span class="dd-ok">聖筊</span>' : ''}</p>`).join('');
+    const n = D.filled(), last = st.last, ok = D.okCount?.() ?? (solved ? 3 : 0), nx = D.next?.() ?? -1;
+    const lastTxt = last ? `上一次：${THROW.name[last.result]}${last.result === 'sheng' && solved ? '' : D.say ? `（${D.say(last)}）` : ''}` : '';
+    const k = nx >= 0 ? D.NUM?.[nx] || '' : '';
+    const hint = solved ? ''
+      : nx >= 0 && D.left?.() > 0 ? `<div class="dd-hint ready">第${k}句填好了。到 2F 護理站阿嬤的照片前，按住 <kbd>E</kbd> 擲筊問她（一次問一句；一正一反＝聖筊＝這一句對了）。</div>`
+      : nx >= 0 ? `<div class="dd-hint ready">第${k}句填好了。${this.game.phase === 'fighting' ? '等招魂燈熄了' : '這次燈熄已經問過了；下一次燈熄'}，再去問阿嬤。</div>`
+      : `<div class="dd-hint">點一個空格，再從右頁挑一個詞（也可以直接拖過去）。一句填滿，就可以去問阿嬤。</div>`;
     const truth = solved ? `<div class="dd-truth"><div class="dd-seal">聖筊</div><h3>最後一頁</h3><p>${esc(QUESTION.truth)}</p></div>` : '';
     this.el.querySelector('.dd-l').innerHTML = `<div class="dd-hd"><span>筆記本</span><span>〈第七暝〉聖心醫院</span></div>
       <h2>${esc(QUESTION.title)}</h2><div class="dd-sent${solved ? ' solved' : ''}">${sent}</div>
-      <div class="dd-stat"><span>已填 ${n}／${QUESTION.m}</span>${lastTxt ? `<span>${esc(lastTxt)}</span>` : ''}</div>${hint}${truth}`;
+      <div class="dd-stat"><span>已填 ${n}／${QUESTION.m}</span><span>聖筊 ${ok}／${QUESTION.sentences.length}</span>${lastTxt ? `<span>${esc(lastTxt)}</span>` : ''}</div>${hint}${truth}`;
     if (dragOnly) return;
     // ---- 右頁:詞庫 / 線索 ----
     const cards = D.cards(), fresh = st.fresh.length;
@@ -148,7 +155,7 @@ export class Book {
       }).join('');
     } else {
       if (!cards.length) body = '<div class="dd-empty">還沒有線索。</div>';
-      else body = `<ol class="dd-cards">${cards.map((c) => `<li data-card="${c.id}" class="${this.card === c.id ? 'open' : ''}"><b>${esc(c.title)}</b><small>${esc(SRC[c.src] || '')}</small>${this.card === c.id ? `<p>${esc(c.text).replace(/\n/g, '<br>')}</p>` : ''}</li>`).join('')}</ol>`;
+      else body = `<ol class="dd-cards">${cards.map((c) => `<li data-card="${c.id}" class="${this.card === c.id ? 'open' : ''}${this.hot === c.id ? ' hot' : ''}"><b>${esc(c.title)}</b><small>${esc(SRC[c.src] || '')}</small>${this.card === c.id ? `<p>${esc(c.text).replace(/\n/g, '<br>')}</p>` : ''}</li>`).join('')}</ol>`;
     }
     this.el.querySelector('.dd-r').innerHTML = tabs + `<div class="dd-body">${body}</div>`;
     this.el.querySelector('.dd-ft').innerHTML = '點空格，再點詞（或拖曳） · 右鍵清除 · <kbd>1</kbd>~<kbd>7</kbd> 選空格 · <kbd>J</kbd> 收起 · <kbd>Esc</kbd> 暫停選單' + (this.game.net ? ' · 世界沒有暫停，受傷會自動收起' : '');

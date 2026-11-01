@@ -2,9 +2,12 @@
 //
 //   game.deduce.addCard(id, { by })   收卡:解鎖卡上的詞,HUD 角落閃「＋線索 [J]」(重複收不會重複算)
 //   game.deduce.has(id) / cards() / words()   has = 筆記本裡有(跨局);got(id) = 這一局碰到了(看到、撿到、聽到;目標鏈只看這個)
-//   game.deduce.fill(blank, wordId) / clear(blank) / ready() / score() → { n, m }
-//   game.deduce.throw() → { result: 'sheng' | 'xiao' | 'yin', n, m } | null(還有空格)
-//   game.deduce.solved()
+//   game.deduce.fill(blank, wordId) / clear(blank) / score() → { n, m }
+//   一句一筊(NARRATIVE N5):三句分開問。sentences() → [{ i, blanks, filled, ok }];next() = 下一句可以問的(填滿、還沒聖筊);okCount()
+//   ready() = 有一句可以問;left() = 這一次招魂燈熄還可以擲幾次(燈亮著 = 0;普通/困難一次、簡單兩次);canThrow()
+//   game.deduce.throw() → { result: 'sheng' | 'xiao' | 'yin', n, m, i } | null(沒有可以問的句子、或這次燈熄已經問過了)
+//     聖筊 = 這一句全對(格子鎖住);笑筊 = 這一句有一格不對;陰筊 = 不只一格(不說是哪一格)
+//   game.deduce.solved() = 三句都聖筊。聖筊才拿得到的(鍵盤密碼給不了):每一句阿嬤的一句真話(TRUTH)、三句都對時相框背面那張紙(hs.01)
 //   game.deduce.open() / close() / toggle()   筆記本畫面(J)
 //   game.objectives.clue(id)   = addCard(靈異系統 STORY3 的 card 欄位會呼叫這個)
 //
@@ -15,22 +18,41 @@ import { MAP, QUESTION, WORDS, CARD, CARDS, NOTE_CARD, WHISPER, LOOK, TALK, THRO
 import { Book } from './book.js';
 import * as THREE from 'three';
 import { sfx, ghost } from '../audio.js';
+import { settings } from '../ui/settings.js';
 import { secsOf, voiceLock, free, wait, seq, line, radioReady, door207 as door207Of } from './voice.js';
 
 const KEY = 'hz.deduce.v1';
+// 三句(QUESTION.sentences 的 {bN})
+const SENT = QUESTION.sentences.map((t) => [...t.matchAll(/\{(b\d)\}/g)].map((m) => m[1]));
+const SENT_OF = Object.fromEntries(SENT.flatMap((bs, i) => bs.map((b) => [b, i])));
+const NUM = ['一', '二', '三', '四'];
+const PER_REST = { easy: 2, normal: 1, hard: 1, nightmare: 1 }; // 一次招魂燈熄可以擲幾次(N5:擲筊是休息的節拍,也不能一直試)
+// 聖筊才聽得到的:阿嬤的一句真話(每一句一個;只有你知道)
+const TRUTH = [
+  '她睡著的時候，手指會跟著收音機打拍子。',
+  '針扎到的時候，阿嬤沒有叫。\n……怕吵醒她。',
+  '第十四晚，後巷有人在喊阿嬤。\n……阿嬤有聽到。',
+];
+// 聖筊才拿得到的卡:三句都對,相框往前倒了一下,背面夾著一張紙(後記憶:媽媽寫給阿嬤的)
+const SHENG_CARD = { id: 'hs.01', title: '相框背面', src: 'photo', words: [], sup: [], sheng: true,
+  text: '三次聖筊之後，相框往前倒了一下。背面夾著一張摺起來的紙，是淑芬（你的媽媽）的字：\n「阿母：阿孫四歲了。他還是每天晚上都要去後巷，看二樓那扇窗。我跟他說，燈亮著，就是阿嬤還在。——淑芬　2004」' };
+if (!CARD[SHENG_CARD.id]) CARD[SHENG_CARD.id] = SHENG_CARD;
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } };
 const _v3 = new THREE.Vector3();
 
 export function installDeduce(game) {
   const all = load();
-  const blank = () => ({ cards: [], words: [], fill: {}, solved: false, last: null, throws: 0, fresh: [] });
+  const blank = () => ({ cards: [], words: [], fill: {}, solved: false, last: null, throws: 0, fresh: [], ok: [] });
   const S = () => (all[MAP] ||= blank());
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* 無痕模式 */ } };
   const subs = new Map();
   const emit = (ev, d) => { for (const fn of subs.get(ev) || []) { try { fn(d); } catch (e) { console.warn('[deduce]', ev, e); } } };
   const ix = () => game.interact;
   const H = () => game.horror;
-  const run = { shops: 0, k1: false, k2: false, w02: false, tq: null, tqLate: false, tqAt: 0, look: new Map(), memT: 0, opened207: false, xl: false, got: new Set() };
+  const run = { shops: 0, k1: false, k2: false, w02: false, tq: null, tqLate: false, tqAt: 0, look: new Map(), memT: 0, opened207: false, xl: false, got: new Set(), restThrows: 0, wasFight: false };
+  const diff = () => { try { return new URLSearchParams(location.search).get('diff') || settings.get?.('difficulty') || 'normal'; } catch { return 'normal'; } };
+  const sentOK = (i) => !!S().solved || !!S().ok?.[i];
+  const silentNow = () => game.phase !== 'fighting';
 
   const D = {
     q: QUESTION, map: MAP,
@@ -64,9 +86,10 @@ export function installDeduce(game) {
     fill(b, w) {
       const B = QUESTION.blanks[b], s = S();
       if (!B || s.solved) return false;
-      if (w == null) { delete s.fill[b]; save(); emit('fill', { b, w: null }); return true; }
+      if (w == null) { if (sentOK(SENT_OF[b])) return false; delete s.fill[b]; save(); emit('fill', { b, w: null }); return true; }
+      if (sentOK(SENT_OF[b])) return false; // 聖筊過的那一句鎖住了
       if (!WORDS[w] || WORDS[w].cat !== B.cat || !s.words.includes(w)) return false;
-      for (const [k, v] of Object.entries(s.fill)) if (v === w && k !== b) delete s.fill[k]; // 同一個詞只能放一格
+      for (const [k, v] of Object.entries(s.fill)) if (v === w && k !== b) { if (sentOK(SENT_OF[k])) return false; delete s.fill[k]; } // 同一個詞只能放一格(鎖住的那一格不讓)
       s.fill[b] = w;
       if (D.hintBlank === b) D.hintBlank = null;
       save();
@@ -75,38 +98,65 @@ export function installDeduce(game) {
     },
     clear(b) { return D.fill(b, null); },
     filled() { return Object.keys(QUESTION.blanks).filter((b) => S().fill[b]).length; },
-    ready() { return D.filled() === QUESTION.m; },
+    allFilled() { return D.filled() === QUESTION.m; },
+    SENT, NUM,
+    sentences() { const f = S().fill; return SENT.map((bs, i) => ({ i, blanks: bs, filled: bs.every((b) => f[b]), ok: sentOK(i) })); },
+    next() { const f = S().fill; return S().solved ? -1 : SENT.findIndex((bs, i) => !sentOK(i) && bs.every((b) => f[b])); },
+    okCount() { return SENT.filter((_, i) => sentOK(i)).length; },
+    ready() { return D.next() >= 0; },
+    perRest() { return PER_REST[diff()] ?? 1; },
+    left() { return silentNow() ? Math.max(0, D.perRest() - run.restThrows) : 0; },
+    canThrow() { return !D.solved() && D.ready() && D.left() > 0; },
     score() { const s = S(); let n = 0; for (const [b, B] of Object.entries(QUESTION.blanks)) if (s.fill[b] === B.answer) n++; return { n, m: QUESTION.m }; },
     solved() { return !!S().solved; },
-    // 擲筊:回傳結果(動畫與台詞由遺照那邊播);沒有懲罰
+    // 擲筊:一次問一句(下一句可以問的),回傳結果(動畫與台詞由遺照那邊播);沒有懲罰,只是這次燈熄不能再問
     throw() {
-      if (!D.ready()) return null;
-      const { n, m } = D.score(), s = S();
-      const result = s.solved ? 'sheng' : THROW.judge(n, m);
-      s.throws++;
-      s.last = { result, n, m, t: Date.now() };
+      if (!D.canThrow()) return null;
+      const i = D.next(), s = S(), bs = SENT[i];
+      const n = bs.filter((b) => s.fill[b] === QUESTION.blanks[b].answer).length, m = bs.length;
+      const result = THROW.judge(n, m); // 全對 = 聖筊;錯一格 = 笑筊;錯兩格以上 = 陰筊
+      run.restThrows++; s.throws++;
+      s.last = { result, n, m, i, t: Date.now() };
       save();
       emit('throw', s.last);
-      return { result, n, m };
+      return { result, n, m, i };
+    },
+    // 擲筊的結果怎麼說(不說是哪一格)
+    say(r) {
+      const k = Number.isInteger(r?.i) ? `第${NUM[r.i]}句` : '這一句';
+      return r.result === 'sheng' ? `${k}，對了。` : r.result === 'xiao' ? `${k}，有一格不對。` : `${k}，不太對。`;
     },
     // 擲筊動畫播完:公布結果、聖筊的獎勵
     resolve(r, pos) {
       if (!r) return;
-      const nm = THROW.name[r.result], txt = THROW.text[r.result].replace('{n}', r.n).replace('{m}', r.m);
+      const nm = THROW.name[r.result], txt = `${nm}——${D.say(r)}`;
       const silent = !!H()?.director?.silent;
       if (r.result === 'sheng') {
-        const s = S(), first = !s.solved;
-        s.solved = true; save();
-        game.ui?.banner?.(nm, '對了。……阿孫，你好聰明。', 4200, 'gold');
-        if (silent) seq(game, [['ama', '對了。……阿孫，你好聰明。', undefined, { ear: 'both', many: true }]]); // 排隊
+        const s = S(), first = !s.solved, i = Number.isInteger(r.i) ? r.i : -1;
+        if (i >= 0) { (s.ok ||= [])[i] = true; }
+        const all = SENT.every((_, k) => sentOK(k));
+        if (all) s.solved = true;
+        save();
+        game.ui?.banner?.(nm, all ? '三句都對了。……阿孫，你好聰明。' : D.say(r), 4200, 'gold');
+        game.ui?.feed?.(txt, { color: '#e3c98a', ms: 6000 });
+        // 聖筊才聽得到的:阿嬤的一句真話(鍵盤密碼給不了);三句都對了,再加一句誇你
+        const L = [];
+        if (i >= 0 && TRUTH[i]) L.push(['ama', '對了。', undefined, { ear: 'both', many: true, gap: 1.4 }], ['ama', TRUTH[i], undefined, { ear: 'both', many: true, noSignal: true, gap: 1.2 }]);
+        if (all) L.push(['ama', '……阿孫，你好聰明。', undefined, { ear: 'both', many: true, noSignal: true }]);
+        if (L.length && (silent || silentNow())) seq(game, L); // 排隊
+        if (i >= 0) { ix()?.flags?.set?.(`h.q.s${i}`, true); emit('sentence', { i }); }
         try { sfx.folk('bell', pos); } catch { /* 還沒烘焙好 */ }
-        ix()?.flags?.set?.('h.q.solved', true);
-        ix()?.flags?.set?.('meta.deduce.hospital.solved', true);
-        if (first) emit('solved', r);
-        ix()?.after?.(2.2, () => unlock207(true));
+        if (all) {
+          ix()?.flags?.set?.('h.q.solved', true);
+          ix()?.flags?.set?.('meta.deduce.hospital.solved', true);
+          if (first) emit('solved', r);
+          ix()?.after?.(2.2, () => unlock207(true));
+          // 聖筊才拿得到的卡:相框往前倒了一下,背面夾著一張紙
+          ix()?.after?.(9, () => { game.ui?.feed?.('阿嬤的相框往前倒了一下。背面，夾著一張摺起來的紙。', { color: '#e3c98a', ms: 6500 }); D.addCard(SHENG_CARD.id, { by: 'sheng' }); });
+        }
       } else {
-        game.ui?.banner?.(nm, txt.replace(/^.筊。/, ''), 3800, '');
-        game.ui?.feed?.(txt, { color: '#cfc6b0', ms: 6000 });
+        game.ui?.banner?.(nm, D.say(r), 3800, '');
+        game.ui?.feed?.(`${txt}改好了，下一次招魂燈熄再來問。`, { color: '#cfc6b0', ms: 6000 });
         if (silent && pos) { // 阿嬤不說話:推車輪子聲慢慢走遠
           const q = { x: pos.x, y: pos.y, z: pos.z }, pp = game.player.pos, dx = q.x - pp.x, dz = q.z - pp.z, dl = Math.hypot(dx, dz) || 1;
           try { ghost.cart(q, 5); } catch { /* 略 */ }
@@ -129,6 +179,7 @@ export function installDeduce(game) {
   game.deduce = D;
   game.objectives = Object.assign(game.objectives || {}, { clue: (id, o) => D.addCard(id, o) });
   const book = new Book(game, D);
+  D.redraw = () => { if (book.isOpen) book.draw(); }; // 筆記本開著:重畫(〈到目前為止〉多了一條、問題劃掉)
   const badge = makeBadge(game, D);
   D.noteFlash = () => badge.set(Math.max(1, S().fresh.length), true, '＋筆記'); // 〈到目前為止〉多了一條
   badge.set(S().fresh.length);
@@ -212,7 +263,7 @@ export function installDeduce(game) {
       if (!run.xl) { run.xl = true; X0.after(3, () => talk(TALK.xiaoling, () => D.addCard('hc.25', { by: 'call' }))); }
     });
     X0.on('voicemail', () => X0.after(9, () => D.addCard('hc.18', { by: 'tape' })));
-    X0.on('reset', () => { run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.k3done = run.knew = false; run.kRest = 0; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); });
+    X0.on('reset', () => { run.restThrows = 0; run.wasFight = false; run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.k3done = run.knew = false; run.kRest = 0; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); });
     X0.tick((dt) => { bindNet(); if (game.state === 'playing') update(dt); return true; });
   }
   // ---------- 卡片來源:靈異系統(耳語、頭七) ----------
@@ -234,6 +285,10 @@ export function installDeduce(game) {
     const X = ix(), p = game.player, h = H();
     if (!X || !p) return;
     const silent = !!h?.director?.silent;
+    // 擲筊:每一次招魂燈熄重新算(一次燈熄問一次)
+    const fight = game.phase === 'fighting';
+    if (run.wasFight && !fight) run.restThrows = 0;
+    run.wasFight = fight;
     // 金水伯的對講機(第 2 次以後開店;第二段要先拿到 hc.07/08/09 任一張)
     if (game.phase === 'shop' && run.lastPh !== 'shop') {
       run.shops++;

@@ -19,7 +19,7 @@ const NOTES = [
   ['badge', (c) => c.step() === 'h.s.badge', '門禁卡在大新的夜班組長身上。第 5 波，他會出現。'],
   ['card', (c) => c.inv('card.security'), '拿到門禁卡了。'],
   ['gift', (c) => c.has('h.radio.ama'), '阿嬤把她在護理站聽的收音機留給你了。'],
-  ['quiz', (c) => c.bookOpened, '填空題：封院第 7 晚，207 發生了什麼事？填好了，去阿嬤的照片前擲筊。'],
+  ['quiz', (c) => c.bookOpened, '填空題：封院第 7 晚，207 發生了什麼事？填好一句，就到阿嬤的照片前擲筊問她。一次問一句，招魂燈熄的時候才能問。'],
   ['elock', (c) => c.has('h.207.elock'), '電子鎖開了，可是門是從裡面鎖的。只有阿嬤開得了。'],
   ['touqi', (c) => c.has('h.207.knob'), '頭七那一夜，阿嬤回來了，替你轉開門裡的鎖。她說，她沒有得 SARS。'],
   ['guard', (c) => c.has('h.boss10'), '看守 207 的保全倒下了。'],
@@ -47,7 +47,7 @@ export function installNotes(game, S) {
     run.seen.add(k);
     run.items.unshift({ k, text, t: game.time });
     try { D()?.noteFlash?.(); } catch { /* 略 */ }
-    if (D()?.isOpen) D().open?.();
+    try { D()?.redraw?.(); } catch { /* 略 */ }
     return true;
   }
   const N = S.notes = {
