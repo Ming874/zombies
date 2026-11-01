@@ -10,7 +10,7 @@ import { createAmbush } from '../zombies/ambush.js';
 import { createChase } from '../zombies/chase.js'; // [zombies-w3] 追逐戰
 import { createNoise } from './noise.js'; // [w4] 噪音:出生點偏向最近的大噪音(game.noise)
 import { roundTail } from './roundtail.js'; // [zombies-w3] 回合收尾:卡住/走不到的搬近、最後幾隻獵殺、伏擊預留放回
-import { waveRoster, wavePace, waveKind, hpMul, SPECIAL, restTime, roundBonus, cleanBonus, POINTS, HOW_MUL, streakMul, streakTier, roundScore, saveBest } from './waves.js';
+import { waveRoster, wavePace, waveKind, hpMul, diffOf, COOP, scaleRoster, SPECIAL, restTime, roundBonus, cleanBonus, POINTS, HOW_MUL, streakMul, streakTier, roundScore, saveBest } from './waves.js';
 
 // 回合流程:重開、開始/結束回合、出怪、休息與商店、補給、醫療包、擊殺獎勵、計分、死亡結算。以 mixin 方式掛到 Game 上
 // 難度曲線與計分數值在 src/game/waves.js
@@ -93,8 +93,10 @@ export const flowMethods = {
       const z = spawn.apply(this, a);
       if (z && !z._hpScaled) {
         z._hpScaled = true;
-        const k = hpMul(this.round || 1, z.type);
+        const D = this.diff(), np = this._coopN();
+        const k = hpMul(this.round || 1, z.type) * D.hp * (z.type === 'brute' ? COOP.brute[np] : 1); // [w4 難度] 血量 × 難度(巨屍再 × 合作人數)
         if (k !== 1) { z.maxHp = Math.round(z.maxHp * k); z.hp = z.maxHp; }
+        if (D.speed !== 1 && z.speed) z.speed = Math.min(z.type === 'runner' ? 4.9 : 99, z.speed * D.speed);
       }
       return z;
     };
@@ -188,13 +190,24 @@ export const flowMethods = {
     this.startRound(1);
   },
 
+  // [w4 難度] ?diff= 網址參數 > settings.difficulty > normal(與 story/revive.js、objectives.js 同一個來源)
+  diffId() {
+    let q = null;
+    try { q = new URLSearchParams(location.search).get('diff'); } catch { /* 略 */ }
+    const id = q || settings.get('difficulty') || 'normal';
+    return id === 'black' ? 'nightmare' : id;
+  },
+  diff() { return diffOf(this.diffId()); },
+  _coopN() { return this.net && !this.net.pvp ? Math.max(1, Math.min(4, (this.players || []).filter((p) => p).length || 1)) : 1; },
+
   startRound(n) {
     this.round = n;
-    this.queue = waveRoster(n);
+    const D = this.diff(), np = this._coopN();
+    this.queue = scaleRoster(waveRoster(n), D.count * COOP.count[np]); // 難度 × 合作人數(房主算好名單,coop.js 送給大家)
     this.toSpawn = this.queue.length;
     const P = wavePace(n);
-    this.maxAlive = P.maxAlive;
-    this.spawnEvery = P.interval;
+    this.maxAlive = Math.max(3, Math.min(np > 1 ? COOP.cap : 16, P.maxAlive + D.alive + COOP.alive[np]));
+    this.spawnEvery = P.interval * D.interval;
     this.spawnBurst = P.burst;
     this.spawnTimer = P.delay;
     this._pace = { hot: 0, relax: 0, cool: 12, n: 0, burst: P.burst + 1 }; // [w4 節奏]

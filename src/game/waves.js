@@ -123,6 +123,32 @@ export function hpMul(n, type) {
   return 1 + 0.06 * (n - 4) + 0.01 * Math.max(0, n - 15) ** 2;
 }
 
+// ---------- [w4] 難度(正典:STORY_v2 §4.5「阿嬤叫你幾次」;數值照 RUN_STRUCTURE §3.1)----------
+// count:每波數量 · hp:血量(含巨屍)· speed:移動速度 · dmg:對玩家的傷害 · alive:同場上限加減 · interval:出怪間隔
+// 倒下後阿嬤叫你幾次在 src/story/revive.js(CALLS:easy ∞ / normal 3 / hard 1 / nightmare 0),兩邊用同一個鍵 settings.difficulty
+export const DIFF = {
+  easy: { name: '阿嬤會一直叫你', sub: '倒下幾次都會醒來 · 活屍少、慢、打不痛', count: 0.7, hp: 0.8, speed: 0.9, dmg: 0.7, alive: -2, interval: 1.25 },
+  normal: { name: '阿嬤叫你三遍', sub: '倒下三次之內會醒來', count: 1, hp: 1, speed: 1, dmg: 1, alive: 0, interval: 1 },
+  hard: { name: '阿嬤叫你一遍', sub: '只會醒來一次 · 活屍多、耐打', count: 1.25, hp: 1.15, speed: 1.05, dmg: 1.2, alive: 1, interval: 0.9 },
+  nightmare: { name: '無人叫你', sub: '倒下就結束', count: 1.5, hp: 1.3, speed: 1.1, dmg: 1.4, alive: 2, interval: 0.8 },
+};
+export const DIFF_ORDER = ['easy', 'normal', 'hard', 'nightmare'];
+export const diffOf = (id) => DIFF[id === 'black' ? 'nightmare' : id] || DIFF.normal;
+// 合作的人數修正(RUN §3.2,疊在難度之上):數量、同場上限、巨屍血量;index = 人數
+export const COOP = { count: [1, 1, 1.35, 1.65, 1.9], alive: [0, 0, 2, 3, 4], brute: [1, 1, 1.4, 1.75, 2.1], cap: 18 };
+// 名單依倍率增減(巨屍數不變、放回原本的相對位置;開場前兩隻不動)
+export function scaleRoster(list, k, rand = Math.random) {
+  if (!(Math.abs(k - 1) > 0.01) || list.length < 3) return list;
+  const n = list.length, bpos = [], rest = [];
+  list.forEach((t, i) => (t === 'brute' ? bpos.push(i / n) : rest.push(t)));
+  const want = Math.max(2, Math.round(rest.length * k)), pool = rest.slice(2);
+  const out = rest.slice();
+  while (out.length > want) out.splice(2 + Math.floor(rand() * (out.length - 2)), 1);
+  while (out.length < want) out.splice(2 + Math.floor(rand() * (out.length - 1)), 0, pool.length ? pool[Math.floor(rand() * pool.length)] : 'walker');
+  for (const f of bpos) out.splice(Math.round(f * (out.length + 1)), 0, 'brute');
+  return out;
+}
+
 // ---------- 經濟 ----------
 export const restTime = (next) => (waveKind(next) === 'boss' ? 40 : 30); // 回合間休息秒數(首領回合前多 10 秒準備)
 export const roundBonus = (n) => 20 + 10 * n; // 清場獎勵

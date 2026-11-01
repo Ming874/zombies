@@ -1,6 +1,6 @@
 import './menu.css';
 import { settings } from './settings.js';
-import { loadBest } from '../game/waves.js';
+import { loadBest, DIFF, DIFF_ORDER } from '../game/waves.js';
 import { sfx } from '../audio.js';
 
 // 主選單(標題畫面)、暫停選單、死亡結算、設定/操作說明/製作與授權面板。
@@ -99,6 +99,8 @@ export class Menu {
           <button class="mn-btn primary" id="startBtn">單人<small>撐過一波波活屍 · 查出阿嬤在 207 守著什麼</small></button>
           <button class="mn-btn" data-mode="coop">合作生存<small>2–4 人連線 · 倒地可互相救援</small></button>
           <button class="mn-btn" data-mode="pvp">對戰死鬥<small>2–8 人 · 各自為戰，可加入殭屍騷擾（非正史）</small></button>
+          <div class="mn-row mn-diff" id="menuDiff" role="radiogroup" aria-label="難度"></div>
+          <div class="mn-diffsub" id="menuDiffSub"></div>
           <div id="menuModes"></div>
           <div class="mn-row">
             <button class="mn-mini" data-p="settings">設定</button>
@@ -122,6 +124,7 @@ export class Menu {
     this.miniRow = m.querySelector('.mn-row');
     this.stage = $('menuStage'); // 空的演出區(主選單右側中央),之後的抽地圖動畫可以放這裡
     this.showBest();
+    this._diffRow(); // [w4] 難度(存在 settings.difficulty)
     // 回到主選單時更新最佳紀錄
     new MutationObserver(() => { if (m.classList.contains('on')) this.showBest(); }).observe(m, { attributes: true, attributeFilter: ['class'] });
   }
@@ -149,6 +152,21 @@ export class Menu {
     const entry = $('mp-entry');
     if (entry) entry.click();
     else this.ui.hud?.banner?.('多人連線無法使用', '請確認多人伺服器已啟動', 2400, 'red');
+  }
+
+  // [w4] 難度:四個小按鈕(正典名稱),選了就存進設定;下一局開始時生效(單人;合作時數量/血量/節奏用房主的)
+  _diffRow() {
+    const row = $('menuDiff'), sub = $('menuDiffSub');
+    if (!row) return;
+    const paint = () => {
+      const cur = settings.get('difficulty') || 'normal';
+      for (const b of row.children) { const on = b.dataset.d === cur; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }
+      if (sub) sub.textContent = DIFF[cur]?.sub || '';
+    };
+    row.innerHTML = DIFF_ORDER.map((d) => `<button class="mn-mini" role="radio" data-d="${d}">${esc(DIFF[d].name)}</button>`).join('');
+    row.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b) return; e.stopPropagation(); sfx.uiClick(); settings.set('difficulty', b.dataset.d); paint(); });
+    settings.on((k) => { if (!k || k === 'difficulty') paint(); });
+    paint();
   }
 
   showBest() {
