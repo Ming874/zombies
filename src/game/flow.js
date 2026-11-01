@@ -165,6 +165,7 @@ export const flowMethods = {
     this.lastRound = null; // [N6] 上一波的數字(暫停選單)
     this._fxEnd(); // [w4 特殊波] 燈回來、警鈴停
     this.noise?.reset(); // [w4] 換地圖後重新接門的事件
+    this.hospital?.beacon?.set?.(0);
     this.ui.resetRun?.();
     this.ui.setCoins(0, true);
     this.ui.setScore?.(0, true);
@@ -225,6 +226,7 @@ export const flowMethods = {
     this.ui.setRound(n);
     const kind = waveKind(n), sp = SPECIAL[kind];
     this._fxStart(kind); // [w4 特殊波] 停電 / 廣播 / 警鈴
+    this.hospital?.beacon?.set?.(1); // [w4] 屋頂的招魂燈亮起(scene 的 game.hospital.beacon;每個端各自點亮)
     const tail = this.queue.includes('brute') ? ` · 巨屍 ${this.queue.filter((t) => t === 'brute').length}` : '';
     const total = this.toSpawn;
     // [motion] 橫幅、聲音、邊緣紅光同一幀;開場演出中或戰鬥 shader 還沒預熱(先不出怪)時,等到真的開始才亮
@@ -510,6 +512,7 @@ export const flowMethods = {
 
   endRound() {
     this._fxEnd();
+    this.hospital?.beacon?.set?.(0); // [w4] 招魂燈熄
     this.phase = 'collecting';
     this.collectT = 1.4;
     const n = this.round, p = this.player, S = this.stats, R = this.rstats;
