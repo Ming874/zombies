@@ -243,7 +243,7 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
       if (w.bar) {
         w.bar.hp -= 0.25 * k;
         if (R() < 0.6) ixs.doorBash(pos(w), who.type === 'brute');
-        if (w.bar.hp <= 0) { unbar(w, true); setState(w, 'open', { by: who.pos, sound: false, fast: true }); }
+        if (w.bar.hp <= 0) { unbar(w, true); setState(w, 'open', { by: who.pos, sound: false, fast: true }); game.noise?.emit?.(pos(w, 0), 24, 'door'); } // 木板被捶破:很大聲
         continue;
       }
       w.press += 0.25 * k;
@@ -251,6 +251,7 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
         w.press = 0;
         setState(w, 'open', { by: who.pos, fast: true, sound: false });
         (who.type === 'brute' ? ixs.doorBash : ixs.doorOpen)(pos(w), who.type === 'brute' ? true : kindOf(w));
+        if (who.type === 'brute') game.noise?.emit?.(pos(w, 0), 22, 'door'); // 巨屍撞開門
       } else if (R() < 0.35) ixs.doorBash(pos(w), false);
     }
     return true;
