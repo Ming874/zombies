@@ -4,7 +4,7 @@
 //       玩家一直可以動(走開 = 跳過;沒看到 60% 不算看過,之後還會再來);燈只改強度;調色是 post 的 uniform(game.post.uniforms.past)。
 // 資料在 memdata.js;每段給一張筆記本的卡(game.deduce?.addCard / game.objectives?.clue),並記進 h.remember('mem.<id>')。
 import { sfx, ghost } from '../audio.js';
-import { MEMORIES } from './memdata.js';
+import { MEMORIES, MEM_RATE } from './memdata.js';
 import { Apparitions, models } from './ghosts.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -145,7 +145,7 @@ export function createMemories(h) {
     if (b.say) {
       const pa = b.from === 'pa', ph = b.from === 'phone';
       // 回憶裡的話一定要出來(不被劇情的聲音鎖擋掉);講的時候佔住鎖,排隊的劇情句等它講完
-      const r = h.whispers.say(b.say, { priority: 9, force: true, lockOk: true, filter: pa ? 'pa' : ph ? 'phone' : null, pos: pa || ph ? undefined : posOf(run, b.from), tag: pa ? '醫院廣播 · 2003' : b.who || '', style: 'past', mode: 'syllabic' });
+      const r = h.whispers.say(b.say, { priority: 9, force: true, lockOk: true, filter: pa ? 'pa' : ph ? 'phone' : null, pos: pa || ph ? undefined : posOf(run, b.from), tag: pa ? '醫院廣播 · 2003' : b.who || '', style: 'past', mode: 'syllabic', rate: MEM_RATE });
       if (r) game.story?.voice?.claim?.(r.dur, 9, 'memory');
     }
   }
