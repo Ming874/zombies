@@ -28,6 +28,7 @@ import { installRevive } from './revive.js';
 import { installNotes } from './notes.js';
 import { installMoments } from './moments.js';
 import { installLamp } from './lamp.js';
+import { installDays } from './days.js';
 import { voiceLock, seq } from './voice.js';
 import * as THREE from 'three';
 
@@ -318,6 +319,7 @@ export function installObjectives(game) {
   try { installNotes(game, S); } catch (e) { console.warn('[story] notes', e); }
   try { installMoments(game, S); } catch (e) { console.warn('[story] moments', e); }
   try { installLamp(game); } catch (e) { console.warn('[story] lamp', e); }
+  try { installDays(game); } catch (e) { console.warn('[story] days', e); }
   return O;
 }
 
