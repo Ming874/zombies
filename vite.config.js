@@ -12,7 +12,9 @@ const isolation = {
 const NET = process.env.NET_SERVER || 'localhost:8787';
 const proxy = {
   '/ws': { target: `ws://${NET}`, ws: true, changeOrigin: true },
-  '/api': { target: `http://${NET}`, changeOrigin: true },
+  // /api、/auth 保留 Host:Google 登入的重新導向 URI 是開發伺服器的網址;存檔 API 的同源檢查(Origin = Host)才會通過
+  '/api': { target: `http://${NET}`, changeOrigin: false },
+  '/auth': { target: `http://${NET}`, changeOrigin: false }, // Google 登入、登出(server/auth.js)
 };
 
 // ---- Rapier:rapier3d-compat 把 3MB 的 WASM 以 base64 內嵌在 JS(變成 4.3MB、壓縮率差、要在 JS 解碼)。

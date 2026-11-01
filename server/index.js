@@ -14,6 +14,9 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { ISOLATION, json, plain } from './http.js';
+import { handleAuth, googleEnabled } from './auth.js';
+import { flushAll, DATA_DIR } from './store.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(process.env.DIST_DIR || path.join(HERE, '..', 'dist'));
@@ -104,14 +107,7 @@ const MIME = {
 };
 // 文字、glTF 幾何(.bin/.glb)、wasm、未壓縮字型與圖示;已壓縮的圖片/音訊/影片/woff 不再壓
 const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.map', '.txt', '.md', '.xml', '.csv', '.svg', '.gltf', '.glb', '.bin', '.obj', '.wasm', '.webmanifest', '.hdr', '.exr', '.ttf', '.otf', '.ico', '.wav']);
-// 跨來源隔離(SharedArrayBuffer 需要):所有回應都帶;靜態資源另外標示只供同源使用
-const ISOLATION = {
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-  'Cross-Origin-Resource-Policy': 'same-origin',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-};
+// 跨來源隔離標頭(ISOLATION)在 server/http.js:所有回應都帶;靜態資源另外標示只供同源使用
 // 快取策略:Vite 產生的 /assets/*(檔名含雜湊)永久快取;入口檔(index.html、Service Worker、manifest)每次重新驗證;
 // 其他未加雜湊的資源(貼圖、模型、圖示、授權說明)快取 1 天,過期後一週內先用舊的、背景重新驗證(內容雜湊 ETag → 304)
 const CC_IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -200,15 +196,6 @@ function watchDist() {
   } catch { /* 平台不支援遞迴監看 */ }
 }
 
-function plain(res, code, text, extra = {}) {
-  res.writeHead(code, { ...ISOLATION, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...extra });
-  res.end(text);
-}
-function json(res, code, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(code, { ...ISOLATION, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-  res.end(body);
-}
 // If-None-Match 是否符合(忽略 W/ 與 -br/-gz 字尾)
 function etagMatch(header, tag) {
   if (!header) return false;
@@ -652,6 +639,10 @@ const server = http.createServer((req, res) => {
   try {
     const q = req.url.indexOf('?');
     const p = q < 0 ? req.url : req.url.slice(0, q);
+    if (p.length > 1024) return plain(res, 414, 'URI Too Long');
+    if (p.startsWith('/auth/') || p === '/api/me' || p.startsWith('/api/avatar/')) { // 登入(server/auth.js)
+      if (handleAuth(req, res, p, new URLSearchParams(q < 0 ? '' : req.url.slice(q + 1)))) return;
+    }
     if (p === '/healthz') return json(res, 200, { ok: true, uptime: Math.round((now() - stat.started) / 1000), files: files.size, conns: conns.size, rooms: rooms.size });
     if (p === '/api/rooms') return json(res, 200, { rooms: publicRooms() });
     if (p === '/api/stats') {
@@ -662,7 +653,6 @@ const server = http.createServer((req, res) => {
       });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return plain(res, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
-    if (p.length > 1024) return plain(res, 414, 'URI Too Long');
     serveStatic(req, res, p);
   } catch (e) {
     log('[http] 錯誤', e);
@@ -690,6 +680,7 @@ server.on('upgrade', (req, socket, head) => {
 reindex().then(() => {
   server.listen(PORT, HOST, () => {
     log(`[server] http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  ws:/ws  dist=${DIST}${files.size ? '' : '(沒有建置檔,僅提供 WebSocket)'}  [${PROD ? 'production' : 'development'}]`);
+    log(`[server] 資料 ${DATA_DIR} · Google 登入${googleEnabled() ? '已設定' : '未設定(GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)'}${process.env.AUTH_DEV === '1' ? ' · 假登入 /auth/dev 已開啟(AUTH_DEV=1,只供測試)' : ''}`);
     watchDist();
   });
 });
@@ -698,7 +689,9 @@ function shutdown(sig) {
   log(`[server] 收到 ${sig},關閉中…`);
   for (const c of conns) { try { c.send({ t: 'error', code: 'restart', msg: '伺服器重新啟動中,請稍後重新連線' }); c.ws?.close(1001, 'restart'); } catch { /* 忽略 */ } }
   server.close();
+  flushAll(); // 帳號、session、存檔:節流中的變更立刻寫完
   setTimeout(() => process.exit(0), 800).unref();
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('exit', () => flushAll());
 process.on('SIGINT', () => shutdown('SIGINT'));
