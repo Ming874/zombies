@@ -3,7 +3,7 @@ import { TYPES } from '../zombies/types.js';
 import { spawnAffinity } from './waves.js'; // [zombies-w3] 新類型的出生區域偏好
 import { Shop, shopTabs, purchase, modTotal } from '../shop.js';
 import { Pickups, Supplies } from '../pickups.js';
-import { sfx, resume as resumeAudio } from '../audio.js';
+import { sfx, resume as resumeAudio, ix as ixs, ghost } from '../audio.js';
 import { settings } from '../ui/settings.js';
 import { buildInteract } from '../interact/index.js';
 import { createAmbush } from '../zombies/ambush.js';
@@ -21,6 +21,9 @@ const STREAK_GAP = 4; // 連殺:兩次擊殺間隔 4 秒內
 const PACE = { PEAK: 0.62, HOLD: 4, RELAX: [8, 15], COOL: 18, MIN_LEFT: 4 };
 // [w4 反站樁] 同一個點(4m 內)站超過 CAMP_T 秒:先在身後放一個聲音預警,WARN 秒後出生點可以出在身後 14~40m(權重 ×3)
 const CAMP = { R: 4, T: 40, WARN: 2.5 };
+// [w4 特殊波] 停電波:只動燈具的 dim(強度;不新增燈、不動 ov/gate,鬼的閃燈與配電盤照常),這些種類保持亮著
+const DARK_KEEP = new Set(['exit', 'emergency', 'candle', 'fire', 'monitor', 'lamp', 'nightlight', 'street', 'sodium', 'beacon']);
+const DARK_K = 0.06, DARK_ZONE_KEEP = new Set(['f2_ward_207']); // 207 的窗(守燈)不熄
 const BONUS = { head: 0.5, melee: 1 }; // 爆頭 / 近戰額外金幣(基礎金幣倍率)
 const TYPE_NAME = { walker: '（建議，同 menu.js:14）活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -156,6 +159,7 @@ export const flowMethods = {
     this.stats = { kills: 0, headshots: 0, melee: 0, shots: 0, hits: 0, time: 0, streak: 0, bestStreak: 0, lastKill: -99, earned: 0, pickups: 0, byType: {}, score: 0, clean: 0, spent: 0 };
     this.rstats = null; // 本回合統計(startRound 建立)
     this.lastRound = null; // [N6] 上一波的數字(暫停選單)
+    this._fxEnd(); // [w4 特殊波] 燈回來、警鈴停
     this.ui.resetRun?.();
     this.ui.setCoins(0, true);
     this.ui.setScore?.(0, true);
@@ -204,6 +208,7 @@ export const flowMethods = {
     this.rstats = { t0: this.time, kills: S.kills, heads: S.headshots, shots: S.shots, hits: S.hits, score: S.score, earned: S.earned };
     this.ui.setRound(n);
     const kind = waveKind(n), sp = SPECIAL[kind];
+    this._fxStart(kind); // [w4 特殊波] 停電 / 廣播 / 警鈴
     const tail = this.queue.includes('brute') ? ` · 巨屍 ${this.queue.filter((t) => t === 'brute').length}` : '';
     const total = this.toSpawn;
     // [motion] 橫幅、聲音、邊緣紅光同一幀;開場演出中或戰鬥 shader 還沒預熱(先不出怪)時,等到真的開始才亮
@@ -345,6 +350,7 @@ export const flowMethods = {
       const held = this.ambush?.reserved || 0; // [ambush] 預留給虛擬埋伏點的(還沒現身、仍算在 toSpawn 裡)
       const relax = this._updatePace(dt, near, alive, held); // [w4 節奏] 山谷:暫停出怪
       this._updateCamp(dt); // [w4 反站樁]
+      this._fxTick(dt); // [w4 特殊波]
       // 壓力:太久沒有殭屍接近玩家(12m 內)→ 出怪間隔減半、出生點挑近一點、遠處閒晃的殭屍移近(長回合不會冷場);山谷裡不算
       this._calmT = near < 12 || relax ? 0 : (this._calmT || 0) + dt;
       this.spawnTimer -= dt * (this._calmT > 8 ? 2 : 1);
@@ -369,6 +375,59 @@ export const flowMethods = {
       if (now !== prev && now <= 5 && now > 0) sfx.countdown(now);
       if (this.restT <= 0) this.nextRound();
     }
+  },
+
+  // ---------- [w4 特殊波] 每個端都跑(燈與聲音是本機的;多人時客戶端在 'rs' 也會呼叫 startRound),出怪仍由房主決定 ----------
+  _fxStart(kind) {
+    this._fxEnd();
+    if (!kind || kind === 'boss' || kind === 'rush' || kind === 'swarm') return;
+    const fx = (this._fx = { kind, t: 0, lis: new Set(), q: [], dimmed: [], li: -1, liT: 0, pulse: 3 });
+    if (kind === 'dark') { ghost?.breaker?.(this._ear(0, 4)); sfx.pa?.('down'); this._fxDarken(this._liOf(this.player.pos), true); }
+    else if (kind === 'pa') { const st = this.world.start; fx.at = { x: st.x, y: (st.y || 0) + 3.2, z: st.z }; sfx.pa?.('up'); }
+    else if (kind === 'alarm') { const s = this._fxFar(); fx.at = s ? { x: s.x, y: (s.y || 0) + 2.2, z: s.z } : this._ear(0, 20); ixs.alarmStart?.('wave-alarm', fx.at); }
+  },
+  _fxTick(dt) {
+    const fx = this._fx;
+    if (!fx) return;
+    fx.t += dt;
+    if (fx.kind === 'dark') {
+      // 換樓層 3 秒後,那一層也熄(停電跟著你,不能上樓躲);一幀最多熄 6 盞(一盞一盞暗下去)
+      const li = this._liOf(this.player.pos);
+      if (li !== fx.li) { fx.li = li; fx.liT = 0; } else if (!fx.lis.has(li) && (fx.liT += dt) > 3) this._fxDarken(li);
+      for (let k = 0; k < 6 && fx.q.length; k++) { const f = fx.q.pop(); if (f._bo === undefined) { f._bo = f.dim; f.dim = f._bo * DARK_K; fx.dimmed.push(f); } }
+      return;
+    }
+    // 廣播 / 警鈴:每隔幾秒在喇叭或警鈴那裡發出大噪音 → 出生點偏向那裡(src/game/noise.js;追擊照舊全知)
+    if ((fx.pulse -= dt) > 0) return;
+    fx.pulse = fx.kind === 'pa' ? 9 : 6;
+    this.noise?.emit?.(fx.at, fx.kind === 'pa' ? 60 : 50, fx.kind);
+    if (fx.kind === 'pa' && fx.t > 4 && Math.random() < 0.5) sfx.pa?.(Math.random() < 0.5 ? 'up' : 'alert');
+  },
+  _fxEnd() {
+    const fx = this._fx;
+    if (!fx) return;
+    this._fx = null;
+    for (const f of fx.dimmed) if (f._bo !== undefined) { f.dim = f._bo; f._bo = undefined; }
+    if (fx.kind === 'alarm') ixs.alarmStop?.('wave-alarm');
+    if (fx.kind === 'dark' && fx.dimmed.length) ghost?.breaker?.(this._ear(0, 4));
+  },
+  _fxDarken(li, now = false) {
+    const fx = this._fx, F = this.hospital?.lights?.fixtures;
+    if (!fx || !F || li < 0 || fx.lis.has(li)) return;
+    fx.lis.add(li);
+    const p = this.player.pos, list = F.filter((f) => f.li === li && !f.ext && !f.link && !DARK_KEEP.has(f.kind) && !DARK_ZONE_KEEP.has(f.zone?.id) && f._bo === undefined);
+    list.sort((a, b) => ((b.x - p.x) ** 2 + (b.z - p.z) ** 2) - ((a.x - p.x) ** 2 + (a.z - p.z) ** 2)); // pop() 從最近的開始熄
+    fx.q.push(...list);
+    if (!now) ghost?.breaker?.(this._ear(0, 6));
+  },
+  _liOf(pos) { return this.world.layout?.levelOfY ? this.world.layout.levelOfY(pos.y + 0.3) : 0; },
+  _ear(dy, d) { const p = this.player.pos, a = this.player.yaw || 0; return { x: p.x + Math.sin(a) * d, y: p.y + 1.6 + dy, z: p.z + Math.cos(a) * d }; }, // 身後 d 公尺
+  _fxFar() { // 警鈴:同一層、路徑 25~50m 的出生點(看不到的地方響)
+    const p = this.player.pos, li = this._liOf(p), W = this.world;
+    const c = W.spawns.filter((s) => !s.bad && !s.vent && s.level === li && Math.hypot(s.x - p.x, s.z - p.z) > 22);
+    const far = c.filter((s) => { const fd = W.flowDistance?.(s.x, s.y || 0, s.z); return fd > 25 && fd < 50; });
+    const L = far.length ? far : c;
+    return L.length ? L[(Math.random() * L.length) | 0] : null;
   },
 
   // [w4 節奏] 張力:單人/房主本機導演的 tension(唯讀),再和「全隊最近的殭屍距離 + 場上數量」取大(合作時隊友被包圍也算)。
@@ -432,6 +491,7 @@ export const flowMethods = {
   },
 
   endRound() {
+    this._fxEnd();
     this.phase = 'collecting';
     this.collectT = 1.4;
     const n = this.round, p = this.player, S = this.stats, R = this.rstats;

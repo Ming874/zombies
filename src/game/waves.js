@@ -5,7 +5,9 @@
 //   1~4 回合:每回合引入一種新殭屍(行屍 → 狂奔者 → 爬行者 → 膿腫者 + 尖叫者),同場上限低、生成慢,讓玩家熟悉。
 //   6~10 回合:第三波新類型依序登場(手術者 → 束縛病患 → 焦屍 → 潛行者 → 防護衣士兵),之後比例慢慢提高;
 //   各新類型偏好在對應的區域出生(手術室/鍋爐房/太平間/隔離病房…,見 spawnAffinity)。
-//   5、10、15、20… 首領回合:巨屍數 = 回合/5。第 8、13、18… 特殊回合:狂奔之夜 / 膿毒潮 輪流。
+//   5、10、15、20… 首領回合:巨屍數 = 回合/5。
+//   特殊回合([w4] 正典的招牌):第 6 波廣播(封院第 6 天的那一句)、第 8 波停電(那一層樓的燈具調暗、潛行者變多);
+//   之後 13、18、23… 停電 / 狂奔 / 膿毒 輪流,11、16、21… 警鈴 / 廣播 輪流。效果(燈、警鈴、噪音)在 flow.js 的 _fx*。
 //   5 回合起一般殭屍血量 +6%/回合,15 回合後再加速(第 10 回合 ×1.36、第 15 回合 ×1.66、第 20 回合 ×2.21),逼玩家升級武器與改裝。
 //   同場上限 6 → 16(效能預算:16 隻時 game.update < 4ms)、生成間隔 1.9 → 0.6 秒。
 
@@ -14,12 +16,18 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 // ---------- 回合類型 ----------
 export const SPECIAL = {
   boss: { name: '最大的一波', sub: '最老的醒了 · 引他撞牆，再打頭', cls: 'red' },
-  rush: { name: '（建議）跑很快的一波', sub: '剛打第一針的人跑得最快 · 背靠牆角，別被包夾', cls: 'red' },
-  swarm: { name: '（建議）會爆的一波', sub: '悶熱的晚上，脹氣的會出來 · 在遠處引爆膿腫者', cls: 'gold' },
+  dark: { name: '停電的一波', sub: '這層樓的燈熄了，只剩緊急照明 · 潛行的會從暗處來，手電筒別關', cls: 'red' },
+  rush: { name: '跑很快的一波', sub: '剛打第一針的人跑得最快 · 背靠牆角，別被包夾', cls: 'red' },
+  swarm: { name: '會爆的一波', sub: '悶熱的晚上，脹氣的會出來 · 在遠處引爆膿腫者', cls: 'gold' },
+  pa: { name: '廣播的一波', sub: '天花板的喇叭在叫人去大廳 · 牠們會從喇叭那邊過來', cls: 'gold' },
+  alarm: { name: '警鈴的一波', sub: '火警鈴一直響 · 牠們來得又多又急', cls: 'red' },
 };
+const LATE3 = ['dark', 'rush', 'swarm'], LATE2 = ['alarm', 'pa'];
 export function waveKind(n) {
   if (n >= 5 && n % 5 === 0) return 'boss';
-  if (n >= 8 && n % 5 === 3) return ((n - 8) / 5) % 2 === 0 ? 'rush' : 'swarm';
+  if (n === 6) return 'pa'; // 封院第 6 天:「鄭玉蘭護理長，請至一樓大廳。」
+  if (n >= 8 && n % 5 === 3) return LATE3[((n - 8) / 5) % 3]; // 第 8 波 = 停電(正典招牌)
+  if (n >= 11 && n % 5 === 1) return LATE2[((n - 11) / 5) % 2];
   return '';
 }
 
@@ -27,7 +35,8 @@ export function waveKind(n) {
 // 8, 11, 14, 18, 22, 26, 30, 32(狂奔)、40, 45 … 第 15 回合 73、第 20 回合 103
 export function waveCount(n) {
   const base = 5 + 3 * n + Math.floor(Math.min(n, 12) ** 2 / 10) + 3 * Math.max(0, n - 12);
-  return Math.round(base * (waveKind(n) === 'rush' ? 0.9 : 1));
+  const k = waveKind(n);
+  return Math.round(base * (k === 'rush' ? 0.9 : k === 'alarm' ? 1.12 : 1));
 }
 export function waveBrutes(n) {
   if (n < 5) return 0;
@@ -51,12 +60,15 @@ export function waveMix(n) {
   let bloater = n >= 4 ? Math.min(0.14, 0.02 + 0.013 * n) : 0;
   if (k === 'rush') { runner = Math.min(0.6, runner * 2); crawler *= 0.5; }
   else if (k === 'swarm') { bloater = 0.22; crawler = 0.3; runner *= 0.5; }
+  else if (k === 'dark') { runner *= 0.75; crawler *= 1.2; }
   const m = { runner, crawler, bloater };
   for (const t in NEW_MIX) {
     const [from, base, per, max] = NEW_MIX[t];
     let v = n >= from ? Math.min(max, base + per * (n - from)) : 0;
     if (k === 'rush' && (t === 'straitjacket' || t === 'stalker')) v *= 1.5; // 狂奔之夜:衝撞與撲擊型也變多
     if (k === 'swarm' && (t === 'burned' || t === 'surgeon')) v *= 1.3;
+    if (k === 'dark' && t === 'stalker') v = Math.max(v * 2, 0.1); // 停電:潛行者提早出現、比例 ×2
+    if (k === 'alarm' && t === 'screamer') v *= 1.5;
     m[t] = v;
   }
   let sum = 0;
@@ -96,11 +108,11 @@ export function waveRoster(n, rand = Math.random) {
 
 // 生成節奏:同場上限、平均間隔(秒)、開場連續快速生成數、第一隻出現前的延遲
 export function wavePace(n) {
-  const rush = waveKind(n) === 'rush';
+  const k = waveKind(n), rush = k === 'rush', alarm = k === 'alarm';
   return {
-    maxAlive: Math.min(16, 5 + n + (rush ? 2 : 0)),
-    interval: Math.max(0.6, 2.0 - 0.1 * n) * (rush ? 0.75 : 1),
-    burst: Math.min(5, 1 + Math.floor(n / 3)) + (rush ? 1 : 0),
+    maxAlive: Math.min(16, 5 + n + (rush || alarm ? 2 : 0)),
+    interval: Math.max(0.6, 2.0 - 0.1 * n) * (rush ? 0.75 : alarm ? 0.7 : 1),
+    burst: Math.min(5, 1 + Math.floor(n / 3)) + (rush || alarm ? 1 : 0),
     delay: n === 1 ? 4 : 2.5,
   };
 }
