@@ -14,6 +14,8 @@ const M1 = [
   '電話裡是阿嬤：\n「阿孫，你來看阿嬤好不好？」',
 ];
 
+const NOTICE = ['本作人物、醫院、地點與機構皆為虛構。', '（內容涉及疫病、死亡與醫院場景）'];
+
 export function installMoments(game, S) {
   const X = game.interact, H = () => game.horror, D = () => game.deduce, O = () => game.objectives;
   const isHost = () => !game.net || !!game.net.isHost;
@@ -37,6 +39,10 @@ export function installMoments(game, S) {
       const skip = (e) => { if (e.type === 'keydown' && (e.repeat || !/^(Space|Enter|NumpadEnter|Escape)$/.test(e.code))) return; skipped = true; cur?.skip?.(); };
       addEventListener('keydown', skip, true); addEventListener('mousedown', skip, true);
       try {
+        // 虛構聲明(HISTORY §8 第 11 條、H4):一張短短的卡,在電話響之前
+        cur = M.card({ lines: NOTICE, hold: 2.2, fadeIn: 500, fadeOut: 400, align: 'center' });
+        await cur;
+        if (skipped) return;
         try { ixs.ringStart?.('m1.ring', null, 'bell'); } catch { /* 略 */ }
         await new Promise((r) => setTimeout(r, 2400));
         try { ixs.ringStop?.('m1.ring'); } catch { /* 略 */ }

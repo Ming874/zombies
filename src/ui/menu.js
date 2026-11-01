@@ -11,7 +11,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const HEART = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M16 27.5S4.5 20 4.5 12.3C4.5 8.6 7.3 6 10.6 6c2.3 0 4.3 1.3 5.4 3.2C17.1 7.3 19.1 6 21.4 6c3.3 0 6.1 2.6 6.1 6.3C27.5 20 16 27.5 16 27.5z"/><path fill="currentColor" d="M15 1.5h2v4h3v2h-3v5h-2v-5h-3v-2h3z"/><path fill="none" stroke="currentColor" stroke-width="1.2" opacity=".7" d="M11 13.5c1.5 2.5 3 3.5 5 3.5s3.5-1 5-3.5"/></svg>';
 const pct = (v) => `${Math.round(v * 100)}%`;
 const TYPE_ORDER = ['walker', 'runner', 'crawler', 'bloater', 'brute'];
-const TYPE_NAMES = { walker: '（建議）活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
+const TYPE_NAMES = { walker: '活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
 const PRESET_NAME = { low: '低', medium: '中', high: '高', ultra: '極致' };
 // [類型, 鍵, 標籤, …]:range(min, max, step, 格式, 說明)/ toggle(說明)/ seg(選項, 說明)/ btn(按鈕文字, 說明)
 const SETTINGS = [
@@ -54,7 +54,7 @@ const TIPS = [
   '<b>膿腫者</b>死亡會爆炸並留下毒氣；<b>巨屍</b>咆哮後會衝鋒，引他撞牆再打頭。',
   '聲音是你最好的朋友：戴上耳機，注意腳步、低吼與遠方的動靜。',
   '<b>筆記本（J）</b>：線索會自己記下來，「到目前為止」那一頁寫著你知道的事。把詞填進句子，到阿嬤的照片前<b>擲筊</b>（丟兩片筊杯問阿嬤）：聖筊＝全對；笑筊、陰筊會告訴你對了幾個。',
-  '<b>鬼月禁忌</b>：晚上不要吹口哨、有人叫你名字不要回頭、路邊的紅包不要撿、被拍肩膀不要轉頭。',
+  '<b>鬼月禁忌</b>：阿嬤說過，七月有人叫你的名字，不要回頭。',
 ];
 const keyGrid = (list, cls = '') => `<div class="mn-keys ${cls}">${list.map(([k, t]) => `<div><kbd>${esc(k)}</kbd><span>${esc(t)}</span></div>`).join('')}</div>`;
 

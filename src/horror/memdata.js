@@ -13,7 +13,7 @@
 //                 { t, fx 'pa'|'phone'|'clip'|'scrawl'|'knock'|'steps'|'squeak'|'shutter'|'water'|'lightsOut'|'struggle' , from } | { t, card: true }
 // 語言：2003 年的人都說國語，每句最多一個調味台語詞；廣播與大新的人說制式國語（CLARITY_PLAN §5）。尊重原則(STORY_v2 §10):醫護是守在裡面的人;不描繪真實人物;沒有兒童死亡。
 export const MEMORIES = [
-  { id: 'm.lockdown', title: '封院', when: '2003/4/29 12:00(封院第 1 天)', where: '1F 大廳', who: '院內的人、阿嬤', why: '一切的開始:衛生局公告封院十四日',
+  { id: 'm.lockdown', title: '封院', when: '封院第 1 天 12:00', where: '1F 大廳', who: '院內的人、阿嬤', why: '一切的開始:衛生局公告封院十四日',
     zone: 'f1_lobby', r: 7, bed: 'lobby', dur: 17, card: 'hc.01', gate: { act: 1 },
     cast: [
       { id: 'a', fig: 'man', pose: 'stand', at: [3, -1.6], face: 'e+' }, { id: 'b', fig: 'patient', pose: 'stand', at: [3.6, 0.4], face: 'e+' },
@@ -26,7 +26,7 @@ export const MEMORIES = [
       { t: 10.2, say: '我太太還在外面等我……', who: '家屬', from: 'w' },
       { t: 13.0, say: '先生，先坐。我們會陪著你。', who: '護理長', from: 'n' },
     ] },
-  { id: 'm.temp', title: '量體溫', when: '2003/5/3(封院第 5 天)', where: '2F 護理站', who: '阿嬤、排隊的病人與家屬', why: '封院期間一天量兩次體溫;值班日記 5/3 那一行就是這樣寫的',
+  { id: 'm.temp', title: '量體溫', when: '封院第 5 天', where: '2F 護理站', who: '阿嬤、排隊的病人與家屬', why: '封院期間一天量兩次體溫;值班日記第 5 天那一行就是這樣寫的',
     zone: 'f2_corridor', cell: [39, 15], r: 6, bed: 'ward', dur: 18, card: 'hc.07', gate: { act: 1 },
     cast: [
       { id: 'n', fig: 'nurse', pose: 'stand', at: [1.6, 0], face: 'e-' },
@@ -39,9 +39,9 @@ export const MEMORIES = [
       { t: 1.4, say: '下一位。……耳朵借我一下。', who: '護理長', from: 'n' },
       { t: 5.0, say: '三十六度五，好。', who: '林護理長', from: 'n' },
       { t: 8.0, say: '一天量兩次，早晚都要量，不要忘記。', who: '護理長', from: 'n' },
-      { t: 12.0, fx: 'clip', from: 'n' }, { t: 12.6, say: '5 月 3 號，全部的人量兩次體溫。207，正常。', who: '護理長', from: 'n', pace: true },
+      { t: 12.0, fx: 'clip', from: 'n' }, { t: 12.6, say: '封院第五天，全部的人量兩次體溫。\n207，正常。', who: '護理長', from: 'n', pace: true },
     ] },
-  { id: 'm.gossip', title: '護理站的閒話', when: '2003/5/3 深夜', where: '2F 護理站', who: '兩位護理師、阿嬤', why: '閒話本上的話(錯的推論「王醫師的親人」也從這裡來);阿嬤交代晚上不要下樓',
+  { id: 'm.gossip', title: '護理站的閒話', when: '封院第 5 天深夜', where: '2F 護理站', who: '兩位護理師、阿嬤', why: '閒話本上的話(錯的推論「王醫師的親人」也從這裡來);阿嬤交代晚上不要下樓',
     zone: 'f2_corridor', cell: [39, 17], r: 5, bed: 'night', dur: 16, card: 'hc.11', gate: { act: 1 },
     cast: [
       { id: 'a', fig: 'nurse', pose: 'stand', at: [0.8, -0.6], face: 'v+' }, { id: 'b', fig: 'nurse', pose: 'stand', at: [0.8, 0.6], face: 'v-' },
@@ -53,7 +53,7 @@ export const MEMORIES = [
       { t: 9.4, say: '好了，不要講了。', who: '護理長', from: 'n' },
       { t: 11.6, say: '晚上不管廣播叫誰，都不要下樓。', who: '護理長', from: 'n' },
     ] },
-  { id: 'm.dock', title: '鐵網邊', when: '2003/5/2 夜(封院第 4 天)', where: 'B1 裝卸平台', who: '金水伯、阿嬤', why: '金水伯每晚隔著鐵網送便當;他說起九二一揹下山的女孩(阿嬤想起 207 的無名氏也是九二一送來的)',
+  { id: 'm.dock', title: '鐵網邊', when: '封院第 4 天夜', where: 'B1 裝卸平台', who: '金水伯、阿嬤', why: '金水伯每晚隔著鐵網送便當;他說起九二一揹下山的女孩(阿嬤想起 207 的無名氏也是九二一送來的)',
     zone: 'b1_dock', r: 7, bed: 'dock', dur: 21, card: 'hc.14', gate: { act: 1 },
     cast: [
       { id: 'k', fig: 'man', pose: 'stand', at: [2.6, 0], face: 'e-' },
@@ -66,7 +66,7 @@ export const MEMORIES = [
       { t: 11.4, say: '交給王醫師。他說，送到醫院就已經沒救了。', who: '金水伯', from: 'k' },
       { t: 16.0, say: '……207 那個沒有名字的病人，也是 921 送來的。', who: '護理長', from: 'n', pace: true },
     ] },
-  { id: 'm.pa', title: '廣播', when: '2003/5/4 22:10(封院第 6 天)', where: '1F 大廳北口的柱子', who: '阿嬤', why: '廣播把她叫下樓,大廳沒有人;她在柱子上寫下「不要相信廣播」',
+  { id: 'm.pa', title: '廣播', when: '封院第 6 天 22:10', where: '1F 大廳北口的柱子', who: '阿嬤', why: '廣播把她叫下樓,大廳沒有人;她在柱子上寫下「不要相信廣播」',
     zone: 'f1_lobby', cell: [25, 27], r: 6, bed: 'night', dur: 19, card: 'hc.02', gate: { act: 2, any: ['hc.03', 'hc.04', 'h.where207'] },
     cast: [
       { id: 'n', fig: 'nurse', pose: 'stand', at: [-6, 0.6], path: [[-1.6, 0.6], [-0.9, 0.2]], speed: 1.5, t: 3.2, face: 'e+' },
@@ -78,7 +78,7 @@ export const MEMORIES = [
       { t: 11.2, say: '……沒有人。', who: '護理長', from: 'n', pace: true },
       { t: 13.3, fx: 'scrawl', from: 'w' }, { t: 14.0, say: '……不要相信廣播。', who: '護理長', from: 'w' },
     ] },
-  { id: 'm.3f', title: '三樓的門', when: '2003/5/4(封院第 6 天)', where: '3F 東樓梯口', who: '阿嬤、大新的研究員', why: '阿嬤上樓問三樓六個病人的事,大新不予回答(大新專案 3F 觀察紀錄 5/4)',
+  { id: 'm.3f', title: '三樓的門', when: '封院第 6 天', where: '3F 東樓梯口', who: '阿嬤、大新的研究員', why: '阿嬤上樓問三樓六個病人的事,大新不予回答(大新專案 3F 觀察紀錄第 6 天)',
     zone: 'f3_stair_e', r: 6, bed: 'night', dur: 17, card: 'hc.43', gate: { act: 2 },
     cast: [
       { id: 'm', fig: 'man', pose: 'stand', at: [1.4, 0], face: 'e-' },
@@ -91,7 +91,7 @@ export const MEMORIES = [
       { t: 10.4, say: '護理長，這是大新的專案。請回二樓。', who: '大新', from: 'm' },
       { t: 14.0, say: '……醫生不是這樣做的。', who: '護理長', from: 'n', pace: true },
     ] },
-  { id: 'm.day7', title: '第七晚', when: '2003/5/5 23:40–23:52(封院第 7 天)', where: '2F 北走廊,207 門口', who: '阿嬤、王醫師', why: '推理題的那一夜:廣播又叫她下樓,她沒去;燈被切斷,王醫師拿著採血針走進 207;她開了檯燈,擋在床前',
+  { id: 'm.day7', title: '第七晚', when: '封院第 7 天 23:40–23:52', where: '2F 北走廊,207 門口', who: '阿嬤、王醫師', why: '推理題的那一夜:廣播又叫她下樓,她沒去;燈被切斷,王醫師拿著採血針走進 207;她開了檯燈,擋在床前',
     zone: 'f2_corridor', cell: [37, 12], side: [37, 11], r: 6, bed: 'night', dur: 22, card: 'hc.38', gate: { act: 3, any: ['hc.03', 'hc.04', 'hc.05', 'hc.27', 'h.ev.ho'] },
     cast: [
       { id: 'n', fig: 'nurse', pose: 'stand', at: [-1.8, 0.4], face: 'v+', end: 9.6 },
@@ -108,7 +108,7 @@ export const MEMORIES = [
       { t: 16.4, fx: 'struggle' },
       { t: 18.6, say: '……你會後悔的。', who: '王醫師', from: 'h2' },
     ] },
-  { id: 'm.needle', title: '那支針', when: '2003/5/5 23:52', where: '2F 護理站', who: '阿嬤', why: '針扎在左手背;她寫了針扎通報單,沒有交出去',
+  { id: 'm.needle', title: '那支針', when: '封院第 7 天 23:52', where: '2F 護理站', who: '阿嬤', why: '針扎在左手背;她寫了針扎通報單,沒有交出去',
     zone: 'f2_corridor', cell: [39, 16], r: 5, bed: 'night', lights: 'keep', dur: 15, card: 'hc.12', gate: { act: 3, after: 'm.day7' },
     cast: [{ id: 'n', fig: 'nurse', pose: 'tilt', at: [0.6, 0], face: 'e-' }],
     beats: [
@@ -117,7 +117,7 @@ export const MEMORIES = [
       { t: 6.0, fx: 'clip', from: 'n' }, { t: 6.6, say: '這張單子……先不要交。', who: '護理長', from: 'n' },
       { t: 9.4, say: '交出去，他們就會來開門。', who: '護理長', from: 'n' },
     ] },
-  { id: 'm.lock', title: '不要開門', when: '2003/5/5 23:55', where: '207 門口', who: '阿嬤', why: '她走進 207,從裡面反鎖,用口紅在門玻璃上反著寫「莫開門」;從這一夜起,207 的燈沒有再關',
+  { id: 'm.lock', title: '不要開門', when: '封院第 7 天 23:55', where: '207 門口', who: '阿嬤', why: '她走進 207,從裡面反鎖,用口紅在門玻璃上反著寫「莫開門」;從這一夜起,207 的燈沒有再關',
     zone: 'f2_corridor', cell: [37, 12], side: [37, 11], r: 5.5, bed: 'night', lights: 'keep', dur: 16, card: 'hc.15', gate: { act: 3, after: 'm.needle' },
     cast: [
       { id: 'n', fig: 'nurse', pose: 'stand', at: [-4, 0], path: [[-0.3, 0.4], [0, 0.9]], speed: 1.0, end: 6.4, face: 'e+' },
@@ -128,7 +128,7 @@ export const MEMORIES = [
       { t: 7.0, fx: 'squeak', from: 'w' }, { t: 7.6, say: '不要……開……門。', who: '護理長', from: 'w', pace: true },
       { t: 12.6, fx: 'knock', from: 'w' },
     ] },
-  { id: 'm.window', title: '後巷的燈', when: '2003/5/8 夜(封院第 10 天)', where: '2F 北側的窗', who: '阿嬤、女兒、三歲的你、金水伯', why: '家人每晚在後巷看二樓的燈;記者在鐵網外拍下她舉著紙的照片(遺照)',
+  { id: 'm.window', title: '後巷的燈', when: '封院第 10 天夜', where: '2F 北側的窗', who: '阿嬤、女兒、三歲的你、金水伯', why: '家人每晚在後巷看二樓的燈;記者在鐵網外拍下她舉著紙的照片(遺照)',
     zone: 'f2_corridor', win: [37, 9], r: 5, bed: 'night', lights: 'keep', dur: 18, card: 'hc.13', gate: { act: 2 },
     cast: [
       { id: 'n', fig: 'nurse', pose: 'reach', at: [-0.6, 0], face: 'e+' },
@@ -151,7 +151,7 @@ export const MEMORIES = [
       { t: 6.4, say: '乖孫，一晚長大一寸。', who: '護理長', from: 'n' },
       { t: 10.0, say: '阿嬤還要顧病人。……你先睡。', who: '護理長', from: 'n' },
     ] },
-  { id: 'm.letter', title: '寫給淑芬的信', when: '2003/5/3(封院第 5 天)', where: '3F 宿舍', who: '阿嬤', why: '封院頭幾天護理人員輪流睡在三樓宿舍;她寫信給女兒(你的媽媽)',
+  { id: 'm.letter', title: '寫給淑芬的信', when: '封院第 5 天', where: '3F 宿舍', who: '阿嬤', why: '封院頭幾天護理人員輪流睡在三樓宿舍;她寫信給女兒(你的媽媽)',
     zone: 'f3_dorm', r: 6, bed: 'night', dur: 19, card: 'hc.42', gate: { act: 1 },
     cast: [{ id: 'n', fig: 'nurse', pose: 'tilt', at: [1.2, 0.6], face: 'e-' }],
     beats: [
@@ -160,5 +160,20 @@ export const MEMORIES = [
       { t: 5.6, say: '晚上帶阿孫來後巷，\n看二樓那排窗，數過來第七個。', who: '護理長', from: 'n' },
       { t: 10.8, say: '燈亮著，就是我還在。', who: '護理長', from: 'n' },
       { t: 13.8, say: '阿孫如果哭，就跟他說：數到十，天就亮了。', who: '護理長', from: 'n', pace: true },
+    ] },
+  { id: 'm.ward3', title: '3 號的電話', when: '封院第 8 天 夜', where: '3F 隔離房 3 門口', who: '阿嬤、三樓的 3 號、他的女兒(電話)', why: '歷史層的「其他人」:三樓試藥的病人也有家人在外面等。阿嬤拿著話筒讓 3 號跟女兒講電話;第 9 天他走了(hc.43)。尊重:虛構的人;死因不是 SARS(HISTORY H20)',
+    zone: 'f3_corridor', cell: [25, 12], side: [25, 10], r: 5.5, bed: 'night', dur: 24, card: 'hc.44', gate: { act: 2, any: ['h.area.3f', 'hc.43', 'hc.06'] },
+    cast: [
+      { id: 'p', fig: 'patient', pose: 'tilt', at: [0, 0.9], face: 'v-' },
+      { id: 'n', fig: 'nurse', pose: 'reach', at: [0.6, 0.2], face: 'v+' },
+    ],
+    beats: [
+      { t: 0.8, fx: 'phone', from: 'n' },
+      { t: 2.4, say: '3 號，你女兒打來的。', who: '護理長', from: 'n' },
+      { t: 5.2, say: '爸，是我。你有沒有好好吃飯？', who: '女兒（電話）', from: 'phone' },
+      { t: 9.0, say: '有啦。護理長每天都盯著我。', who: '3 號', from: 'p' },
+      { t: 12.6, say: '他們說三樓不能探病……', who: '女兒（電話）', from: 'phone' },
+      { t: 16.0, say: '封院一結束，我第一個來接你。', who: '女兒（電話）', from: 'phone' },
+      { t: 20.0, say: '好。……跟阿孫說，阿公很快就回家。', who: '3 號', from: 'p', pace: true },
     ] },
 ];

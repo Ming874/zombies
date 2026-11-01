@@ -24,7 +24,7 @@ const ONE = {
   dark: '燈熄了。不是她關的。',
   normal: '每天晚上都亮著。二十三年了。',
 };
-const PAGE = ['5/12　封院第 14 天。燒退一點。左手腫。', '207 今天眼睛有動。我跟她說：燈我會顧，等你自己醒來，自己關。', '如果我走了，告訴淑芬：我不是 SARS。是針。'];
+const PAGE = ['封院第 14 天。燒退一點。左手腫。', '207 今天眼睛有動。我跟她說：燈我會顧，等你自己醒來，自己關。', '如果我走了，告訴淑芬：我不是 SARS。是針。'];
 const LAST = '告訴阿孫：阿嬤沒有不要回家。';
 const NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
@@ -346,7 +346,7 @@ export function installEnding(game, S) {
     box.className = 'st-photo';
     box.innerHTML = mine
       ? '<div class="stamp">2000 · 聖心醫院 新生兒室</div><div class="hand">床母娘娘，<br>保佑我的孫子。</div><div class="sig">秀英</div>'
-      : '<div class="stamp">霧港日報 · 92 年 5 月 8 日</div><div class="hand">不要怕<br>阿嬤在這裡</div><div class="sig">（剪下來的報紙，背面寫著：阿孫）</div>';
+      : '<div class="stamp">霧港日報 · 2003 · 聖心封院第 10 天</div><div class="hand">不要怕<br>阿嬤在這裡</div><div class="sig">（剪下來的報紙，背面寫著：阿孫）</div>';
     void v;
     return box;
   }
