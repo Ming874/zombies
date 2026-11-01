@@ -169,9 +169,9 @@ export const LINES = [
   // ---- 第三輪(src/horror/haunts.js):劇情 v2 核心(STORY_v2 出來前的對齊版)----
   // 2003 年 SARS 封院十四天;護理長林秀英守了 207 十四暝,燈沒有熄過;玩家是她的孫子,她認得你。921(1999/9/21 01:47)那一晚小美在山上現場直播。
   // 用詞：國語為主，每句最多一個白名單台語詞（阿孫、免驚、乖…）；不用暝／莫／細漢／目睭（CLARITY_PLAN §5）。由 STORY3 表指定播放(trig 'story3'),不進隨機池。
-  { id: 's3.swing', text: '那盞燈……阿嬤守了十四個晚上。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '2003 封院十四天,她守著 207,燈一次都沒熄(「207 的燈」傳說的由來)', when: '2003 封院期間', trig: 'story3', ear: 'right' },
+  { id: 's3.swing', text: '那盞燈……阿嬤顧了十四個晚上。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '2003 封院十四天,她守著 207,燈一次都沒熄(「207 的燈」傳說的由來)', when: '2003 封院期間', trig: 'story3', ear: 'right' },
   { id: 's3.follow', text: '燈，阿嬤幫你開著。\n往前走，不要回頭。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她認得你;你一回頭,她就把背後的燈都開回來', when: '現在', trig: 'story3', ear: 'behind' },
-  { id: 's3.bed', text: '第七晚，廣播又叫阿嬤下樓。\n……阿嬤沒有去。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題「封院第 7 天,207 號房發生了什麼事」:護理長答應大家第七天', when: '2003 封院第一週', trig: 'story3', ear: 'left' },
+  { id: 's3.bed', text: '第七晚，廣播又叫阿嬤下樓……\n阿嬤沒有去。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題「封院第 7 天,207 號房發生了什麼事」:護理長答應大家第七天', when: '2003 封院第一週', trig: 'story3', ear: 'left' },
   { id: 's3.flat', text: '又一床……他們給他打了那個藥。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '封院的混亂裡,大新生技在其他病人身上試藥;她是發現的人', when: '2003 封院期間', trig: 'story3' },
   { id: 's3.ball', text: '金水伯拿來的球……你小時候最愛玩。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '你是她的孫子:小時候常來醫院等她下班,金水伯會從店裡拿球給你(關於你是誰)', when: '你小時候', trig: 'story3', ear: 'left' },
   { id: 's3.beam', text: '……這邊。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她站的方向就是 207;鬼＝提示,她一直在帶你過去', when: '現在', trig: 'story3' },
@@ -181,7 +181,7 @@ export const LINES = [
   { id: 's3.name.bad', text: '有人叫你的名字……\n不要回頭，知道嗎？', ghost: 'zheng', who: '林秀英(阿嬤)', why: '你回頭了;她把燈開回來', when: '現在', trig: 'story3', ear: 'right' },
   { id: 's3.radio', text: '……現在時間，凌晨 1 點 47 分。\n這裡是山上的現場，我們——', who: '小美(1999/9/21 的現場直播錄音)', why: '921 那一晚 01:47,小美在大新山研究站的塔上直播;研究站倒塌,直播在這一秒中斷(hc.37)', when: '1999/9/21 01:47', trig: 'story3', filter: 'radio' },
   { id: 's3.dark.know', text: '阿孫……你怎麼也進來了？', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她認得你;官方說她死於 SARS,你從來不信', when: '現在', trig: 'story3', ear: 'left' },
-  { id: 's3.dark.day7', text: '封院第 7 晚……燈也是這樣熄掉的。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題:封院第 7 天的晚上,207 那一層停過電', when: '2003 封院第 7 天', trig: 'story3', ear: 'right' },
+  { id: 's3.dark.day7', text: '封院第七晚……燈也是這樣熄的。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題:封院第 7 天的晚上,207 那一層停過電', when: '2003 封院第 7 天', trig: 'story3', ear: 'right' },
   { id: 's3.dark.207', text: '207 的燈不能熄……裡面有人。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '大新把昏迷的小美藏在 207;她守的是裡面那個人', when: '2003 封院期間', trig: 'story3', ear: 'left' },
   { id: 's3.face', text: '不要看窗外……那時候不能開窗。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '封院十四天,窗戶封死;外面的家屬只能隔著玻璃', when: '2003 封院期間', trig: 'story3', ear: 'right' },
   { id: 's3.burst', text: '這間……那時候是隔離病房。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '門自己開了:她讓你進去看(封院時的隔離病房)', when: '2003 封院期間', trig: 'story3' },
@@ -197,7 +197,7 @@ export const LINES = [
   { id: 'h.w.tc4', text: '這樣就沒有人敢開門。', ghost: 'zheng', who: '阿嬤', trig: 'script', ear: 'both' },
   { id: 'h.w.tc2', text: '阿嬤沒有得 SARS。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '頭七:⑥ 的關鍵來源(hc.19);她說了這輩子唯一一個謊', when: '封院第 11 天', trig: 'script', ear: 'both' },
   { id: 'h.w.sheng', text: '對了。……阿孫，你好聰明。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '在她的遺照前擲出聖筊', when: '現在', trig: 'script', ear: 'both' },
-  { id: 'h.w.bm', text: '床母娘娘，保佑我的孫子。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '新生兒室的床母(支線)', when: '2000', trig: 'script', ear: 'both' },
+  { id: 'h.w.bm', text: '床母娘娘，保佑我的乖孫。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '新生兒室的床母(支線)', when: '2000', trig: 'script', ear: 'both' },
 
 ];
 
