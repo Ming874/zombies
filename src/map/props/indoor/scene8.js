@@ -442,13 +442,13 @@ const dryRack = (k) => tpl(`r8:dryrack:${k}`, (b) => {
     x += w + 0.06 + r() * 0.12;
   }
 });
-// 一疊封口的污染布單袋(黃袋 + 紅色膠帶 + 貼紙)
+// 一疊封口的污染布單袋(紅袋 + 黃色膠帶 + 貼紙):送焚化(熱處理)的感染性廢棄物裝紅袋
 const linenBags = (k) => tpl(`r8:linenbags:${k}`, (b) => {
   const r = rnd(k + 41);
   for (let i = 0; i < 7; i++) {
     const row = i < 4 ? 0 : 1, x = (i % 4) * 0.42 - 0.63 + (row ? 0.2 : 0) + (r() - 0.5) * 0.1, z = (r() - 0.5) * 0.25, rr = 0.22 + r() * 0.05;
-    b.raw('po_bag_yellow', bagGeo(rr, k * 57 + i), compose(x, row * 0.28 + rr * 0.5, z, 0, r() * 6, 0, 1.1, 1.0, 1.0));
-    b.box('pl_red', 0.04, 0.05, 0.12, x, row * 0.28 + rr * 1.5, z, { r: 0.01, ry: r() * 3 }); // 紅膠帶封口
+    b.raw('po_bag_red', bagGeo(rr, k * 57 + i), compose(x, row * 0.28 + rr * 0.5, z, 0, r() * 6, 0, 1.1, 1.0, 1.0));
+    b.box('pl_yellow', 0.04, 0.05, 0.12, x, row * 0.28 + rr * 1.5, z, { r: 0.01, ry: r() * 3 }); // 黃膠帶封口
   }
   b.meta.coll = Box([-0.9, 0, -0.32], [0.9, 0.8, 0.32]);
 });
@@ -473,7 +473,7 @@ function laundry(R) {
   const W1 = R.run('W', (r) => r.t0 <= 30 && r.t1 >= 44); // 西牆是一整段(z 28–66)
   if (W1) {
     if (![39.6, 41.2, 36.2, 34.4].some((t) => R.atWall(linenBags(0), W1, t, { gap: 0.04 }))) R.wall(linenBags(0), { runs: [W1], collide: false });
-    R.atWall(tapedSheet('linen', noteRect('linen', ['SARS 病房布單', '一律裝黃袋', '紅膠帶封口', '直接送焚化', '不准拆開洗', '92.5.2 感控'], { w: 96, h: 112, col: '#9a1010', size: 11 }), 0.26, 0.3, 0.03), W1, 39.2, { mount: 1.35 });
+    R.atWall(tapedSheet('linen', noteRect('linen', ['SARS 病房布單', '一律裝紅袋', '膠帶封口', '直接送焚化', '不准拆開洗', '92.5.2 感控'], { w: 96, h: 112, col: '#9a1010', size: 11 }), 0.26, 0.3, 0.03), W1, 39.2, { mount: 1.35 });
   }
   floorDecal(R, 'water', 24.6, 56.8, 2.2);
   floorDecal(R, 'drip', 25.4, 60.2, 0.8);
