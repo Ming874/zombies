@@ -10,7 +10,7 @@ import { sfx } from '../audio.js';
 
 const N = 32;
 // 每種武器開槍的噪音半徑(m);滅音器沒有,所以手槍最小、巴雷特最大
-export const GUN_R = { pistol: 26, revolver: 38, shotgun: 44, ak47: 46, m4a1: 40, barrett: 70 };
+export const GUN_R = { pistol: 26, revolver: 38, shotgun: 44, ak47: 46, m4a1: 40, barrett: 70, rpg: 60 }; // rpg:發射的嘶吼(爆炸另外由 explodeAt 記)
 
 export function createNoise(game) {
   const buf = Array.from({ length: N }, () => ({ x: 0, y: 0, z: 0, r: 0, t: -1e9, kind: '' }));
