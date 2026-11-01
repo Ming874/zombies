@@ -132,7 +132,7 @@ export class GfxPass extends Pass {
       uInvView: this.mSSR.uniforms.uInvView, uVP: { value: this.vp }, uPrevVP: { value: this.prevVP }, uReset: { value: 1 }, uAlpha: { value: 0.1 },
     }, 'gfx.taa');
     this.mCopy = mk(S.COPY, { tSrc: tex(null), uSharp: { value: 0.18 } }, 'gfx.copy');
-    this.mBlit = mk(S.COPY, { tSrc: tex(this.outRT.texture), uSharp: { value: 0 } }, 'gfx.blit');
+    this.mBlit = mk(S.BLIT, { tSrc: tex(this.outRT.texture) }, 'gfx.blit'); // 含清 NaN + 高光壓縮(取代 post.js 的 SanitizeShader pass)
     this.occ = new Occluder(game.renderer); // 金水商行/補給櫃的遮擋查詢(src/gfx/occlude.js)
     this.materials = [this.mPrep, this.mAO, this.mAOBlur, this.mDown, this.mSSR, this.mVol, this.mComp, this.mTAA, this.mCopy, this.mBlit, this.occ.material];
     this.configure({});
@@ -277,6 +277,7 @@ export class GfxPass extends Pass {
     const ac = renderer.autoClear;
     renderer.autoClear = false;
     if (g.weaponPass) g.weaponPass.enabled = !this.any; // 有效果時手持武器在這個 pass 裡畫(見 outRT)
+    if (g.sanitizePass) g.sanitizePass.enabled = !this.any; // 有效果時清 NaN 併在最後的 mBlit 裡
     // 不需要任何效果(低畫質):直接畫進 composer 的緩衝,省掉一次複製與解析
     if (!this.any) {
       this.frame++;
