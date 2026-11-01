@@ -93,12 +93,13 @@ function makeBar() {
 }
 
 export class Zombie {
-  constructor(scene, x, z, round) {
+  // y = 出生點的地面高度(地圖有四層)
+  constructor(scene, x, z, round, y = 0) {
     this.scene = scene;
     this.hp = ZOMBIE_HP;
     this.alive = true;
     this.dying = 0;
-    this.pos = new THREE.Vector3(x, 0, z);
+    this.pos = new THREE.Vector3(x, y, z);
     this.vel = new THREE.Vector3();
     this.speed = Math.min(2.7, 1.0 + round * 0.07 + Math.random() * 0.45);
     this.attackT = 0;
@@ -211,16 +212,20 @@ export class Zombie {
       return 0;
     }
     let dealt = 0;
-    const toX = player.pos.x - this.pos.x, toZ = player.pos.z - this.pos.z;
-    const dist = Math.hypot(toX, toZ);
+    const pos = this.pos;
+    const toX = player.pos.x - pos.x, toZ = player.pos.z - pos.z;
+    const hd = Math.hypot(toX, toZ);
+    // 同一樓層(高度差 < 1.2m)才算得上近戰距離;隔樓層時行為判斷用的距離視為很遠
+    const dy = player.pos.y - pos.y, same = dy < 1.2 && dy > -1.2;
+    const dist = same ? hd : hd + 40;
 
-    // 方向:近距離且視線通暢就直線,否則走導航場
+    // 方向:近距離且視線通暢就直線,否則走導航場(會引導上下樓梯)
     let dx = 0, dz = 0, moving = true;
-    if (dist < 4 && world.hasLineOfSight(this.pos.x, this.pos.z, player.pos.x, player.pos.z)) {
-      dx = toX / dist; dz = toZ / dist;
+    if (dist < 4 && world.hasLineOfSight(pos.x, pos.y + 1.4, pos.z, player.pos.x, player.pos.y + 1.4, player.pos.z)) {
+      dx = toX / hd; dz = toZ / hd;
     } else {
-      const f = world.flowDir(this.pos.x, this.pos.z, this._dir || (this._dir = { x: 0, z: 0 }));
-      if (f) { dx = f.x; dz = f.z; } else { dx = toX / (dist || 1); dz = toZ / (dist || 1); }
+      const f = world.flowDir(pos.x, pos.y, pos.z, this._dir || (this._dir = { x: 0, z: 0 }));
+      if (f) { dx = f.x; dz = f.z; } else { dx = toX / (hd || 1); dz = toZ / (hd || 1); }
     }
 
     const reach = 1.05;
@@ -249,7 +254,7 @@ export class Zombie {
     this.vel.z += (dz * sp - this.vel.z) * k;
     // 與其他殭屍分離
     for (const o of others) {
-      if (o === this || !o.alive) continue;
+      if (o === this || !o.alive || Math.abs(o.pos.y - this.pos.y) > 1.5) continue;
       const ax = this.pos.x - o.pos.x, az = this.pos.z - o.pos.z;
       const d2 = ax * ax + az * az;
       if (d2 < 0.5 && d2 > 1e-4) {
@@ -260,10 +265,10 @@ export class Zombie {
     }
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    world.resolve(this.pos, 0.34);
+    world.resolve(this.pos, 0.34); // 水平碰撞 + 腳底貼地(上下樓梯)
     // 別疊在玩家身上
     if (dist < 0.75) {
-      const nx = (this.pos.x - player.pos.x) / (dist || 1), nz = (this.pos.z - player.pos.z) / (dist || 1);
+      const nx = (this.pos.x - player.pos.x) / (hd || 1), nz = (this.pos.z - player.pos.z) / (hd || 1);
       this.pos.x = player.pos.x + nx * 0.75;
       this.pos.z = player.pos.z + nz * 0.75;
     }
@@ -355,7 +360,7 @@ export class Zombie {
   }
 
   _applyRoot() {
-    this.root.position.set(this.pos.x, this.rootY, this.pos.z);
+    this.root.position.set(this.pos.x, this.pos.y + this.rootY, this.pos.z);
     this.root.rotation.set(this.rootPitch, this.heading, this.rootRoll);
   }
 

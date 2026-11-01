@@ -1,3 +1,9 @@
+// 錄音樣本庫(src/audio/samples.js 讀取):main 的音效是合成的,沒有一次性樣本;
+// 環境音床(LOOPS)由 src/audio/weather.js 登記雨聲錄音(public/audio/rain/)
+export const CATS = [];
+export const LAZY = new Set();
+export const BANK = {};
+export const LOOPS = {};
 // 錄音配樂(串流,檔案在 public/audio/music/,署名見 public/credits/music.md):依配樂狀態挑選。
 // g 音量(已含 LUFS 對齊)、loop 循環、dur 長度(秒)、xf 結尾交叉淡化秒數
 export const TRACKS = {

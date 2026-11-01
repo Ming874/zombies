@@ -1,7 +1,13 @@
-// 以 WebAudio 即時合成所有音效(不需任何音檔);配樂(錄音串流 + 程式合成)在 src/audio/
-import { A, attach as attachMusic } from './audio/core.js';
+// 以 WebAudio 即時合成所有音效(不需任何音檔);配樂(錄音串流 + 程式合成)、雨聲、門與地圖紙張的 3D 音效在 src/audio/
+// (src/audio/core.js 取自 test 分支:混音匯流排、3D 定位、遮蔽、殘響;這裡原本的合成音效仍直接走自己的 master)
+import { A, attach as attachCore, setListener } from './audio/core.js';
 import { startMusic, setMood, setTension, setHealth, addPain } from './audio/music.js';
 import { sting, preloadStings, resumeTracks } from './audio/tracks.js';
+import { setRain, thunder, preloadRain } from './audio/weather.js';
+import { ix } from './audio/ix.js';
+
+export { ix };
+export const _internal = { A }; // map/weather.js 讀取(沒有 sfx.thunder 時的備援)
 
 let ctx = null;
 let master = null;
@@ -34,7 +40,7 @@ function ensure() {
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const nd = noiseBuf.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  attachMusic(ctx, master);
+  attachCore(ctx);
   return ctx;
 }
 
@@ -45,6 +51,7 @@ function boot() {
   booted = true;
   startMusic();
   preloadStings();
+  setTimeout(preloadRain, 1500); // 雨聲錄音在選單時就背景載入
 }
 export function resume() {
   const c = ensure();
@@ -174,7 +181,7 @@ export const sfx = {
     f.connect(g);
     // 嗡鳴音量跟著配樂狀態(music.js 的 amb)
     A.ambG = ctx.createGain();
-    A.ambG.gain.value = A.ambLevel;
+    A.ambG.gain.value = A.ambLevel ?? 1;
     g.connect(A.ambG);
     out(A.ambG, 0.2);
     o.start();
@@ -188,4 +195,19 @@ export const sfx = {
   setMood(m) { setMood(m); }, // 'menu' | 'fight' | 'boss' | 'break' | 'shop' | 'dead'
   setTension(x) { setTension(x); }, // 0..1:最近的殭屍越近越緊張
   setHealth(r) { setHealth(r); }, // 玩家血量比例 0..1(低血量:心跳)
+
+  // ---- 地圖 / 天氣 / 門(3D 音效走 src/audio/core.js)----
+  listener(x, y, z, yaw) { if (A.ctx) setListener(x, y, z, yaw); }, // 每幀:聆聽者位置(玩家眼睛)
+  attachGame(game) { A.game = game; A.world = game.world || null; }, // 視線遮蔽、樓層悶音用的 World
+  setRain(level, outdoorFactor) { try { setRain(level, outdoorFactor); } catch { /* 音效失敗不影響遊戲 */ } }, // 說明見 src/audio/weather.js
+  thunder(dist, delay) { if (A.ctx) thunder(dist, delay); },
+  pickupDeny() { this.deny(); },
+  uiClick() { tone('square', 1400, 1200, 0.02, 0.06, 0); },
+  shutter(pos, open) { // 店面捲門:鐵捲門的隆隆聲(拉起較長、放下較短較重)
+    noise(open ? 2.2 : 1.6, 'bandpass', open ? 900 : 700, open ? 1300 : 420, 0.22, 0.4, 0, 1.5);
+    noise(open ? 2.2 : 1.6, 'lowpass', 260, 120, 0.25, 0.3);
+    if (!open) tone('sine', 90, 45, 0.3, 0.35, 0.3, 1.5);
+  },
+  // test 地圖裡由環境音系統/驚嚇導演處理的聲音:main 沒有這些系統,不出聲
+  loopStart() {}, loopStop() {}, crow() {}, flap() {}, door() {}, scare() {}, thud() {},
 };

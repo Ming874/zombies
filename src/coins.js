@@ -18,16 +18,16 @@ export class Coins {
 
   get total() { return this.piles.reduce((s, p) => s + p.count, 0); }
 
-  // 在(x,z)掉落 n 枚;附近已有金幣堆就疊上去,不新增堆
-  drop(x, z, n = 5) {
+  // 在(x,y,z)掉落 n 枚(y = 地面高度);附近已有金幣堆就疊上去,不新增堆
+  drop(x, y, z, n = 5) {
     for (const p of this.piles) {
-      if (!p.flying && Math.hypot(p.group.position.x - x, p.group.position.z - z) < 0.45) {
+      if (!p.flying && Math.hypot(p.group.position.x - x, p.group.position.z - z) < 0.45 && Math.abs(p.group.position.y - y) < 0.5) {
         this._add(p, n);
         return p;
       }
     }
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
+    group.position.set(x, y, z);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
     glow.scale.set(0.7, 0.7, 1);
     glow.position.y = 0.12;
@@ -79,7 +79,7 @@ export class Coins {
       p.t += dt / 0.8;
       const e = Math.min(1, p.t);
       const k = e * e * (3 - 2 * e);
-      const tx = player.pos.x, tz = player.pos.z, ty = 1.2;
+      const tx = player.pos.x, tz = player.pos.z, ty = player.pos.y + 1.2;
       p.group.position.x = p.from.x + (tx - p.from.x) * k;
       p.group.position.z = p.from.z + (tz - p.from.z) * k;
       p.group.position.y = p.from.y + (ty - p.from.y) * k + Math.sin(e * Math.PI) * 0.8;

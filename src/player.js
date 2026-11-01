@@ -8,7 +8,7 @@ export class Player {
   constructor(camera, world) {
     this.camera = camera;
     this.world = world;
-    this.pos = new THREE.Vector3(world.start.x, 0, world.start.z);
+    this.pos = new THREE.Vector3(world.start.x, world.start.y || 0, world.start.z);
     this.yaw = 0; // 朝北(往醫院深處,-Z)
     this.pitch = 0;
     this.keys = {};
@@ -83,7 +83,7 @@ export class Player {
     this.vz = (this.vz || 0) + (wz * speed - (this.vz || 0)) * Math.min(1, dt * 10);
     this.pos.x += this.vx * dt;
     this.pos.z += this.vz * dt;
-    this.world.resolve(this.pos, RADIUS);
+    this.world.resolve(this.pos, RADIUS); // 水平碰撞 + 腳底貼地(上下樓梯、站上矮台)
     const sp = Math.hypot(this.vx, this.vz);
     this.speedNorm = Math.min(1, sp / 3.3);
 
@@ -102,7 +102,7 @@ export class Player {
     const bobY = Math.sin(this.bobT * 2) * 0.035 * this.speedNorm;
     const bobX = Math.cos(this.bobT) * 0.025 * this.speedNorm;
     const sh = this.shake * (Math.random() - 0.5) * 0.08;
-    this.camera.position.set(this.pos.x + bobX * cos, EYE + bobY + sh, this.pos.z - bobX * sin);
+    this.camera.position.set(this.pos.x + bobX * cos, this.pos.y + EYE + bobY + sh, this.pos.z - bobX * sin);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.set(this.pitch + sh, this.yaw, 0);
   }

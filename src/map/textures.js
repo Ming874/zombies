@@ -2,20 +2,21 @@ import * as THREE from 'three';
 
 // 固定種子的亂數,讓每次載入的貼圖一致
 let seed = 1337;
+export function setSeed(s) { seed = s >>> 0; }
 export function rnd() {
   seed = (seed * 1664525 + 1013904223) >>> 0;
   return seed / 4294967296;
 }
-const rr = (a, b) => a + rnd() * (b - a);
+export const rr = (a, b) => a + rnd() * (b - a);
 
-function canvas(w, h) {
+export function canvas(w, h) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   return [c, c.getContext('2d')];
 }
 
-function grain(ctx, w, h, amount) {
+export function grain(ctx, w, h, amount) {
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -27,7 +28,7 @@ function grain(ctx, w, h, amount) {
   ctx.putImageData(img, 0, 0);
 }
 
-function blotches(ctx, w, h, n, rMin, rMax, rgb, aMin, aMax) {
+export function blotches(ctx, w, h, n, rMin, rMax, rgb, aMin, aMax) {
   for (let i = 0; i < n; i++) {
     const x = rnd() * w, y = rnd() * h, r = rr(rMin, rMax);
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -39,7 +40,7 @@ function blotches(ctx, w, h, n, rMin, rMax, rgb, aMin, aMax) {
   }
 }
 
-function toTexture(c, repeatX = 1, repeatY = 1, srgb = true) {
+export function toTexture(c, repeatX = 1, repeatY = 1, srgb = true) {
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeatX, repeatY);

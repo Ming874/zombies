@@ -54,7 +54,16 @@ export class UI {
 
   prompt(text) {
     const el = $('prompt');
+    if (performance.now() < (this.noteUntil || 0)) return; // 短訊息(pickup)顯示中
     if (text) { el.textContent = text; el.style.display = 'block'; } else el.style.display = 'none';
+  }
+
+  // 短訊息(例如「門口有東西擋著」):借用提示列顯示 1.6 秒
+  pickup(text) {
+    const el = $('prompt');
+    el.textContent = text;
+    el.style.display = 'block';
+    this.noteUntil = performance.now() + 1600;
   }
 
   hitMarker(head) {

@@ -46,6 +46,7 @@
   .overlay .btn { margin-top: 22px; padding: 12px 36px; font-size: 20px; letter-spacing: 4px; color: #e8e8e0; background: #7a1a15; border: 1px solid #b4443a; cursor: pointer; font-family: inherit; }
   .overlay .btn:hover { background: #99241d; }
   .keys { margin-top: 18px; font-size: 14px; opacity: .7; line-height: 1.9; }
+  .overlay .btn:disabled { opacity: .6; cursor: wait; }
   #shop { z-index: 11; background: rgba(0,0,0,.78); }
   #shop .box { width: min(760px, 92vw); border: 1px solid #4b5a4b; background: rgba(14,18,14,.96); padding: 22px 28px; text-align: left; }
   #shop h2 { margin: 0 0 4px; letter-spacing: 6px; color: #9fe0a0; font-size: 28px; }
@@ -77,9 +78,9 @@
 
 <div class="overlay on" id="menu">
   <h1>廢棄醫院</h1>
-  <p>殭屍橫行的聖心醫院。守住大廳，撐過每一個回合。<br />每 5 回合結束，醫院大門會出現武器商店。</p>
+  <p>殭屍橫行的聖心醫院。四層樓的醫院與外圍，撐過每一個回合。<br />每 5 回合結束，一樓便利商店（金水商行）會拉起捲門賣武器。</p>
   <button class="btn" id="startBtn">開始遊戲</button>
-  <div class="keys">WASD 移動　Shift 奔跑　滑鼠 瞄準／射擊　R 換彈　1-4 切換武器<br />F 手電筒　E 互動（商店）　N 開始下一回合（商店內）</div>
+  <div class="keys">WASD 移動　Shift 奔跑　滑鼠 瞄準／射擊　R 換彈　1-4 切換武器<br />F 手電筒　E 開關門／商店　M 地圖（PgUp／PgDn 翻樓層）　N 開始下一回合（商店內）</div>
 </div>
 
 <div class="overlay" id="pause">
