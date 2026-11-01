@@ -1,25 +1,29 @@
 // 手提收音機(REDESIGN §2.4):小美唯一的來源。
 //   大廳輪椅旁撿到一台(家屬帶來的,一直調在 AM 1207)→ 地下室收訊變差 → 太平間門口燒壞(「數到十」)→ 阿嬤把她護理站那台留給你。
 //   Q 點一下:舉起/放下(舉起:兩耳、清楚;放下:左肩、小一點)。舉起時按住 Q:調頻(掃台);放下時按住 Q:開/關。
-//   雜訊 = 活屍近了(14 m 內開始升,不給方向);6 m 內又看不到牠:尖叫。開著(雜訊大、小美在說話)活屍也聽得到你(loud)。
+//   雜訊 = 你看不到的活屍近了(視線外或被牆擋住的才算;14 m 內開始升;裝死的只有一點點);左右聲道偏向最近那一隻(一陣陣的雜訊從那一側的耳邊出來,
+//   只給左右,不給位置);6 m 內又看不到牠:尖叫。地下室、失魂(三把火都熄了)時不可靠:雜訊忽大忽小、方向亂跳。
+//   開著(雜訊大、小美在說話)活屍也聽得到你(loud)。
 //   阿嬤來之前收音機自己安靜(hush);小美聽不到阿嬤。
 // API(game.story.radio):kind / dead / on / raised / level / loud / has() / hear() / weak() / offer(variant) / give(kind) / hush(秒) / clear(秒)
 //   / screech(k) / voice() → { pos, gain }(小美這一句從哪裡出來)/ garble(text) / warn() / on(ev, fn)
 import './radio.css';
-import { sfx, ix as ixs } from '../audio.js';
+import { sfx, ghost, ix as ixs } from '../audio.js';
 import { seq, wait } from './voice.js';
 import { captions } from '../ui/captions.js';
 import * as THREE from 'three';
 
 const FREQ = [['AM 1206', 'ra.1206'], ['AM 1062', 'ra.emerg'], ['AM 891', 'ra.drop'], ['FM 105.3', 'ra.recovery'], ['AM 1207', 'ra.1999']]; // 調頻:掃得到的台(文字在 interact/lines.js RADIO)
 const _f = new THREE.Vector3();
+const NONE = { near: null, sense: null };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function installRadio(game, S) {
   const X = game.interact, O = () => game.objectives, H = () => game.horror;
   const fresh = () => ({ kind: null, dead: false, on: true, raised: false, level: 0, bed: false, hushUntil: 0, clearUntil: 0, quietT: 0,
     screechT: -99, screechN: 0, loopT: 0, lobbyT: 0, warnT: -99, warnWave: 0, warnN: 0, b1Walk: 0, lastP: null, burning: false,
-    gift: false, giftT: 0, giftRest: 0, giftAsk: false, fallback: false, rests: 0, wasSilent: false, freq: 4, cast: null, ackT: 0, ack: null, autoLower: 0 });
+    gift: false, giftT: 0, giftRest: 0, giftAsk: false, fallback: false, rests: 0, wasSilent: false, freq: 4, cast: null, ackT: 0, ack: null, autoLower: 0,
+    panT: 0, pan: 0, junk: 0, junkT: 0, drop: false, near: null });
   let run = fresh();
   const ev = new Map();
   const emit = (k, a) => { for (const f of ev.get(k) || []) { try { f(a); } catch (e) { console.warn('[radio]', e); } } };
@@ -245,6 +249,40 @@ export function installRadio(game, S) {
     S.say?.('xl', t, { warn: true });
   }
 
+  // ---------- 感官:你看不到的活屍 ----------
+  // 看得到 = 在前方視野裡(水平夾角約 57° 以內)而且沒有被擋住;只對 16 m 內、視野裡的打射線(每 0.25 秒幾條)
+  function unseen() {
+    const pl = game.player, p = pl.pos, cam = game.camera?.position || { x: p.x, y: p.y + 1.6, z: p.z };
+    const fx = -Math.sin(pl.yaw || 0), fz = -Math.cos(pl.yaw || 0), W = game.world;
+    let near = null, sense = null;
+    for (const z of game.zombies || []) {
+      if (!z.alive || Math.abs(z.pos.y - p.y) > 4) continue;
+      const dx = z.pos.x - p.x, dz = z.pos.z - p.z, d = Math.hypot(dx, dz);
+      const dorm = !!z.amb?.dormant, e = dorm ? d * 1.6 : d;
+      if (e > 16 || (sense && e >= sense.e && (dorm || (near && d >= near.d)))) continue;
+      const dot = (dx * fx + dz * fz) / (d || 1);
+      let seen = false;
+      if (dot > 0.55) { try { seen = W.hasLineOfSight(cam.x, cam.y, cam.z, z.pos.x, z.pos.y + (dorm ? 0.5 : 1.3), z.pos.z); } catch { seen = true; } }
+      if (seen) continue;
+      const q = { z, d, e, side: (fx * dz - fz * dx) > 0 ? 1 : -1, back: dot < -0.55 };
+      if (!sense || e < sense.e) sense = q;
+      if (!dorm && (!near || d < near.d)) near = q;
+    }
+    return { near, sense };
+  }
+  // 左右聲道:雜訊大的時候,每 1.4~2.6 秒在那一側的耳邊爆一小段雜訊(越近越靠耳朵、越大聲);地下室、失魂時方向亂跳
+  function panTick(step, sense, shaky, lost) {
+    if ((run.panT -= step) > 0) return;
+    if (run.level < 0.28 || (!sense && !(shaky && run.junk > 0)) || now() < run.hushUntil || now() < run.clearUntil) { run.panT = 0.5; return; }
+    run.panT = 1.4 + Math.random() * 1.2;
+    let side = sense ? sense.side : Math.random() < 0.5 ? -1 : 1;
+    if (shaky && Math.random() < (lost ? 0.6 : 0.4)) side = Math.random() < 0.5 ? -1 : 1;
+    const pl = game.player, yaw = pl.yaw || 0, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = -fz, rz = fx;
+    const d = 2.2 - 1.3 * clamp(run.level, 0, 1), bk = sense?.back ? 0.35 : 0;
+    run.pan = side;
+    try { ghost.tune({ x: pl.pos.x + rx * side * d - fx * bk * d, y: pl.pos.y + 1.5, z: pl.pos.z + rz * side * d - fz * bk * d }, 0.45); } catch { /* 略 */ }
+  }
+
   // ---------- 每 0.25 秒 ----------
   X.on('reset', () => { stopCast(); if (run.bed) { try { sfx.radio(false); } catch { /* 略 */ } } run = fresh(); hud.draw(); });
   let acc = 0, loopAcc = 0;
@@ -263,17 +301,22 @@ export function installRadio(game, S) {
     if (run.fallback && run.kind !== 'ama' && game.hospital?.zone?.id === 'f1_store') give('ama');
     // 第一次自動舉起:小美講完自己放下
     if (run.raised && run.autoLower >= 0 && R.has()) { const V = S.voice; if (V && V.who === 'xl' && now() < V.until + 0.5) run.autoLower = 0; else if ((run.autoLower += step) > 6) { run.autoLower = -1; R.raise(false); emit('lowered'); } }
-    // 雜訊 = 最近的活屍
+    // 雜訊 = 最近一隻「你看不到」的活屍(near:醒著的;sense:含裝死的,距離 ×1.6 算 → 只有一點點雜訊)
     const p = game.player.pos;
-    let near = null;
-    for (const z of game.zombies || []) { if (!z.alive || z.amb?.dormant) continue; const d = z.dist ?? Math.hypot(z.pos.x - p.x, z.pos.z - p.z); if (Math.abs(z.pos.y - p.y) > 4) continue; if (!near || d < near.d) near = { z, d }; }
+    const { near, sense } = R.hear() ? unseen() : NONE; // 收音機沒開就不必算
+    run.near = sense ? { d: +sense.d.toFixed(1), side: sense.side, back: sense.back, dormant: !!sense.z.amb?.dormant } : null;
+    const b1 = isB1(), lost = !!game.soul?.lost?.(), shaky = b1 || lost;
     let lvl = 0;
     if (R.hear()) {
-      lvl = 0.08 + 0.6 * clamp((14 - (near ? near.d : 99)) / 10, 0, 1);
+      lvl = 0.08 + 0.6 * clamp((14 - (sense ? sense.e : 99)) / 10, 0, 1);
       // 207 門口:叫得比任何活屍都大聲(她的源頭)
       const dw = X.doors?.list?.find((q) => q.lock?.door === 'f2_ward_207');
       if (dw && Math.abs(dw.y - p.y) < 2.5) { const d7 = Math.hypot(dw.cx - p.x, dw.cz - p.z); if (d7 < 6) lvl = Math.max(lvl, 0.5 + 0.4 * (1 - d7 / 6)); }
-      if (isB1()) lvl = Math.min(1, lvl + 0.12);
+      if (b1) lvl = Math.min(1, lvl + 0.12);
+      if (shaky) { // 不可靠:一陣一陣亂跳的雜訊、有時整個掉下去(你分不出是不是真的有東西)
+        if ((run.junkT -= step) <= 0) { run.junkT = 0.6 + Math.random() * 1.6; run.junk = Math.random() < (lost ? 0.55 : 0.35) ? 0.15 + Math.random() * (lost ? 0.55 : 0.3) : 0; run.drop = Math.random() < 0.25; }
+        lvl = run.drop ? lvl * 0.2 : Math.max(lvl * (lost ? 0.6 : 0.85), run.junk);
+      }
       if (run.burnK) lvl = Math.max(lvl, run.burnK);
       if (now() < run.hushUntil || now() < run.clearUntil) lvl = 0;
       lvl *= run.raised ? 1 : 0.75;
@@ -284,6 +327,7 @@ export function installRadio(game, S) {
         if (!see) R.screech(clamp((6 - near.d) / 6 + 0.4, 0.4, 1));
       }
       warnTick(near);
+      panTick(step, sense, shaky, lost);
     }
     run.level += (lvl - run.level) * Math.min(1, step * (now() < run.hushUntil ? 2.2 : 5));
     const bedLvl = run.level * 0.55;
