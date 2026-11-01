@@ -4,7 +4,7 @@ import { A, emit, burst, tone } from '../../audio/core.js';
 import { THROW } from '../../story/clues.js';
 
 // 2F 護理站「問的地方」:阿嬤的遺照、乾掉的白色康乃馨、香爐、一副筊杯(2004 年金水伯放的)。
-//   看著遺照 0.8 秒 → 線索卡 hc.13(筆記本系統自己判斷);按 [E] 看遺照;筆記本填好之後按住 [E] 擲筊。
+//   看著遺照 0.8 秒 → 線索卡 hc.13(筆記本系統自己判斷);按 [E] 看遺照;筆記本填好一句之後按住 [E] 擲筊(一次問一句)。
 //   擲筊是本機的(多人時隊友看不到你的筊),結果交給 game.deduce.resolve();聖筊替全隊打開 207。
 // 筊杯:一面平(陽,「正」)、一面圓(陰,「反」)。聖筊 = 一正一反;笑筊 = 兩正;陰筊 = 兩反。
 // 材質沿用互動物件的 ix:plastic(頂點色;開機預編譯時已經在場景裡),不新增 shader;不投影、不碰燈。
@@ -167,17 +167,22 @@ export const memorial = {
     const D = () => game.deduce;
     const e = ix.register(pos, {
       id: spec.id || 'h.ix.memorial', kind: 'memorial', name: '阿嬤的遺照', reach: 2.1, radius: 0.16, scope: 'map', priority: 8, hold: 0,
+      // 一句一筊(src/story/deduce.js):填滿的那一句才能問;招魂燈熄的時候才能擲,一次燈熄問一次(簡單兩次)
       prompt: () => {
         const d = D();
         if (busy) { e.hold = 0; e.onTap = null; return { text: '擲筊中……', dim: true }; }
-        if (d && d.ready() && !d.solved()) { e.hold = THROW.hold; e.onTap = view; e.tapText = '看遺照'; e.holdText = '擲筊（問阿嬤對不對）'; return '擲筊'; }
+        if (d && !d.solved() && d.ready()) {
+          if (d.canThrow?.() ?? true) { const k = d.NUM?.[d.next()] || ''; e.hold = THROW.hold; e.onTap = view; e.tapText = '看遺照'; e.holdText = k ? `擲筊（問阿嬤第${k}句）` : '擲筊（問阿嬤對不對）'; return '擲筊'; }
+          e.hold = 0; e.onTap = null;
+          return game.phase === 'fighting' ? '看阿嬤的照片（招魂燈熄了，才能擲筊）' : '看阿嬤的照片（這次燈熄已經問過了）';
+        }
         e.hold = 0; e.onTap = null;
-        return d && !d.solved() && d.filled() > 0 ? '看阿嬤的照片（筆記本還有空格）' : '看阿嬤的照片';
+        return d && !d.solved() && d.filled() > 0 ? '看阿嬤的照片（先把一句填完）' : '看阿嬤的照片';
       },
       onUse: (ctx) => {
         if (busy) return false;
         const d = D();
-        if (e.hold > 0 && d?.ready() && !d.solved()) { const r = d.throw(); if (r) toss(r); return; }
+        if (e.hold > 0 && (d?.canThrow?.() ?? d?.ready())) { const r = d.throw(); if (r) toss(r); return; }
         return view(ctx);
       },
       reset: () => { busy = false; reset(); },

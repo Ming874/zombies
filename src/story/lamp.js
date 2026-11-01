@@ -34,7 +34,7 @@ export function installLamp(game) {
     seq: 0, sentN: -1, flagName: null, // 房主:目前的旗標
     hostK: -1, hostN: 10, optimT: 0, // 隊友:房主最新的值
     cur: 1, dip: 0, dipV: 1, dipN: 0, nextDip: 2, state: 'ok', stT: 0, // 視覺
-    lowSaid: 0, lowN: 0, lowPend: false, outSaid: false, outPend: false, fillT: -99, fillN: 0,
+    lowSaid: 0, lowN: 0, lowPend: false, outSaid: false, outPend: false, fillT: -99, fillN: 0, outs: 0, // outs:這一夜熄了幾次(結局記得,N14)
     carry: false, fireWas: false, done: new Set(),
   });
   let run = fresh();
@@ -146,7 +146,7 @@ export function installLamp(game) {
   }
   const L = {
     level, lit, drain, refuel,
-    state: () => ({ level: +run.level.toFixed(3), lit: lit(), powered: powered(), coarse: coarse(run.level), waves: run.waves, refuels: run.refuels, carry: run.carry, look: run.state, k: +run.cur.toFixed(3), host: isHost(), hostN: run.hostN, work: work.length }),
+    state: () => ({ level: +run.level.toFixed(3), lit: lit(), powered: powered(), coarse: coarse(run.level), waves: run.waves, refuels: run.refuels, outs: run.outs, carry: run.carry, look: run.state, k: +run.cur.toFixed(3), host: isHost(), hostN: run.hostN, work: work.length }),
     get run() { return run; },
     PER_WAVE, FLICK, REFUEL,
   };
@@ -166,7 +166,7 @@ export function installLamp(game) {
     });
   };
   function onLow() {
-    note('lamp.low', '207 的燈在閃：後巷的發電機快沒油了。去 B1 鍋爐房扛柴油過去加。');
+    note('lamp.low', '207 的燈在閃，後巷那台發電機快沒油了。去 B1 鍋爐房扛一桶柴油過去加。');
     if (game.time - run.lowSaid < 120 || run.lowPend) return;
     run.lowPend = true;
     atRest((ok) => {
@@ -178,9 +178,10 @@ export function installLamp(game) {
     });
   }
   function onOut() {
+    run.outs++;
     run.state = 'dying'; run.stT = 0;
     genOff = true;
-    note('lamp.out', '207 的燈熄了。替發電機加油，燈還點得回來。');
+    note('lamp.out', '207 的燈熄了。替發電機加了油，燈還點得回來。');
     try { sfx.loopStop?.(GEN_LOOP); } catch { /* 略 */ }
     if (!run.outSaid) {
       run.outSaid = true;

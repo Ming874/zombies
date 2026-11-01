@@ -455,7 +455,14 @@ export const typewriter = {
     const ok = (l) => !l?.after || ix.flags.has(l.after); // after:那個旗標之後才會打出來(例:M4 之後的廣播排程)
     const pool = (spec.lines || []).map((id) => api.lineById(id)).filter(Boolean);
     const all0 = api.lineList('TYPEWRITER'), all = all0.filter((l) => !l.after);
-    const fresh = (spec.lines ? pool : all0).filter((l) => l.after); // 等旗標的那幾張:旗標一到,第一次靠近就自己打出來
+    const fresh = [...(spec.lines ? pool : all0), ...all0.filter((l) => l.always && !(spec.lines || []).includes(l.id))].filter((l) => l.after); // 等旗標的那幾張:旗標一到,第一次靠近就自己打出來(always:不在清單裡也算)
+    // 打完一張:有 feed 就在畫面上說一句(紙上的小字不好讀),有 note 就寫進筆記本〈到目前為止〉
+    const done = (l) => {
+      if (!l) return;
+      ix.flags.set('h.tw.' + l.id, true);
+      if (l.feed) api.feed(fill(l.feed), '#e8d9a8');
+      if (l.note) { try { api.game.story?.notes?.add?.(l.note[0], fill(l.note[1])); } catch { /* 略 */ } }
+    };
     const fill = (t) => String(t || '').split('{暱稱}').join(nick()), typed = new Set(); // typed:這一局打過的那幾張(每局重來)
     let idx = 0, self = false;
     const type = (text, then) => {
@@ -482,6 +489,7 @@ export const typewriter = {
         for (let k = 0; !l && k < pool.length; k++) { const q = pool[idx++ % pool.length]; if (ok(q)) l = q; }
         if (!l) l = all[(R() * all.length) | 0];
         type(l?.text || '……', () => {
+          if (due) done(due);
           if (self || !all.length) return;
           self = true;
           const w = ix.tick(() => { if (!api.near(pos, 7)) { ix.after(2 + R() * 4, () => type(all[(R() * all.length) | 0]?.text || '207 207 207')); return false; } return true; }); void w;
@@ -491,7 +499,7 @@ export const typewriter = {
       reset: () => { lines.length = 0; draw(); self = false; idx = 0; typed.clear(); },
     });
     // 等旗標的那幾張(例:M4 之後的廣播排程):旗標一到、你走到 6 m 內,打字機自己打出來(每秒看一次,不每幀跑)
-    if (fresh.length) { const watch = () => { const due = fresh.find((q) => ok(q) && !typed.has(q.id)); if (due && api.game.state === 'playing' && api.near(pos, 6)) { typed.add(due.id); ix.flags.set('h.tw.' + due.id, true); type(due.text); api.say('', '（打字機自己動了起來。）', 2600); } ix.after(1, watch); }; ix.after(1, watch); ix.on('reset', () => ix.after(1, watch)); } // 每一局重來時計時器會被清掉:reset 之後再排
+    if (fresh.length) { const watch = () => { const due = fresh.find((q) => ok(q) && !typed.has(q.id)); if (due && api.game.state === 'playing' && api.near(pos, 6)) { typed.add(due.id); ix.flags.set('h.tw.' + due.id, true); api.say('', '（打字機自己動了起來。）', 2600); type(due.text, () => done(due)); } ix.after(1, watch); }; ix.after(1, watch); ix.on('reset', () => ix.after(1, watch)); } // 每一局重來時計時器會被清掉:reset 之後再排
     return ent;
   },
 };

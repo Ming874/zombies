@@ -6,7 +6,7 @@
 //   → 收音機自己安靜 →〈望春風〉→ 阿嬤「阿孫……你來了。」→ 一顆球(M2)
 // 休息的節拍(NARRATIVE N4、REDESIGN R4:一次休息一個劇情節拍;山谷要安靜):
 //   1 到了(小美 → 對講機 → 阿嬤「你來了」→ 球)  2 小美說她「聽到」的規則(+「關掉再打開」= 收到)  3 金水伯:207 那扇窗(deduce.js k.1)
-//   4 阿嬤「樓梯慢慢走」  5 金水伯認出你(k.3)  6 廣播叫你的名字(moments.js M4)  7 〈第七暝〉與頭七(climax.js)
+//   4 阿嬤「樓梯慢慢走」,2003 年三樓 5 號家屬的留言(電話;沒接到之後再響)  5 金水伯認出你(k.3)  6 廣播叫你的名字(moments.js M4)  7 〈第七暝〉與頭七(climax.js)
 //   8 王醫師的電話(保全倒下之後)或金水伯:921 那個女孩(k.2)  9 三樓的家屬(memdata m.ward3 的電話版:對講機轉接的舊留言)
 // - 金水伯只從店門口的對講機說話:game.story.kimsui(id, parts, cb) 讓對講機響,接了才講;沒接就下一次休息再響
 // - 追逐時小美一局最多 3 句(game.story.chaseLine;用完回傳 '',只剩收音機的尖叫)
@@ -17,8 +17,8 @@ const C = { combatOk: true };
 const PA = [['pa', '各位家屬請注意：', undefined, { pos: null }], ['pa', '您的家人已經回來了。'], ['pa', '請到一樓大廳會面。', undefined, { gap: 0.8 }]];
 const INTRO = [
   ['xl', '……喂？喂喂？這個頻道有人嗎？', 3.0, { ...C, gap: 0.9 }],
-  ['xl', '我叫陳美玲，大家都叫我小美。', undefined, C],
-  ['xl', 'AM 1207，〈霧港夜話〉。', undefined, C],
+  ['xl', '我是陳美玲，大家都叫我小美。', undefined, C],
+  ['xl', '這裡是 AM 1207，〈霧港夜話〉。', undefined, C],
   ['xl', '還醒著的人，不要去大廳。', undefined, C],
   ['xl', '醫院的廣播是假的。', undefined, { ...C, gap: 0.8 }],
 ];
@@ -27,15 +27,23 @@ const FIRST = [['xl', '……等一下。', 1.6, { ...O1, gap: 0.8 }], ['xl', '�
 const TEACH = [['xl', '收音機在叫，就是他們靠近了。', undefined, O1], ['xl', '打頭！', 1.2, O1]];
 const CHASE = ['跑！', '不要回頭，跑。', '綠燈那邊，跑！'];
 const KS = '對講機 · 金水伯';
-// 第 9 次休息:離你最近的電話響,是 2003 年留在總機裡的一通留言(三樓 3 號的女兒打給爸爸;他在第 9 天走了,hc.43、memdata m.ward3)
-const OLD3 = { id: 'ph.old3', who: '電話 · 留言（2003）', voice: 'woman', ear: 'right', parts: ['（2003 年，封院第 8 天的留言。）', '爸，是我。你有沒有好好吃飯？', '他們說三樓不能探病……', '封院一結束，我第一個來接你。', '……爸？你有聽到嗎？'] };
+// 第 9 次休息:離你最近的電話響,是 2003 年留在總機裡的一通留言(三樓 3 號的女兒打給爸爸,封院第 6 天;他在第 9 天走了,hc.43、memdata m.ward3)
+// 第 4 次休息:另一通 2003 年的留言 —— 三樓 5 號(大新的試藥病人,hc.43「第 9 天 3 號、5 號死亡」)的兒子,第 10 天打到護理站。
+// 那時阿嬤已經把自己鎖在 207,沒有人回電。史實:疑似 SARS 死者依當時規定二十四小時內入殮、以火化為原則,家屬多半沒見到最後一面(HISTORY §1、S2)。
+// 人物、病房、天數都是虛構的;不寫真實日期,不寫病況細節。
+const OLD5 = { id: 'ph.old5', who: '電話 · 留言（2003）', voice: 'man', ear: 'right', parts: ['（2003 年，封院第 10 天的留言。）', '喂？護理站嗎？我是三樓 5 號的兒子。', '醫院打電話來，說我爸昨天晚上走了。', '說是規定，二十四小時內就要火化。', '……他住進去那天，還隔著窗跟我揮手。', '可不可以，讓我隔著玻璃看他一眼？', '（很久沒有聲音。）', '……我在後巷等。等你們回電話。'] };
+const OLD_NOTE = {
+  'ph.old3': '2003 年，三樓 3 號的女兒留了言：「封院一結束，我第一個來接你。」他沒有等到那一天。',
+  'ph.old5': '2003 年，三樓 5 號的兒子留了言：規定二十四小時內就要火化，他沒能見到爸爸最後一面。',
+};
+const OLD3 = { id: 'ph.old3', who: '電話 · 留言（2003）', voice: 'woman', ear: 'right', parts: ['（2003 年，封院第 6 天的留言。）', '爸，是我。你有沒有好好吃飯？', '他們說三樓不能探病……', '封院一結束，我第一個來接你。', '……爸？你有聽到嗎？'] };
 
 export function installOpening(game, S) {
   const X = game.interact, H = () => game.horror, Rd = () => game.story?.radio;
   const isHost = () => !game.net || !!game.net.isHost;
   const fresh = () => ({ started: false, t0: 0, pa: null, intro: false, introDone: false, first: false, teach: false, quiet: 0, firstBreak: false, ama1: false, ext: false, chase: 0, wasSilent: false, held: false, released: false, ack: 0, acked: false, kT: -99 });
   let run = fresh();
-  S.opening = { get run() { return run; } };
+  S.opening = { get run() { return run; }, ringOld: (k) => ringOld(k === 'old5' ? OLD5 : OLD3) }; // ringOld:測試用
   game.story = Object.assign(game.story || {}, {
     chaseLine() { const i = run.chase++; return i < CHASE.length ? CHASE[i] : ''; },
   });
@@ -114,13 +122,24 @@ export function installOpening(game, S) {
     return true;
   });
 
-  function ringOld() { // 2003 年的「其他人」:一通沒有人接過的留言
-    if (run.old3 || S.busy?.() || game.phase === 'fighting' || game.state !== 'playing' || game.story?.ending?.active) return;
+  function ringOld(L = OLD3) { // 2003 年的「其他人」:一通沒有人接過的留言(離你最近、沒在響的電話)
+    if (run.heardOld?.[L.id] || S.busy?.() || game.phase === 'fighting' || game.state !== 'playing' || game.story?.ending?.active) return false;
+    if (L === OLD3 && run.old3) return false;
     const q = game.player.pos;
     let best = null, bd = Infinity;
     for (const P of X.phones || []) { if (P.state !== 'idle' || P.e?.id === 'h.ix.phone.store') continue; const d = Math.hypot(P.pos.x - q.x, P.pos.z - q.z) + Math.abs(P.pos.y - q.y) * 6; if (d < bd) { bd = d; best = P; } }
-    if (best?.startRing?.(OLD3, 28)) { run.old3 = true; if (!game.net && game.phase === 'shop') game.restT = Math.max(game.restT, 34); }
+    if (!best?.startRing?.(L, 28)) return false;
+    if (L === OLD3) run.old3 = true; else run.old5N = (run.old5N || 0) + 1;
+    if (!game.net && game.phase === 'shop') game.restT = Math.max(game.restT, 34);
+    return true;
   }
+  // 接起來聽完:寫進筆記本〈到目前為止〉(沒接到的那一通,之後的休息再響一次)
+  X.on('call', (P, ln) => {
+    const nt = OLD_NOTE[ln?.id];
+    if (!nt) return;
+    (run.heardOld ||= {})[ln.id] = true;
+    X.after((P.talk?.dur || 12) + 1, () => { try { S.notes?.add?.('old.' + ln.id, nt); } catch { /* 略 */ } });
+  });
   function release() { // 第一波開始出怪
     if (run.released) return;
     run.released = true;
@@ -132,16 +151,19 @@ export function installOpening(game, S) {
       X.after(3, () => {
         if (game.phase === 'fighting') return;
         seq(game, [
-          ['xl', '上次燈熄的時候，收音機突然沒聲音，', 3.4], ['xl', '然後有人在叫你，對不對？', 2.6, { gap: 1.2 }],
+          ['xl', '上次燈熄的時候，\n收音機突然安靜下來。', 3.4], ['xl', '然後有人在叫你，對不對？', 2.6, { gap: 1.2 }],
           ['xl', '我聽不到她。……我只聽得到他們。', 3.4, { gap: 1.4 }],
-          ['xl', '收音機開小聲一點。他們也聽得到。', 3.2, { gap: 2.2 }],
-          ['xl', '你還在的話，把收音機關掉再打開。', 3.2],
+          ['xl', '收音機開小聲一點。\n他們也聽得到。', 3.2, { gap: 2.2 }],
+          ['xl', '你還在的話，\n把收音機關掉，再打開。', 3.2],
           () => { run.ack = game.time; },
         ]);
       });
     }
     if (run.quiet === 9) X.after(10, () => ringOld());
     if (run.quiet === 4) X.after(12, () => { if (game.phase !== 'fighting' && game.state === 'playing' && !S.busy?.()) seq(game, [['ama', '阿孫，樓梯慢慢走。', undefined, { ear: 'left' }]]); }); // 把你當小孩(頭七回收)
+    // 第 4 次休息:2003 年三樓 5 號的家屬留在總機裡的一通留言(試藥的病人;規定二十四小時內火化,家人沒見到最後一面)
+    // 沒接到:第 5、8、10 次休息再響一次(金水伯的對講機在排隊、或有戲在演,就讓開)
+    if (run.quiet === 4 || ([5, 8, 10].includes(run.quiet) && run.old5N && run.old5N < 3 && !run.heardOld?.['ph.old5'])) X.after(run.quiet === 4 ? 20 : 22, () => { if (!(S.kimsuiQ?.() > 0)) ringOld(OLD5); });
     if (run.quiet !== 1 || run.firstBreak) return;
     run.firstBreak = true;
     run.pa?.stop?.();
@@ -151,7 +173,7 @@ export function installOpening(game, S) {
       2.4,
       ['xl', '招魂燈熄了。現在是休息時間。', 3.0, { gap: 2.2 }],
       ['xl', '店門口的對講機在響。', 2.4, { gap: 0.6 }],
-      ['xl', '大新的無線電說，有一台發財車，每晚來送貨。', 4.2],
+      ['xl', '我聽大新的無線電說，\n每天晚上有一台發財車來送貨。', 4.2],
     ], { alive: () => game.state === 'playing' });
     // 休息後段:收音機自己安靜 →〈望春風〉→ 阿嬤只說一句(訊號由 voice.js 的 seq 放)→ 一顆球
     // 對講機講完 2 秒(沒接的話休息第 30 秒)

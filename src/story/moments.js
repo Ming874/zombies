@@ -8,8 +8,10 @@ import { sfx, ix as ixs } from '../audio.js';
 import * as THREE from 'three';
 const _f = new THREE.Vector3();
 
+// 第二張是後記憶(NARRATIVE N12;Hirsch):你不記得 2003 年,你記得的是媽媽說的 —— 結局回到同一條後巷、同一扇窗
 const M1 = [
-  '你的阿嬤林秀英是護理長。\n2003 年 SARS 封院時，她死在 207 號房。',
+  '你的阿嬤林秀英是護理長。\n2003 年 SARS 封院，她沒有出來。',
+  '那年你三歲，什麼都不記得。\n媽媽說，那十四天，她每天晚上抱著你，\n在後巷看二樓那扇亮著的窗。',
   '23 年後，七月初一，鬼門開。\n家裡的電話響了：「聖心醫院 207」。',
   '電話裡是阿嬤：\n「阿孫，你來看阿嬤好不好？」',
 ];
@@ -47,8 +49,9 @@ export function installMoments(game, S) {
         await new Promise((r) => setTimeout(r, 2400));
         try { ixs.ringStop?.('m1.ring'); } catch { /* 略 */ }
         for (let i = 0; i < M1.length && !skipped; i++) {
-          if (i === 2) setTimeout(() => { if (!skipped) try { ixs.phoneVoice?.('阿孫，你來看阿嬤好不好？', { voice: 'woman', filter: 'phone' }); } catch { /* 略 */ } }, 1100);
-          cur = M.card({ lines: M1[i].split('\n'), hold: i === 2 ? 2.6 : 2.4, fadeIn: 700, fadeOut: 450, align: 'center' });
+          const last = i === M1.length - 1, lines = M1[i].split('\n');
+          if (last) setTimeout(() => { if (!skipped) try { ixs.phoneVoice?.('阿孫，你來看阿嬤好不好？', { voice: 'woman', filter: 'phone' }); } catch { /* 略 */ } }, 1100);
+          cur = M.card({ lines, hold: last ? 2.6 : lines.length > 2 ? 3.4 : 2.4, fadeIn: 700, fadeOut: 450, align: 'center' });
           await cur;
         }
       } finally { try { ixs.ringStop?.('m1.ring'); } catch { /* 略 */ } removeEventListener('keydown', skip, true); removeEventListener('mousedown', skip, true); }
@@ -109,10 +112,10 @@ export function installMoments(game, S) {
       () => { try { api?.speak?.({ who: '醫院廣播（2003 年的舊錄音）', parts: ['林秀英護理長，請到一樓大廳。'], voice: 'woman' }, { filter: 'pa', lockOk: true }); } catch { /* 略 */ } S.voice?.claim?.(3.4, 9, 'pa'); },
       3.6,
       ['pa', '{暱稱}，請到一樓大廳。', 2.6, { gap: 0.4 }],
-      ['pa', '你的阿嬤在等你。', 2.2, { gap: 1.6 }],
+      ['pa', '您的阿嬤在等您。', 2.2, { gap: 1.6 }],
       ['xl', '不要去。', 1.6, { ...C, gap: 0.6 }],
-      ['xl', '它以前叫一個護理長下樓，', 2.6, C],
-      ['xl', '現在叫你。……不要去。', 2.6, C],
+      ['xl', '它以前也這樣叫一個護理長下樓。', 2.6, C],
+      ['xl', '現在叫的是你。……不要去。', 2.6, C],
       () => flag('h.m4'),
     ]);
   }
@@ -129,14 +132,14 @@ export function installMoments(game, S) {
       () => { Rd()?.clear?.(45); }, // 一走進去,收音機的雜訊完全消失(REDESIGN §2.4.9)
       1.6,
       ['xl', '……收音機，突然好清楚。', 2.4, C],
-      ['xl', '……我好像看得到了。這個房間。', 3.0, C],
+      ['xl', '……我好像看得到這個房間了。', 3.0, C],
       ['xl', '床、檯燈、一張椅子。', 2.6, C],
       ['xl', '床頭那張卡……', 2.0, { ...C, gap: 1.2 }],
       ['xl', '……那是我的工作證。', 2.4, { ...C, gap: 1.2 }],
       ['xl', '那個沒有名字的病人……', 2.6, { ...C, gap: 1.4 }],
       ['xl', '……是我？', 1.6, { ...C, gap: 4 }],
       ['xl', '她守了十四個晚上的人，是我。', 3.2, C],
-      () => X.after(24, () => seq(game, [['xl', '收音機一靠近他們就會叫。', 2.8], ['xl', '207 這裡，叫得最大聲。', 2.6, { gap: 1.2 }], ['xl', '他們身上的針……跟我的血有關，對不對？', 3.6]])),
+      () => X.after(24, () => seq(game, [['xl', '收音機一靠近他們就會叫。', 2.8], ['xl', '207 這裡，叫得最大聲。', 2.6, { gap: 1.2 }], ['xl', '他們身上的針……\n跟我的血有關，對不對？', 3.6]])),
     ]);
   }
 
