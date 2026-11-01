@@ -109,5 +109,15 @@ function frostTexture() {
     const [px, py, a] = side === 0 ? [t * W, 0, Math.PI / 2] : side === 1 ? [t * W, H, -Math.PI / 2] : side === 2 ? [0, t * H, 0] : [W, t * H, Math.PI];
     branch(px, py, a + (r() - 0.5) * 0.9, 50 + r() * 120, 1.6, 0);
   }
+  // 邊緣漸隱(原本是 CSS mask-image 的橢圓漸層:中央透明 48% → 70% 半透明 → 96% 全不透明)直接烘進貼圖
+  x.save();
+  x.globalCompositeOperation = 'destination-in';
+  x.translate(W / 2, H / 2);
+  x.scale((W / 2) * Math.SQRT2, (H / 2) * Math.SQRT2);
+  const m = x.createRadialGradient(0, 0, 0, 0, 0, 1);
+  m.addColorStop(0.48, 'rgba(0,0,0,0)'); m.addColorStop(0.7, 'rgba(0,0,0,0.45)'); m.addColorStop(0.96, 'rgba(0,0,0,1)');
+  x.fillStyle = m;
+  x.fillRect(-1, -1, 2, 2);
+  x.restore();
   return c.toDataURL('image/png');
 }

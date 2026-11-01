@@ -90,11 +90,11 @@
 .ix-ring .badge { position: absolute; left: -1.25em; top: -1.25em; width: 2.5em; height: 2.5em; border-radius: 50%; display: grid; place-items: center;
   background: radial-gradient(circle, rgba(60,36,10,.78) 0, rgba(14,10,6,.72) 70%); border: 2px solid var(--amber);
   box-shadow: 0 0 10px rgba(255,170,60,.65), 0 0 22px rgba(255,140,30,.3), inset 0 0 8px rgba(255,170,60,.25); }
-.ix-ring .badge svg { width: 1.35em; height: 1.35em; filter: drop-shadow(0 0 3px rgba(255,180,80,.8)); }
+.ix-ring .badge svg { width: 1.35em; height: 1.35em; } /* [perf] 不用 filter: drop-shadow(合成器每幀套用、現場編譯 shader);光暈靠 .badge 的 box-shadow */
 .ix-ring .rip { position: absolute; left: -1.25em; top: -1.25em; width: 2.5em; height: 2.5em; border-radius: 50%; border: 2px solid var(--amber); opacity: 0; }
 .ix-ring .dir { position: absolute; left: 0; top: 0; width: 0; height: 0; display: none; }
 .ix-ring .dir u { position: absolute; left: -.62em; top: -2.75em; width: 0; height: 0; border-left: .62em solid transparent; border-right: .62em solid transparent;
-  border-bottom: .9em solid var(--amber); filter: drop-shadow(0 0 4px rgba(255,160,50,.9)); }
+  border-bottom: .9em solid var(--amber); }
 .ix-ring span { position: absolute; left: 0; top: 1.55em; transform: translateX(-50%); white-space: nowrap; font-size: .95em; font-weight: 600; letter-spacing: .14em;
   color: #ffe2b0; padding: .1em .55em; background: rgba(12,9,6,.62); border-top: 1px solid rgba(255,197,106,.55); border-bottom: 1px solid rgba(255,197,106,.55);
   text-shadow: 0 0 6px rgba(0,0,0,.9), 0 1px 2px #000; }

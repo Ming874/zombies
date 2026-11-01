@@ -88,11 +88,12 @@
 @keyframes ob-in { 0% { opacity: 0; filter: blur(3px); letter-spacing: .5em; } 12% { opacity: .9; } 16% { opacity: .2; } 22% { opacity: 1; filter: none; color: #f3e2b8; } 100% { letter-spacing: .22em; } }
 /* 提示:東西閃一下 */
 .ob-glint { left: 0; top: 0; width: 36px; height: 36px; margin: -18px 0 0 -18px; opacity: 0; transition: opacity .8s; pointer-events: none;
-  background: radial-gradient(circle, rgba(255,244,214,.95) 0 8%, rgba(255,226,160,.35) 18%, transparent 55%); filter: blur(.3px); }
+  background: radial-gradient(circle, rgba(255,244,214,.95) 0 8%, rgba(255,226,160,.35) 18%, transparent 55%); }
 .ob-glint::before, .ob-glint::after { content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 1px; margin: -.5px 0 0 -15px; background: linear-gradient(90deg, transparent, rgba(255,240,205,.8), transparent); }
 .ob-glint::after { transform: rotate(90deg); }
 .ob-glint.on { opacity: .9; animation: ob-tw 2.2s ease-in-out infinite; }
-@keyframes ob-tw { 0%, 100% { filter: brightness(.6); } 45% { filter: brightness(1.4); } 55% { filter: brightness(.9); } }
+/* [perf] 閃爍用 opacity(合成器直接處理),不用 filter: brightness(每幀套用濾鏡) */
+@keyframes ob-tw { 0%, 100% { opacity: .5; } 45% { opacity: 1; } 55% { opacity: .75; } }
 
 /* 目標列的「為什麼」(CLARITY_PLAN §7.1):淡 40%、小一號 */
 .ob-line small { opacity: .6; font-size: .84em; letter-spacing: .12em; white-space: nowrap; }

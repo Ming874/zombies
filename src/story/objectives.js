@@ -350,7 +350,7 @@ function makeHud(game, textOf) {
   gl.className = 'hd ob-glint';
   hud.appendChild(gl);
   const _v = new THREE.Vector3();
-  let last = '';
+  let last = '', glOn = false, glT = 0;
   return {
     set(id, fresh) {
       const v = textOf(), t = Array.isArray(v) ? v[0] : v, w = Array.isArray(v) ? v[1] || '' : '';
@@ -363,13 +363,14 @@ function makeHud(game, textOf) {
       sw.textContent = w ? '｜' + w : '';
     },
     glint(p, on, g) {
-      if (!on || !p || g.state !== 'playing') { gl.classList.remove('on'); return; }
+      if (!on || !p || g.state !== 'playing') { if (glOn) { glOn = false; gl.classList.remove('on'); } glT = 0; return; }
       const cam = g.camera, pl = g.player.pos;
       const d = Math.hypot(p.x - pl.x, p.z - pl.z);
       _v.set(p.x, p.y, p.z).project(cam);
       const vis = _v.z < 1 && Math.abs(_v.x) < 0.95 && Math.abs(_v.y) < 0.95 && d < 16 && Math.abs(p.y - pl.y - 1) < 2.6
         && (g.world?.hasLineOfSight?.(cam.position.x, cam.position.y, cam.position.z, p.x, p.y, p.z) ?? true);
-      gl.classList.toggle('on', vis);
+      // [perf] 可見性要連續 0.15 秒一致才切換:邊界附近每幀來回切 class 會一直重播淡入與閃爍動畫
+      if (vis !== glOn) { const t = performance.now(); if (!glT) glT = t; else if (t - glT > 150) { glOn = vis; glT = 0; gl.classList.toggle('on', vis); } } else glT = 0;
       if (vis) gl.style.transform = `translate(${((_v.x * 0.5 + 0.5) * innerWidth).toFixed(0)}px, ${((-_v.y * 0.5 + 0.5) * innerHeight).toFixed(0)}px)`;
     },
   };

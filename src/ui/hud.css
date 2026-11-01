@@ -30,7 +30,8 @@
 
 /* ---- 右上:金幣 ---- */
 .hd-coins { right: 1.8em; top: 1.2em; display: flex; align-items: center; gap: .45em; font: 700 1.6em/1 var(--num); color: var(--hud-gold); }
-.hd-coins svg { width: 1.05em; height: 1.05em; filter: drop-shadow(0 0 5px rgba(240,190,60,.45)); }
+/* [perf] HUD 不用 CSS filter(drop-shadow/blur):filter 由瀏覽器合成器每幀重新套用,而且每種組合都要現場編譯 GPU shader(弱 CPU 卡 1~2 秒) */
+.hd-coins svg { width: 1.05em; height: 1.05em; }
 .hd-cgain { font-size: .7em; color: #ffe7a0; opacity: 0; }
 
 /* ---- 右上:分數 / 連殺 ---- */
@@ -109,7 +110,7 @@
 /* ---- 準心周圍:受傷方向 ---- */
 .hd-dmg { left: 50%; top: 50%; width: 0; height: 0; }
 .hd-dmg i { position: absolute; left: -9.5em; top: -9.5em; width: 19em; height: 19em; border-radius: 50%; opacity: 0; box-sizing: border-box;
-  border: .85em solid transparent; border-top-color: rgba(235, 28, 18, .95); filter: drop-shadow(0 0 8px rgba(255, 30, 10, .85)); will-change: transform, opacity; }
+  border: .85em solid transparent; border-top-color: rgba(235, 28, 18, .95); will-change: transform, opacity; }
 
 /* ---- 擊殺跳字 ---- */
 .hd-pops { left: 50%; top: 50%; width: 0; height: 0; }
@@ -138,7 +139,7 @@
 
 /* ---- 回合間:補給站方向標記 ---- */
 .hd-wp { left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: .1em; color: var(--hud-amber); font: 700 .95em/1 var(--num); will-change: transform; }
-.hd-wp svg { width: 1.9em; height: 1.9em; filter: drop-shadow(0 0 6px rgba(255,170,60,.7)); }
+.hd-wp svg { width: 1.9em; height: 1.9em; }
 .hd-wp .arr { width: 0; height: 0; border: .45em solid transparent; border-bottom: .75em solid var(--hud-amber); margin-bottom: .1em; display: none; }
 .hd-wp.edge .arr { display: block; }
 .hd-wp small { font-family: "Microsoft JhengHei", sans-serif; font-size: .78em; letter-spacing: .1em; opacity: .85; }
@@ -147,7 +148,7 @@
 .hd-pick { left: 50%; bottom: 28%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: .35em; }
 .hd-pk { font-size: 1.45em; font-weight: 700; letter-spacing: .18em; white-space: nowrap; text-align: center; will-change: transform, opacity; }
 .hd-pk small { display: block; font-size: .58em; letter-spacing: .06em; margin-top: .1em; opacity: .82; }
-.hd-pk svg { width: 1em; height: 1em; margin-right: .45em; filter: drop-shadow(0 0 5px currentColor); }
+.hd-pk svg { width: 1em; height: 1em; margin-right: .45em; }
 
 /* ---- 左側中:新手提示 ---- */
 .hd-tip { left: 1.6em; top: 34%; width: 21em; padding: .6em .9em .7em; background: linear-gradient(90deg, rgba(10, 12, 11, .82), rgba(10, 12, 11, .55));

@@ -119,7 +119,7 @@ export class Hud {
   // ---------- 小工具 ----------
   _set(key, val, fn) { if (this.v[key] === val) return false; this.v[key] = val; fn(val); return true; }
   _flash(e, color) {
-    e.animate([{ transform: 'scale(1.22)', filter: `drop-shadow(0 0 8px ${color})` }, { transform: 'scale(1)', filter: 'none' }], { duration: 650, easing: 'ease-out' });
+    e.animate([{ transform: 'scale(1.22)', color }, { transform: 'scale(1)' }], { duration: 650, easing: 'ease-out' }); // [perf] 不用 filter(見 hud.css)
   }
 
   // ---------- 生命 / 護甲 / 耐力 ----------
@@ -327,8 +327,8 @@ export class Hud {
     const inK = Math.min(0.3, 520 / ms), outK = Math.min(0.3, 700 / ms), OUT = 'cubic-bezier(.2,.7,.2,1)', IO = 'cubic-bezier(.65,0,.35,1)';
     const kf = R
       ? [{ opacity: 0 }, { opacity: 1, offset: inK }, { opacity: 1, offset: 1 - outK }, { opacity: 0 }]
-      : [{ opacity: 0, filter: 'blur(7px)', transform: 'scale(1.05)', easing: OUT }, { opacity: 1, filter: 'blur(0px)', transform: 'none', offset: inK },
-        { opacity: 1, filter: 'blur(0px)', transform: 'none', offset: 1 - outK, easing: IO }, { opacity: 0, filter: 'blur(3px)', transform: 'translateY(-.18em)' }];
+      : [{ opacity: 0, transform: 'scale(1.08)', easing: OUT }, { opacity: 1, transform: 'none', offset: inK }, // [perf] 不用 blur:filter 動畫會讓合成器現場編譯 shader
+        { opacity: 1, transform: 'none', offset: 1 - outK, easing: IO }, { opacity: 0, transform: 'translateY(-.18em)' }];
     e.animate(kf, { duration: ms, delay, fill: 'backwards' });
   }
 

@@ -41,8 +41,8 @@
 .mn-stage { position: absolute; right: max(4vw, 24px); top: 14vh; z-index: 2; width: min(520px, 40vw); }
 .mn-stage:empty { display: none; }
 /* 主選單右側:按鍵一覽 */
-.mn-side { position: absolute; right: max(4vw, 24px); bottom: 70px; z-index: 1; width: min(420px, 34vw); padding: 14px 18px 12px; background: rgba(8, 8, 8, .55);
-  border: 1px solid rgba(255, 255, 255, .08); backdrop-filter: blur(2px); }
+.mn-side { position: absolute; right: max(4vw, 24px); bottom: 70px; z-index: 1; width: min(420px, 34vw); padding: 14px 18px 12px; background: rgba(8, 8, 8, .66);
+  border: 1px solid rgba(255, 255, 255, .08); } /* [perf] 不用 backdrop-filter:背後的 3D 畫面每幀都在變,模糊每幀都要重算 */
 .mn-sideh { font-size: 12px; letter-spacing: 6px; color: var(--mn-amber); margin-bottom: 8px; }
 .mn-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 18px; }
 .mn-keys div { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, .04); font-size: 13px; min-width: 0; }

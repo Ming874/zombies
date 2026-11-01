@@ -21,8 +21,6 @@ const SAFE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="curren
 // 綠色版的響鈴標記(沿用 interact.css 的 .ix-ring 版型,只換顏色)
 const SAFE_CSS = `.ix-ring.zch-safe { --amber: #5dff8a; color: #5dff8a; }
 .ix-ring.zch-safe .badge { background: radial-gradient(circle, rgba(10,60,26,.85) 0, rgba(4,20,9,.78) 70%); box-shadow: 0 0 12px rgba(80,255,130,.75), 0 0 26px rgba(40,230,100,.35), inset 0 0 8px rgba(80,255,130,.3); }
-.ix-ring.zch-safe .badge svg { filter: drop-shadow(0 0 3px rgba(110,255,150,.9)); }
-.ix-ring.zch-safe .dir u { filter: drop-shadow(0 0 4px rgba(80,255,130,.95)); }
 .ix-ring.zch-safe span { color: #d2ffdc; border-color: rgba(93,255,138,.6); }
 .ix-ring.zch-safe.wall .badge { box-shadow: 0 0 9px rgba(80,255,130,.5); }`;
 const _pv = new THREE.Vector3();

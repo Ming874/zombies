@@ -87,6 +87,14 @@ npm start            # 正式環境:node server/index.js 同時提供 dist/ 靜�
 - 健康檢查:`/healthz`;公開房間列表:`/api/rooms`。
 - 網址參數(除錯用):`?physics=off|main|worker`、`?blockout`(灰盒場景)、`?room=代碼`(直接加入房間)。
 
+### 效能:遊戲中偶爾整個畫面停 1~3 秒
+
+Windows 版 Chrome 預設用 ANGLE 的 Direct3D 11 後端:畫面上第一次出現某種繪製組合時,會現場把 shader 編譯成 D3D 版本。舊款或時脈低的 CPU(例如 Xeon E5 v3)一次要 0.5~3 秒,期間整個畫面停住,而且每次開遊戲都可能再發生(F3 面板的「卡頓 >50ms」會一直增加)。
+改用 Vulkan 後端可以避開:在網址列打開 `chrome://flags/#use-angle`,把「Choose ANGLE graphics backend」改成 **Vulkan**,重新啟動 Chrome。
+實測(Xeon E5-2678 v3 + RTX 3060):載入從約 44 秒降到約 22 秒,遊戲中的卡頓幾乎消失;平均幀率比 D3D11 低一點(混戰時約 34 對 41 FPS)。
+
+HUD、字幕、提示等網頁元素刻意不用 CSS `filter` / `backdrop-filter` / `mask`(會在瀏覽器合成器每幀重新套用,並觸發上述的 shader 編譯);需要模糊、褪色的畫面效果請寫在 `src/game/post.js` 的 uniform。
+
 ### 部署(Zeabur)
 
 `zbpack.json` 已設定 `build_command: npm run build`、`start_command: node server/index.js`;平台提供的 `PORT` 會自動使用。推送到追蹤的分支即會重新部署。

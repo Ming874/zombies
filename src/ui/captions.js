@@ -63,7 +63,7 @@ if (typeof window !== 'undefined') window.__captions = captions;
 // 收掉的那一行:很快淡掉(不要和新的人疊在一起)
 export function cutEl(el, ms = 220) {
   if (!el) return;
-  el.style.transition = `opacity ${ms}ms linear, filter ${ms}ms linear`;
+  el.style.transition = `opacity ${ms}ms linear`;
   el.classList.add('out', 'cut');
   setTimeout(() => el.remove(), ms + 40);
 }

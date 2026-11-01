@@ -14,19 +14,21 @@ import { installPCSS } from '../gfx/pcss.js';
 //   grain 顆粒加量 · desat 去飽和 · beat 心跳的暗角脈動(0..1)
 // [gpu] scare 驚嚇脈衝(src/gfx/grade.js 聽 horror 的 'scare' 事件寫入並衰減)→ 只有這時候才有明顯的邊緣色差;
 //   uCA 平時的鏡頭色差(預設 0)· uGrain0 線性空間的基本顆粒(預設 0:底片顆粒改在最後的調色 pass 依亮度加)
+//   daze 尖叫者的暈眩(src/zombies/behaviors/daze.js):模糊 + 褪色 + 對比。以前是畫布的 CSS filter,
+//   合成器每幀重套、模糊半徑一變就現場編譯 shader(弱 CPU 上卡 1~2 秒)→ 改在這裡做
 export const PostShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, aspect: { value: 1 }, hurt: { value: 0 }, past: { value: 0 }, // [ghost] past:回憶(src/horror/memories.js)
     fade: { value: 0 }, fadeCol: { value: new THREE.Color(0, 0, 0) }, tint: { value: 0 }, tintCol: { value: new THREE.Color(0.55, 0.06, 0.03) },
     vig: { value: 0 }, lid: { value: 0 }, crt: { value: 0 }, roll: { value: 0 }, dawn: { value: 0 }, grain: { value: 0 }, desat: { value: 0 }, beat: { value: 0 },
-    scare: { value: 0 }, uCA: { value: 0 }, uGrain0: { value: 0 },
+    scare: { value: 0 }, uCA: { value: 0 }, uGrain0: { value: 0 }, daze: { value: 0 },
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float time; uniform float aspect; uniform float hurt; uniform float past;
     uniform float fade; uniform vec3 fadeCol; uniform float tint; uniform vec3 tintCol; uniform float vig; uniform float lid;
     uniform float crt; uniform float roll; uniform float dawn; uniform float grain; uniform float desat; uniform float beat;
-    uniform float scare; uniform float uCA; uniform float uGrain0;
+    uniform float scare; uniform float uCA; uniform float uGrain0; uniform float daze;
     varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     void main(){
@@ -47,8 +49,15 @@ export const PostShader = {
       c.g = texture2D(tDiffuse, uv).g;
       c.b = texture2D(tDiffuse, uv - off2).b;
       c.a = 1.0;
+      if (daze > 0.001) { // 暈眩:8 點圓盤模糊(半徑約畫面高度的 0.45%)+ 對比
+        vec2 rd = vec2(0.0045 / aspect, 0.0045) * daze;
+        vec3 bl = c.rgb;
+        for (int i = 0; i < 8; i++) { float a = float(i) * 0.7854; bl += texture2D(tDiffuse, uv + vec2(cos(a), sin(a)) * rd).rgb; }
+        c.rgb = mix(c.rgb, bl / 9.0, clamp(daze * 1.4, 0.0, 1.0));
+        c.rgb = max(vec3(0.0), (c.rgb - 0.18) * (1.0 + 0.25 * daze) + 0.18);
+      }
       float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-      c.rgb = mix(vec3(l), c.rgb, clamp(0.8 - hurt * 0.5 - desat, 0.0, 1.0));
+      c.rgb = mix(vec3(l), c.rgb, clamp(0.8 - hurt * 0.5 - desat - daze * 0.55, 0.0, 1.0));
       vec2 dv = vUv - 0.5;
       float L = length(dv * vec2(aspect * 0.8, 1.0));
       float vg = clamp(vig + beat * 0.22, -0.6, 1.0);

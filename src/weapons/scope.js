@@ -245,7 +245,7 @@ export class CenterHud {
     const op = !o.show || amt > 0.05 ? 0 : Math.max(0, 1 - o.ads * 1.8) * (o.busy ? 0.35 : 1);
     if (Math.abs(op - this.lastOp) > 0.01) { this.lastOp = op; this.ret.style.opacity = op.toFixed(2); }
     const kind = o.shotgun ? 'shotgun' : '';
-    if (kind !== this.kind) { this.kind = kind; this.ret.className = kind; }
+    if (kind !== this.kind) { this.kind = kind; this.ret.className = kind; this.lastGap = -1; }
     const gap = Math.max(3, Math.min(120, o.gapPx));
     if (op > 0 && Math.abs(gap - this.lastGap) > 0.25) {
       this.lastGap = gap;
@@ -255,7 +255,7 @@ export class CenterHud {
       P.l.style.transform = `translateX(${-gap.toFixed(1)}px)`;
       P.r.style.transform = `translateX(${gap.toFixed(1)}px)`;
       const d = gap * 2;
-      Object.assign(P.ring.style, { width: `${d.toFixed(1)}px`, height: `${d.toFixed(1)}px`, left: `${-gap.toFixed(1)}px`, top: `${-gap.toFixed(1)}px` });
+      if (kind) Object.assign(P.ring.style, { width: `${d.toFixed(1)}px`, height: `${d.toFixed(1)}px`, left: `${-gap.toFixed(1)}px`, top: `${-gap.toFixed(1)}px` }); // 霰彈的圈(其他槍隱藏:不用每幀改尺寸觸發排版)
     }
     return this.sway;
   }

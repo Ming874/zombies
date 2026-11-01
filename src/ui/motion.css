@@ -50,7 +50,8 @@
 @keyframes mo-rise { from { opacity: 0; translate: 0 10px; } }
 @keyframes mo-fade { from { opacity: 0; } }
 @keyframes mo-rule { from { opacity: 0; scale: 0 1; } }
-@keyframes mo-ink { from { opacity: 0; filter: blur(10px); scale: 1.04; } 60% { opacity: 1; filter: blur(.6px); } }
+/* [perf] 墨水暈開不用 filter: blur(合成器每個模糊半徑都要現場編譯 shader,弱 CPU 卡 1~2 秒):改成淡入 + 縮放 */
+@keyframes mo-ink { from { opacity: 0; scale: 1.08; } 60% { opacity: 1; scale: 1.01; } }
 /* 離開(按下單人):按鈕往下沉、其他淡出 */
 #menu.mo-leave > * { transition: opacity .2s var(--mo-in), translate .24s var(--mo-in); opacity: 0; translate: 0 6px; pointer-events: none; }
 #menu.mo-leave .mn-wrap { transition-delay: 40ms; }
@@ -88,7 +89,7 @@
 .mo-card .s { font-size: clamp(15px, 1.5vw, 21px); letter-spacing: .32em; padding-left: .32em; color: rgba(230, 224, 208, .78); }
 .mo-card .l { font-size: clamp(14px, 1.3vw, 19px); line-height: 1.9; letter-spacing: .12em; color: rgba(230, 224, 208, .85); }
 .mo-card .img img, .mo-card .img canvas { display: block; max-width: min(40em, 80vw); max-height: 52vh; box-shadow: 0 1.4em 3em rgba(0, 0, 0, .8); }
-@keyframes mo-ink-in { from { opacity: 0; filter: blur(8px); translate: 0 .25em; } 55% { filter: blur(.8px); } }
+@keyframes mo-ink-in { from { opacity: 0; translate: 0 .25em; scale: 1.06; } 55% { scale: 1.01; } }
 /* 開場標題卡:印刷字、時間用監視器的等寬字 */
 .mo-card.cold { background: #000; }
 .mo-card.cold .t { font-size: clamp(34px, 5vw, 70px); letter-spacing: .3em; padding-left: .3em; }

@@ -6,7 +6,8 @@ let D = null;
 export function daze(game, k) {
   if (!game || !game.player || !(k > 0.05)) return;
   k = Math.min(1, k);
-  const c = game.renderer && game.renderer.domElement;
+  // 畫面效果寫進最後一道後處理的 uniform(src/game/post.js daze);不用畫布的 CSS filter(合成器每幀重套、現場編譯 shader)
+  const c = game.post?.uniforms?.daze || null;
   if (D) { D.k = Math.max(D.k * (1 - D.t / D.dur), k); D.t = 0; D.dur = 1.4 + 1.6 * D.k; return; }
   D = { game, c, k, t: 0, dur: 1.4 + 1.6 * k, last: performance.now(), ph: Math.random() * 6 };
   sfx.zDaze?.(k);
@@ -21,9 +22,9 @@ function step(now) {
   d.last = now;
   d.t += dt;
   const u = d.t / d.dur;
-  if (u >= 1 || d.game.state !== 'playing') { if (d.c) d.c.style.filter = ''; D = null; return; }
+  if (u >= 1 || d.game.state !== 'playing') { if (d.c) d.c.value = 0; D = null; return; }
   const e = (u < 0.08 ? u / 0.08 : 1 - (u - 0.08) / 0.92) * d.k; // 一下子衝上來再慢慢退
-  if (d.c) d.c.style.filter = `blur(${(e * 3.2).toFixed(2)}px) saturate(${(1 - 0.55 * e).toFixed(2)}) contrast(${(1 + 0.25 * e).toFixed(2)})`;
+  if (d.c) d.c.value = e;
   const p = d.game.player;
   if (!d.game.paused) {
     // 視角漂移(瞄準被干擾):低頻、兩個不同週期疊加

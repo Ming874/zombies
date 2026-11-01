@@ -46,7 +46,7 @@
 #wx-hit i:nth-child(3) { transform: rotate(225deg); } #wx-hit i:nth-child(4) { transform: rotate(315deg); }
 #wx-hit.head i { background: #ffb43a; height: 9px; top: -18px; transform-origin: 1px 18px; }
 #wx-hit.kill i { background: #ff3326; width: 3px; left: -1.5px; height: 11px; top: -21px; transform-origin: 1.5px 21px; box-shadow: 0 0 4px rgba(255,40,20,.8), 0 0 1px #000; }
-#wx-hit .skull { position: absolute; left: -11px; top: 24px; width: 22px; height: 22px; display: none; filter: drop-shadow(0 0 2px #000); }
+#wx-hit .skull { position: absolute; left: -11px; top: 24px; width: 22px; height: 22px; display: none; } /* [perf] 不用 filter(見 src/ui/hud.css) */
 #wx-hit.kill.head .skull { display: block; }
 #wx-hit.pop { animation: wx-pop .32s ease-out; }
 @keyframes wx-pop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
