@@ -1,4 +1,8 @@
-// 以 WebAudio 即時合成所有音效(不需任何音檔)
+// 以 WebAudio 即時合成所有音效(不需任何音檔);配樂(錄音串流 + 程式合成)在 src/audio/
+import { A, attach as attachMusic } from './audio/core.js';
+import { startMusic, setMood, setTension, setHealth, addPain } from './audio/music.js';
+import { sting, preloadStings, resumeTracks } from './audio/tracks.js';
+
 let ctx = null;
 let master = null;
 let reverb = null;
@@ -30,12 +34,28 @@ function ensure() {
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const nd = noiseBuf.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  attachMusic(ctx, master);
   return ctx;
 }
 
+// AudioContext 只能在使用者互動後恢復;第一次互動(點擊、按鍵)就啟動配樂,選單也聽得到
+let booted = false;
+function boot() {
+  if (booted || !ctx) return;
+  booted = true;
+  startMusic();
+  preloadStings();
+}
 export function resume() {
   const c = ensure();
-  if (c && c.state === 'suspended') c.resume();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().then(boot, () => {});
+  else boot();
+  resumeTracks();
+}
+if (typeof document !== 'undefined') {
+  const unlock = () => { resume(); if (ctx && ctx.state === 'running') for (const e of ['pointerdown', 'keydown', 'touchstart']) document.removeEventListener(e, unlock, true); };
+  for (const e of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(e, unlock, true);
 }
 
 function out(node, wet = 0.3) {
@@ -98,6 +118,7 @@ export const sfx = {
     noise(s.dur, 'lowpass', s.crack, 300, s.vol, 0.45);
     noise(0.04, 'highpass', 3000, 1000, s.vol * 0.7, 0.2);
     tone('sine', s.thump, 38, s.tdur, s.vol * 0.9, 0.2);
+    if (ctx) A.combatT = ctx.currentTime; // 配樂:最近的戰鬥活動
   },
   dry() { tone('square', 1800, 1500, 0.03, 0.12, 0); },
   reload(id) {
@@ -119,14 +140,25 @@ export const sfx = {
     noise(1.0, 'bandpass', 380, 220, v * 0.9, 0.4, 0, 6);
   },
   attack() { tone('sawtooth', 220, 90, 0.35, 0.25, 0.3); },
-  hurt() { tone('sine', 100, 40, 0.35, 0.8, 0.2); noise(0.25, 'lowpass', 500, 100, 0.5, 0.2); },
+  hurt() {
+    tone('sine', 100, 40, 0.35, 0.8, 0.2); noise(0.25, 'lowpass', 500, 100, 0.5, 0.2);
+    if (ctx) A.combatT = ctx.currentTime;
+    addPain(0.5); // 配樂:受傷後心跳
+  },
   coin(i = 0) { tone('sine', 1200 + (i % 5) * 120, 1800 + (i % 5) * 120, 0.12, 0.12, 0.2); tone('sine', 2400, 3000, 0.1, 0.05, 0.2, 0.05); },
   buy() { tone('triangle', 600, 900, 0.15, 0.2, 0.2); tone('triangle', 900, 1400, 0.2, 0.2, 0.2, 0.12); },
   deny() { tone('square', 200, 150, 0.2, 0.2, 0); },
   step() { noise(0.09, 'lowpass', 500, 150, 0.22, 0.25); },
   switch() { noise(0.06, 'bandpass', 2000, 1000, 0.18, 0.05, 0, 2); tone('square', 500, 300, 0.05, 0.1, 0.05, 0.04); },
-  roundStart() { tone('sawtooth', 110, 55, 1.4, 0.25, 0.6); tone('sine', 55, 40, 1.8, 0.4, 0.5); },
-  roundEnd() { tone('triangle', 440, 440, 0.4, 0.15, 0.5); tone('triangle', 660, 660, 0.6, 0.15, 0.5, 0.2); },
+  // 回合開始/結束:串流的錄音刺擊(還沒載好時用合成版)
+  roundStart() {
+    if (sting('round', 0.9, 6)) return;
+    tone('sawtooth', 110, 55, 1.4, 0.25, 0.6); tone('sine', 55, 40, 1.8, 0.4, 0.5);
+  },
+  roundEnd() {
+    if (sting('gong', 0.9, 7)) return;
+    tone('triangle', 440, 440, 0.4, 0.15, 0.5); tone('triangle', 660, 660, 0.6, 0.15, 0.5, 0.2);
+  },
   ambient() {
     // 低頻環境嗡鳴 + 偶爾的遠處聲響
     if (!ensure()) return;
@@ -140,11 +172,20 @@ export const sfx = {
     g.gain.value = 0.05;
     o.connect(f);
     f.connect(g);
-    out(g, 0.2);
+    // 嗡鳴音量跟著配樂狀態(music.js 的 amb)
+    A.ambG = ctx.createGain();
+    A.ambG.gain.value = A.ambLevel;
+    g.connect(A.ambG);
+    out(A.ambG, 0.2);
     o.start();
     setInterval(() => {
       if (Math.random() < 0.5) noise(0.6, 'lowpass', 400, 80, 0.06, 0.9);
       else tone('sine', 90 + Math.random() * 60, 50, 0.9, 0.05, 0.9);
     }, 7000);
   },
+
+  // ---- 配樂 ----
+  setMood(m) { setMood(m); }, // 'menu' | 'fight' | 'boss' | 'break' | 'shop' | 'dead'
+  setTension(x) { setTension(x); }, // 0..1:最近的殭屍越近越緊張
+  setHealth(r) { setHealth(r); }, // 玩家血量比例 0..1(低血量:心跳)
 };

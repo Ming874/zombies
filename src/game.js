@@ -10,7 +10,12 @@ import { buildHospital } from './map/hospital.js';
 import { makeBloodSplat } from './map/textures.js';
 import { Player } from './player.js';
 import { WeaponSystem, WEAPONS, ORDER } from './weapons/weapon.js';
-import { Zombie } from './zombie.js';
+import { Zombie, LOOK_TYPES, warmZombies } from './zombie.js';
+import { prewarm, variantReady } from './zombies/model.js';
+import { loadRealistic } from './zombies/realistic.js';
+import { ZU } from './zombies/materials.js';
+import { assets } from './sys/assets.js';
+import { uploads } from './sys/uploads.js';
 import { Coins } from './coins.js';
 import { Shop } from './shop.js';
 import { UI } from './ui.js';
@@ -77,6 +82,11 @@ export class Game {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     this.renderer = renderer;
+    // 殭屍模型:寫實角色(GLB)排隊下載、貼圖逐幀上傳;程式生成的變體在背景 Worker 預建
+    uploads.attach(renderer);
+    assets.open();
+    loadRealistic();
+    prewarm();
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050606);
@@ -145,6 +155,7 @@ export class Game {
     this.resetRun();
     this.ui.setHP(this.player.hp, this.player.maxHp);
     this.updateAmmoHud();
+    sfx.setMood('menu');
   }
 
   resize() {
@@ -252,10 +263,11 @@ export class Game {
     if (hits.length && hits[0].distance < wallDist) {
       const h = hits[0];
       const z = h.object.userData.zombie;
-      const head = h.object.userData.part === 'head';
+      const part = h.object.userData.part;
+      const head = part === 'head';
       const dmg = def.damage * (head ? 2 : 1);
       end.copy(h.point);
-      const killed = z.damage(dmg);
+      const killed = z.damage(dmg, part);
       this.burst(h.point, dir.clone().negate(), 'blood', head ? 14 : 8);
       this.ui.hitMarker(head);
       (head ? sfx.headshot : sfx.hit)();
@@ -329,6 +341,7 @@ export class Game {
     this.ui.banner(`第 ${n} 回合`, `殭屍 ${this.toSpawn} 隻`, 3000);
     this.ui.prompt(null);
     sfx.roundStart();
+    sfx.setMood(n % 5 === 0 ? 'boss' : 'fight'); // 每 5 回合(商店開放前)是高潮回合
     this.updateAmmoHud();
   }
 
@@ -351,6 +364,7 @@ export class Game {
     this.phase = 'collecting';
     this.ui.banner(`第 ${this.round} 回合結束`, '收集金幣中…', 3000);
     sfx.roundEnd();
+    sfx.setMood('break');
     this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
     this.ui.setHP(this.player.hp, this.player.maxHp);
     const after = () => {
@@ -359,6 +373,7 @@ export class Game {
         this.phase = 'shop';
         this.shop = new Shop(this.scene, this.world);
         this.ui.banner('武器商店開放', '前往醫院大門(南側玄關)購買武器', 5000);
+        sfx.setMood('shop');
       } else {
         this.phase = 'break';
         this.breakTimer = 6;
@@ -411,6 +426,7 @@ export class Game {
 
   die() {
     this.state = 'dead';
+    sfx.setMood('dead');
     document.exitPointerLock();
     this.input.fireHeld = false;
     document.getElementById('deadinfo').innerHTML = `你撐到了第 <b>${this.round}</b> 回合<br />累積金幣 ${this.player.coins}`;
@@ -423,6 +439,11 @@ export class Game {
     this.hospital.update(this.time);
     this.post.uniforms.time.value = this.time % 100;
     this.updateParticles(dt);
+    ZU.uTime.value = this.time; // 殭屍材質:焦屍裂縫的餘燼閃爍
+    ZU.uFlash.value = this.player.flashOn ? 1 : 0; // 手電筒照到殭屍眼睛的反光
+    // 選單與回合間:繼續預建殭屍模型;全部類型都有變體後預先編譯殭屍 shader(第一隻出現時才不會卡)
+    if (this.state !== 'playing' || this.phase !== 'fighting') prewarm();
+    if (!this.zWarm && LOOK_TYPES.every(variantReady)) { this.zWarm = true; warmZombies(this.renderer, this.scene, this.camera); }
 
     if (this.state !== 'playing') {
       // 選單/死亡:鏡頭保持,只更新場景動畫
@@ -469,6 +490,12 @@ export class Game {
 
     this.coins.update(dt, p);
     this.ui.setZombies(this.phase === 'fighting' ? this.zombiesLeft() : 0);
+
+    // 配樂:最近的殭屍越近越緊張、低血量心跳
+    let near = 99;
+    for (const z of this.zombies) if (z.alive) near = Math.min(near, Math.hypot(z.pos.x - p.pos.x, z.pos.z - p.pos.z));
+    sfx.setTension(Math.max(0, Math.min(1, 1 - (near - 1.5) / 12)));
+    sfx.setHealth(p.hp / p.maxHp);
 
     // 回合狀態
     if (this.phase === 'fighting' && this.toSpawn === 0 && !this.zombies.some((z) => z.alive)) this.endRound();
