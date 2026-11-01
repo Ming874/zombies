@@ -214,7 +214,7 @@ export const WRITINGS = [
   { id: 'w.psych', kind: 'static', text: '每天晚上\n都有人來打針', zone: 'f3_corridor', style: 'scratch', who: '受試者 004', why: '熟悉的人聲讓宿主暫時安靜', when: '2003 封院期間', size: 0.15, h: 1.3, hint: 'rule:voice' },
   { id: 'w.archive', kind: 'static', text: '207 病歷\n借閱：神經科　王　未還', zone: 'b1_archive', style: 'marker', who: '舊病歷庫管理員', why: '2003 封院期間 的床位異動;正本其實一直在 207 的床墊底下', when: '2003 封院期間', size: 0.16, h: 1.5 },
   { id: 'w.dorm', kind: 'static', text: '207 的燈不要關\n等她醒來，讓她自己關　——林', zone: 'f3_dorm', style: 'chalk', who: '2003 年的修女', why: '七月初三帶小美離開前寫在宿舍白板上(2003 年的信裡也寫了同一句)', when: '七月初三 00:30', size: 0.16, h: 1.45 },
-  { id: 'w.icu', kind: 'static', text: '機器的聲音會叫他們來\n關掉！', zone: 'f2_icu', style: 'marker', who: '急診護理師大新的看護', why: '她發現聲音會把宿主引過來(「他們聽得到」也是她寫的);之後下落不明', when: '七月初四', size: 0.16, h: 1.5, hint: 'rule:sound' },
+  { id: 'w.icu', kind: 'static', text: '機器一響\n就會把他們叫來\n關掉！', zone: 'f2_icu', style: 'marker', who: '急診護理師大新的看護', why: '她發現聲音會把宿主引過來(「他們聽得到」也是她寫的);之後下落不明', when: '七月初四', size: 0.16, h: 1.5, hint: 'rule:sound' },
   { id: 'w.playroom', kind: 'static', text: '護理長阿嬤\n明天還來講故事嗎', zone: 'f2_playroom', style: 'crayon', who: '小兒科的孩子(活著)', why: '阿嬤以前在遊戲室講故事', when: '2003 封院期間', size: 0.14, h: 0.8 },
   { id: 'w.laundry', kind: 'static', text: '床單不夠了\n先用白布', zone: 'b1_laundry', style: 'marker', who: '洗衣房的阿姨', why: '病房的白布都拿去蓋人了', when: '七月初四', size: 0.16, h: 1.5 },
   // 事件:趁玩家背對時出現(作者是鬼;留白:監視器拍不到是誰寫的)
@@ -276,7 +276,7 @@ export const CAPTIONS = {
 // 鬼不說謊(§1.9):說「剛剛是關著的」的那扇門真的是關著的,而且接著就會打開;說「它停在你後面」時,後面真的有腳步停下來。
 export const CALLS = [
   { id: 'call.sys.switch', act: 1, sys: true, who: '總機的自動語音', why: '總機的自動語音還在運作;同一區內的內線還通(§11.5)', when: '2026 年',
-    lines: [{ text: '這裡是總機。您撥的分機，已經沒有人了。' }, { text: '……如需轉接，請稍候。', gap: 1.6 }, { text: '……您撥的分機，已經沒有人了。', gap: 2.4 }], end: 'tone', w: 0.8 },
+    lines: [{ text: '這裡是總機。\n您撥的分機，已經沒有人了。' }, { text: '……如需轉接，請稍候。', gap: 1.6 }, { text: '……您撥的分機，已經沒有人了。', gap: 2.4 }], end: 'tone', w: 0.8 },
   { id: 'call.sys.207', act: 1, sys: true, who: '院內呼叫的舊錄音', why: 'R2 護理站的舊電話放的是 207 家屬的呼叫錄音', when: '2003 年',
     lines: [{ text: '……林秀英護理長，請到一樓大廳。' }, { text: '林秀英護理長……', gap: 1.2 }, { text: '……一樓大廳……', gap: 1.6 }], end: 'dead', w: 0.7, once: true },
   { id: 'call.zheng.rounds', act: 1, ghost: 'zheng', who: '林秀英(內線)', why: '她還在值夜班;世界規則「他們聽得到」', when: '七月十一之後',
@@ -288,7 +288,7 @@ export const CALLS = [
   { id: 'call.window', act: 2, ghost: 'lobby', who: '大廳的人(內線)', why: '他們還在等大新的專車;專車從來沒有來', when: '七月初三', need: { window: true },
     lines: [{ text: '別看窗外。' }, { text: '……他們還在外面等。', gap: 1.0 }, { text: '我說了，別看。', gap: 2.4 }], cues: [{ line: 1, kind: 'window', at: 0.8 }], end: 'dead', w: 1.3 },
   { id: 'call.prop', act: 2, who: '不明(內線;亡者)', why: '鬼不說謊:那個東西真的被推過了', when: '現在', need: { propBehind: true },
-    lines: [{ text: '你背後那張{物}……' }, { text: '剛剛不在那裡。', gap: 1.4 }, { text: '不要回頭。', gap: 1.2 }], cues: [{ line: 0, kind: 'prop', at: 1.4 }], end: 'breath', w: 1.2 },
+    lines: [{ text: '你背後那個{物}……' }, { text: '剛剛不在那裡。', gap: 1.4 }, { text: '不要回頭。', gap: 1.2 }], cues: [{ line: 0, kind: 'prop', at: 1.4 }], end: 'breath', w: 1.2 },
   { id: 'call.steps', act: 2, who: '不明(內線;亡者)', why: '腳步聲真的停在你後面', when: '現在', need: { behindFree: true },
     lines: [{ text: '你有沒有聽到……腳步聲？' }, { text: '……它停在你後面了。', gap: 3.4 }], cues: [{ line: 0, kind: 'steps', at: 1.6 }, { line: 1, kind: 'breath', at: 1.6 }], end: 'breath', w: 1.1 },
   { id: 'call.ear', act: 2, who: '不明(亡者)', why: '電話那頭的聲音,其實在你旁邊', when: '現在',
@@ -302,7 +302,7 @@ export const CALLS = [
   { id: 'call.seen.ama', act: 1, ghost: 'zheng', who: '林秀英(阿嬤,內線)', why: '引用你剛剛看到的她(h.remember);她認得你', when: '現在', need: { seen: 'zheng' },
     lines: [{ text: '你剛剛看到阿嬤了吧。' }, { text: '……免驚。阿嬤在這裡。', gap: 1.4 }], cues: [{ line: 1, kind: 'steps', at: 1.0 }], end: 'click', w: 1.4, once: true },
   { id: 'call.seen.dark', act: 1, ghost: 'zheng', who: '林秀英(阿嬤,內線)', why: '引用剛剛走廊全暗的那一段;鬼不說謊:那口氣不是她', when: '現在', need: { seen: 'dark' },
-    lines: [{ text: '「剛剛燈熄的時候……你有聽到嗎？」' }, { text: '「那不是阿嬤……阿嬤不會在你耳邊喘氣。」', gap: 1.6 }], cues: [{ line: 1, kind: 'breath', at: 1.0 }], end: 'breath', w: 1.4, once: true },
+    lines: [{ text: '剛剛燈熄的時候……你有聽到嗎？' }, { text: '那不是阿嬤。\n……阿嬤不會在你耳邊喘氣。', gap: 1.6 }], cues: [{ line: 1, kind: 'breath', at: 1.0 }], end: 'breath', w: 1.4, once: true },
   { id: 'call.seen.taboo', act: 1, ghost: 'zheng', who: '林秀英(阿嬤,內線)', why: '引用你剛剛碰到的鬼月禁忌', when: '現在', need: { seen: 'taboo' },
     lines: [{ text: '現在是七月。' }, { text: '有人叫你名字，不要回頭。', gap: 1.2 }, { text: '有人拍你肩膀，不要轉頭。', gap: 0.8 }], end: 'click', w: 1.2, once: true },
   { id: 'call.ringback', act: 3, who: '不明(內線;亡者)', why: '掛掉之後又打來', when: '現在', ringbackOnly: true,
@@ -311,23 +311,23 @@ export const CALLS = [
 // 依地點的來電(你站的地方發生過什麼;只說那個人死前知道的事)
 export const PLACE_CALLS = {
   f1_lobby: { ghost: 'lobby', who: '大廳的人(內線)', why: '七月初三集合事件;專車沒有來', when: '七月初三',
-    lines: [{ text: '你站的地方……七月初一那天晚上，坐滿了人。' }, { text: '大家都在等家人醒來。', gap: 0.8 }, { text: '……醒來的，不是他們。', gap: 1.6 }], end: 'dead' },
+    lines: [{ text: '你站的地方……\n七月初一那天晚上，坐滿了人。' }, { text: '大家都在等家人醒來。', gap: 0.8 }, { text: '……醒來的，不是他們。', gap: 1.6 }], end: 'dead' },
   f2_ward_207: { ghost: 'zheng', who: '林秀英(內線)', why: '1999/9/24 起,207 一直是小美(2003 封院後被轉去山上的研究站);金水伯每天晚上看那扇窗', when: '七月十一之前',
     lines: [{ text: '那張床……四年來，都是同一個人。' }, { text: '沒有人知道她叫什麼名字。', gap: 0.8 }, { text: '……燈不要關。', gap: 1.4 }], end: 'click', hint: 'quest:207light' },
   b1_morgue: { who: '喚醒之夜被大新清理隊放進冰櫃的人(內線)', why: '回收清冊上有你的編號「預約中」(A8)', when: '七月下旬',
     lines: [{ text: '你腳邊那一排抽屜……' }, { text: '有一格，留給 207 的家屬。', gap: 1.0 }, { text: '……就是你。', gap: 1.8 }], cues: [{ line: 1, kind: 'knock', at: 0.8 }], end: 'dead' },
   f3_corridor: { who: '試驗病房的病人(內線;亡者)', why: '三樓試驗病房的門從外面鎖;病人用刻痕數日子', when: '2003 封院期間',
-    lines: [{ text: '「三樓的門……都是從外面鎖的。」' }, { text: '「護理長敲門，沒有人應。」', gap: 0.8 }], end: 'dead' },
+    lines: [{ text: '三樓的門……都是從外面鎖的。' }, { text: '護理長來敲過門……沒有人應。', gap: 0.8 }], end: 'dead' },
   psych_cell: { who: '試驗病房的病人(內線;亡者)', why: '三樓試驗病房的門從外面鎖;病人用刻痕數日子', when: '2003 封院期間',
-    lines: [{ text: '「你在隔離房裡面……門是從外面鎖的。」' }, { text: '「2003 年，這裡關過六個人。」', gap: 0.8 }], cues: [{ line: 1, kind: 'knock', at: 0.6 }], end: 'dead' },
+    lines: [{ text: '你在隔離房裡面。\n……門是從外面鎖的。' }, { text: '2003 年，這裡關過六個人。', gap: 0.8 }], cues: [{ line: 1, kind: 'knock', at: 0.6 }], end: 'dead' },
   f2_nursery: { ghost: 'zheng', who: '值夜護理師的聲音(留白;孩子們都活著離開了)', why: '七月初三夜,2003 年的修女把孩子帶到廟口', when: '七月初三',
     lines: [{ text: '孩子們都平安出去了。' }, { text: '……阿孫，你也是在這裡出生的。', gap: 1.0 }], end: 'click' },
   f1_chapel: { who: '禮拜堂的人(內線;亡者)', why: '2003 年的修女的習慣:有人在等,就點一根蠟燭', when: '現在',
     lines: [{ text: '蠟燭……還有人在點嗎？' }, { text: '修女說，有人在等，就點一根。', gap: 0.8 }], end: 'click', hint: 'egg:candle' },
   f1_er: { who: '急診的家屬(內線;亡者)', why: '正門焊死之後,家屬逃進急診,把門堵起來;外面一直有人在敲', when: '七月初三',
-    lines: [{ text: '急診的門……那天晚上是我們自己堵起來的。' }, { text: '外面一直有人在敲。', gap: 0.8 }, { text: '……不要開。', gap: 1.8 }], cues: [{ line: 1, kind: 'knock', at: 0.9 }], end: 'dead' },
+    lines: [{ text: '急診的門……\n那天晚上，是我們自己堵起來的。' }, { text: '外面一直有人在敲。', gap: 0.8 }, { text: '……不要開。', gap: 1.8 }], cues: [{ line: 1, kind: 'knock', at: 0.9 }], end: 'dead' },
   b1_boiler: { ghost: 'zheng', who: '林秀英(內線)', why: '207 的燈和監控室搶同一台發電機', when: '七月初二起',
-    lines: [{ text: '「這裡的油桶……」' }, { text: '「是給 207 的燈加油用的。」', gap: 0.8 }], end: 'click', hint: 'quest:207light' },
+    lines: [{ text: '這裡的油桶……' }, { text: '是給 207 的燈加油用的。', gap: 0.8 }], end: 'click', hint: 'quest:207light' },
   f1_waiting: { ghost: 'lobby', who: '候診區的人(內線;亡者)', why: '叫號機停在七月初三的號碼', when: '七月初三',
     lines: [{ text: '叫號機一直停在同一個號碼。' }, { text: '……那是我的號碼。', gap: 1.4 }], end: 'dead' },
   f3_dorm: { ghost: 'zheng', who: '林秀英(內線)', why: '2003 年的修女七月初三 00:41 的答錄機留言:「我明天回來。」她沒有回來(她在廟口)', when: '七月初三~十一',
@@ -335,7 +335,7 @@ export const PLACE_CALLS = {
   _default: { who: '不明(內線;亡者)', why: '它看得到你', when: '現在',
     lines: [{ text: '你在{房名}，對不對？' }, { text: '……我看得到你。', gap: 1.2 }], end: 'breath' },
 };
-// 道具與門的名字(電話裡說「你背後那張{物}」)
+// 道具與門的名字(電話裡說「你背後那個{物}」)
 export const PROP_NAMES = { wc: '輪椅', wheelchair: '輪椅', wheel: '輪椅', cart: '推車', linen: '布巾車', gurney: '推床', trolley: '推車', iv: '點滴架', chair: '椅子', stool: '凳子', bin: '垃圾桶', box: '紙箱',
   body_sheet: '白布', doll: '娃娃', incubator: '保溫箱', cell_door: '隔離房門', morgue_drawer: '冰櫃抽屜', mirror: '鏡子', candles: '蠟燭', generator: '發電機', bed_curtain: '隔簾', statue_mary: '聖母像', tv: '電視', cctv: '螢幕', phone: '電話', radio: '收音機' };
 export const DOOR_NAMES = { fire: '防火門', cell: '隔離房門', glass: '玻璃門', wood: '木門', chapel: '木門', metal: '鐵門', swing: '雙開門', ward: '病房門' };
