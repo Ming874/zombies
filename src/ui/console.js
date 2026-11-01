@@ -1,5 +1,5 @@
 import './console.css';
-import { ITEMS, findItem, itemNames, clampCount, countable, maxCount, applyGive } from '../game/give.js';
+import { ITEMS, CATS, findItem, itemNames, clampCount, countable, maxCount, applyGive } from '../game/give.js';
 import { CICON, WIDE } from './conicons.js';
 
 // ===== 控制面板(F8 開關)=====
@@ -55,11 +55,21 @@ function onKeyDown(e) {
 }
 
 // ---------- 介面 ----------
+// 常用指令:點了只填進輸入框(玩家可以接著改);物品格子:點一下直接給自己
+const QUICK = [
+  ['give me ', '給自己…'], ['give @a ', '給所有人…'], ['give me all', '全部給齊'], ['give me ammo', '補滿彈藥'],
+  ['give me hp', '補滿生命'], ['give me coins 1000', '1000 金幣'], ['list', '玩家清單'], ['help', '說明'],
+];
+
 function build() {
   if (S.el) return;
   const el = document.createElement('div');
   el.id = 'hzcon';
+  const quick = QUICK.map(([q, t]) => `<button type="button" data-q="${esc(q)}" title="填入 /${esc(q.trim())}"><b>${esc(t)}</b><code>${paintStatic('/' + q.trim())}</code></button>`).join('');
+  const tiles = itemNames().map((k) => `<button type="button" class="tile c-${ITEMS[k].cat}" data-k="${k}" title="給自己：${esc(ITEMS[k].name)}（/give me ${k}）">${icon(k)}<small>${esc(ITEMS[k].short)}</small></button>`).join('');
   el.innerHTML = `<div class="hd"><b>控制面板</b><span><kbd>F8</kbd> 關閉</span></div>
+    <div class="sec"><span class="lb">常用指令<small>點了填進輸入框</small></span><div class="qk">${quick}</div></div>
+    <div class="sec"><span class="lb">物品<small>點一下就給自己</small></span><div class="grid">${tiles}</div></div>
     <div class="log"></div>
     <div class="row"><div class="menu"></div><b>›</b><div class="ed"><div class="pt"><span></span></div><input spellcheck="false" autocomplete="off" placeholder="打指令，或從清單選，例如 /give me rpg" /></div></div>
     <div class="hint"></div>`;
@@ -73,12 +83,14 @@ function build() {
   S.input.addEventListener('input', () => { S.menuOff = false; S.hi = S.hist.length; refresh(); });
   S.input.addEventListener('click', refresh);
   S.input.addEventListener('scroll', syncScroll);
-  // 選單不搶輸入框的焦點;滾輪不切換武器(input.js 在 document 上聽 wheel)
-  S.menu.addEventListener('mousedown', (e) => e.preventDefault());
+  // 按鈕、選單不搶輸入框的焦點;滾輪不切換武器(input.js 在 document 上聽 wheel)
+  for (const q of el.querySelectorAll('.qk, .grid, .menu')) q.addEventListener('mousedown', (e) => e.preventDefault());
   el.addEventListener('wheel', (e) => e.stopPropagation());
+  el.querySelector('.qk').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) setValue(b.dataset.q, b.dataset.q.length); });
+  el.querySelector('.grid').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) exec(`give me ${b.dataset.k}`); });
   S.menu.addEventListener('click', (e) => { const r = e.target.closest('.mi'); if (r) accept(+r.dataset.i); });
   S.menu.addEventListener('mousemove', (e) => { const r = e.target.closest('.mi'); if (r && +r.dataset.i !== S.sel) { S.sel = +r.dataset.i; markSel(false); } });
-  info('打 /help 看全部說明，例如 /give me rpg。');
+  info('打指令，或用上面的按鈕和物品格子。打 /help 看全部說明。');
 }
 
 function open() {
@@ -129,6 +141,7 @@ const ok = (h) => line('ok', h, CICON.ok);
 const fail = (t) => line('err', esc(t), CICON.err);
 const tip = (t) => line('tip', esc(t), CICON.tip);
 const info = (t) => line('info', esc(t));
+const table = (head, rows) => line('tbl', `<table class="tb"><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`);
 
 function setValue(v, caret) {
   S.input.value = v;
@@ -255,15 +268,24 @@ function runGive(a) {
 
 function runList() {
   const g = S.game, host = g.net?.hostSlot;
-  for (const x of players()) info(`  ${String(x.n).padStart(2)}  ${x.name}${x.self && g.net ? '（你）' : ''}${g.net && x.slot === host ? '（房主）' : ''}`);
+  table(['編號', '暱稱', '身分'], players().map((x) => {
+    const role = [x.self && '你', g.net && x.slot === host && '房主'].filter(Boolean).join('・');
+    return `<tr><td class="n">${x.n}</td><td><span class="it c-pl">${CICON.me}${esc(x.name)}</span></td><td>${role}</td></tr>`;
+  }));
   if (!g.net) tip('單人模式只有你自己，打 me 或 1 都可以。');
 }
 
 function runHelp() {
-  for (const [k, c] of Object.entries(CMDS)) info(`/${k}${c.args ? ' ' + c.args : ''}　${c.use}`);
-  info('玩家：me（自己）、@a（所有人）、/list 裡的編號，或暱稱');
-  info(`物品：${itemNames().join('  ')}`);
+  const d = table(['指令', '用途', '例子'], Object.entries(CMDS).map(([k, c]) =>
+    `<tr><td><span class="it c-cmd">${CICON[k]}/${k}</span>${c.args ? ` <span class="ar">${esc(c.args)}</span>` : ''}</td><td>${esc(c.use)}</td><td><code>${paintStatic('/' + c.ex)}</code></td></tr>`));
+  table(['玩家', '意思'], [['me', '自己'], ['@a', '所有人'], ['2', '/list 裡的編號'], ['小明', '暱稱，只打開頭也可以']].map(([k, t]) =>
+    `<tr><td><code class="c-pl">${k}</code></td><td>${t}</td></tr>`));
+  table(['種類', '物品（中文名稱也能打）'], Object.entries(CATS).map(([cat, label]) => {
+    const ks = itemNames().filter((k) => ITEMS[k].cat === cat);
+    return `<tr class="c-${cat}"><td class="ct">${label}</td><td>${ks.map((k) => `<span class="chip">${icon(k)}${esc(ITEMS[k].name)} <code>${k}</code>${countable(k) ? `<small>預設 ${ITEMS[k].def}</small>` : ''}</span>`).join('')}</td></tr>`;
+  }));
   line('dim', '只有火箭彈、手榴彈、醫療包、金幣可以填數量，不填就用預設。例：/give @a grenade 3、/give 2 coins 500');
+  S.log.scrollTop = d.offsetTop - S.log.offsetTop - 4; // 從表格開頭看起
 }
 
 // ---------- 解析與上色 ----------
