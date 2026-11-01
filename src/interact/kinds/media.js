@@ -451,11 +451,15 @@ export const typewriter = {
     };
     draw();
     const pos = api.wp(s, ...(desk ? [-0.1, 0.92, 0.42] : [s.host.x, s.host.y + 0.15, s.host.z]));
+    const nick = () => { try { const n = localStorage.getItem('hz.nick'); return n && n.trim() ? n.trim().slice(0, 12) : '阿孫'; } catch { return '阿孫'; } };
+    const ok = (l) => !l?.after || ix.flags.has(l.after); // after:那個旗標之後才會打出來(例:M4 之後的廣播排程)
     const pool = (spec.lines || []).map((id) => api.lineById(id)).filter(Boolean);
-    const all = api.lineList('TYPEWRITER');
+    const all0 = api.lineList('TYPEWRITER'), all = all0.filter((l) => !l.after);
+    const fresh = (spec.lines ? pool : all0).filter((l) => l.after); // 等旗標的那幾張:旗標一到,第一次靠近就自己打出來
+    const fill = (t) => String(t || '').split('{暱稱}').join(nick()), typed = new Set(); // typed:這一局打過的那幾張(每局重來)
     let idx = 0, self = false;
     const type = (text, then) => {
-      const s2 = String(text || '').replace(/\n/g, ' ');
+      const s2 = fill(text).replace(/\n/g, ' ');
       let k = 0;
       lines.push('');
       const step = () => {
@@ -468,11 +472,15 @@ export const typewriter = {
       };
       step();
     };
-    return ix.register(pos, {
+    const ent = ix.register(pos, {
       id: spec.id || 'typewriter' + Math.round(pos.x), kind: 'typewriter', name: '打字機', reach: 1.9, radius: 0.22, scope: 'map', hold: 1.4, holdText: '打字', prompt: '打幾個字', cooldown: 3,
       onHoldStart: () => ixs.typeKey(pos),
       onUse: () => {
-        const l = pool.length ? pool[idx++ % pool.length] : all[(R() * all.length) | 0];
+        const due = fresh.find((q) => ok(q) && !typed.has(q.id));
+        if (due) typed.add(due.id);
+        let l = due;
+        for (let k = 0; !l && k < pool.length; k++) { const q = pool[idx++ % pool.length]; if (ok(q)) l = q; }
+        if (!l) l = all[(R() * all.length) | 0];
         type(l?.text || '……', () => {
           if (self || !all.length) return;
           self = true;
@@ -480,8 +488,11 @@ export const typewriter = {
         });
         ix.flags.set('h.typewriter', true);
       },
-      reset: () => { lines.length = 0; draw(); self = false; idx = 0; },
+      reset: () => { lines.length = 0; draw(); self = false; idx = 0; typed.clear(); },
     });
+    // 等旗標的那幾張(例:M4 之後的廣播排程):旗標一到、你走到 6 m 內,打字機自己打出來(每秒看一次,不每幀跑)
+    if (fresh.length) { const watch = () => { const due = fresh.find((q) => ok(q) && !typed.has(q.id)); if (due && api.game.state === 'playing' && api.near(pos, 6)) { typed.add(due.id); ix.flags.set('h.tw.' + due.id, true); type(due.text); api.say('', '（打字機自己動了起來。）', 2600); } ix.after(1, watch); }; ix.after(1, watch); ix.on('reset', () => ix.after(1, watch)); } // 每一局重來時計時器會被清掉:reset 之後再排
+    return ent;
   },
 };
 
