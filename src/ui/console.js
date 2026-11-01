@@ -39,15 +39,15 @@ function onKeyDown(e) {
   if (e.isComposing || e.keyCode === 229) return; // 中文輸入法選字中:Enter / 方向鍵交給輸入法
   const menu = shown();
   switch (e.key) {
-    case 'Escape': e.preventDefault(); if (menu) { S.menuOff = true; renderMenu(); } else close(false); break;
+    case 'Escape': e.preventDefault(); if (menu) { S.menuOff = true; render(); } else close(false); break;
     case 'Enter': e.preventDefault(); enter(); break;
-    case 'Tab': e.preventDefault(); if (menu) accept(Math.max(0, S.sel)); else if (S.cands.length) { S.menuOff = false; renderMenu(); } break;
+    case 'Tab': e.preventDefault(); if (menu) accept(Math.max(0, S.sel)); else if (S.cands.length) { S.menuOff = false; render(); } break;
     case 'ArrowUp': e.preventDefault(); if (menu) move(-1); else recall(-1); break;
     case 'ArrowDown':
       e.preventDefault();
       if (menu) move(1);
       else if (S.hi < S.hist.length) recall(1);
-      else { S.menuOff = false; renderMenu(); }
+      else { S.menuOff = false; render(); }
       break;
     case 'ArrowLeft': case 'ArrowRight': case 'Home': case 'End': setTimeout(refresh, 0); break; // 游標換格 → 換一份候選
     default:
@@ -194,10 +194,10 @@ function players() {
 
 // 參數 → 玩家陣列;找不到回傳錯誤字串(直接講怎麼改)
 function targets(arg) {
-  if (!S.game) return '遊戲還在載入，請稍等一下。';
   const list = players(), a = String(arg).toLowerCase();
   if (SELF.includes(a)) return list.filter((x) => x.self);
   if (ALL.includes(a)) return list;
+  if (!S.game) return '遊戲還在載入，請稍等一下。'; // me / @a 照樣算對(載入中先畫好的按鈕不會變成紅字)
   if (DIGITS.test(a)) { const x = list.find((q) => q.n === Number(a)); return x ? [x] : `找不到編號 ${a} 的玩家。打 /list 可以看編號。`; }
   const exact = list.filter((q) => q.name.toLowerCase() === a);
   if (exact.length) return exact;
@@ -353,7 +353,7 @@ function giveCheck(a, A, cur) {
   }
   for (const i of r.extra) set(i, 'x-extra');
   if (r.extra.length) A.tips.push(`多打的「${r.extra.map((i) => a[i]).join(' ')}」會略過。`);
-  if (!A.err && !A.need && r.key && Array.isArray(r.ts)) {
+  if (!A.err && !A.need && r.key && Array.isArray(r.ts) && r.ts.length) {
     const n = countable(r.key) ? clampCount(r.key, r.numRaw === undefined ? undefined : Number(r.numRaw)) : 0;
     const who = isAll(r.who) && S.game?.net ? `所有人（${r.ts.length} 位）` : r.ts.map((x) => (x.self ? '你' : x.name)).join('、');
     A.ready = true;
@@ -486,9 +486,9 @@ function refresh() {
   S.pt.innerHTML = paint(v, toks, A.cls) + ' ';
   syncScroll();
   requestAnimationFrame(syncScroll); // 輸入框的捲動有時下一幀才更新
-  renderMenu();
-  renderHint();
+  render();
 }
+function render() { renderMenu(); renderHint(); }
 
 function syncScroll() { if (S.pt) S.pt.style.transform = `translateX(${-S.input.scrollLeft}px)`; }
 
@@ -558,7 +558,8 @@ function renderHint() {
   else if (findCmd(toks[0]?.t) === 'give') {
     const on = { who: 1, item: 2, count: 3 }[role?.r];
     h = `<span class="u">${['/give', '&lt;玩家&gt;', '&lt;物品&gt;', '[數量]'].map((p, i) => (i === on ? `<b>${p}</b>` : p)).join(' ')}</span><span>玩家可以省略，就是給自己</span>`;
-  } else h = '<span><kbd>Tab</kbd> 或 <kbd>Enter</kbd> 套用　<kbd>↑</kbd><kbd>↓</kbd> 選擇　<kbd>Esc</kbd> 收起清單　<kbd>F8</kbd> 關閉面板</span>';
+  } else if (shown()) h = '<span><kbd>Tab</kbd> 或 <kbd>Enter</kbd> 套用　<kbd>↑</kbd><kbd>↓</kbd> 選擇　<kbd>Esc</kbd> 收起清單　<kbd>F8</kbd> 關閉面板</span>';
+  else h = '<span><kbd>↑</kbd> 叫回上一個指令　<kbd>↓</kbd> 或 <kbd>Tab</kbd> 打開清單　<kbd>Esc</kbd> 關閉面板</span>';
   if (A.tips.length) h += `<span class="t">${CICON.tip}${esc(A.tips[0])}</span>`;
   S.hint.innerHTML = h;
 }
