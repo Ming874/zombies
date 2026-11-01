@@ -235,13 +235,28 @@ export class GfxPass extends Pass {
     u.uLN.value = n;
   }
 
+  // 天空(深度 = 1 的全螢幕球)與遠方天際線原本 renderOrder -1000/-999 最先畫:每個像素都先跑一次 5 階 fbm 雲,
+  // 之後幾乎全被牆蓋掉。改成不透明物件最後才畫(天際線先、天空後;都只在深度還是 1 的背景像素通過深度測試)→
+  // 室內幾乎不用算天空。畫面不變:天空 depthWrite 關、z = w;天際線 z = 0.99999w;透明物件(暴風雲、閃電)本來就在不透明之後。
+  // 只改執行期的 renderOrder(src/map 不動);找不到(還沒建好)就每 60 幀再找一次
+  orderSky(scene) {
+    if (this._skyOK || (this.frame & 63) !== 1) return;
+    const sky = scene.getObjectByName('sky'), line = scene.getObjectByName('skyline');
+    if (!sky) return;
+    sky.renderOrder = 1e6 + 1;
+    if (line) line.renderOrder = 1e6;
+    this._skyOK = true;
+  }
+
   render(renderer, writeBuffer, readBuffer) {
     const g = this.game, cam = g.camera, prof = g.quality?.gpu, L = this.live, U = this.U;
+    this.orderSky(g.scene);
     const ac = renderer.autoClear;
     renderer.autoClear = false;
     if (g.weaponPass) g.weaponPass.enabled = !this.any; // 有效果時手持武器在這個 pass 裡畫(見 outRT)
     // 不需要任何效果(低畫質):直接畫進 composer 的緩衝,省掉一次複製與解析
     if (!this.any) {
+      this.frame++;
       renderer.setRenderTarget(readBuffer);
       renderer.clear(true, true, false);
       const t0 = performance.now();
