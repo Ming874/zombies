@@ -791,11 +791,13 @@ class Ambush {
       }
     }
     for (const [k, h] of this.hints) if (!live.has(k)) { if (h.jig > 0) this.props.jiggle(h.gi, 0); this.hints.delete(k); }
+    const rest = g.phase === 'shop' || g.phase === 'break';
     for (const z of g.zombies) {
       const a = z.amb;
-      if (!a || !a.dormant || !z.alive || a.decoy || !isCorpse(a.code)) continue;
+      if (!a || !a.dormant || !z.alive || a.decoy) continue;
       const d = Math.hypot(z.pos.x - lp.x, z.pos.z - lp.z);
-      if (Math.abs(z.pos.y - lp.y) > 2.5 || d > 4.2) continue;
+      if (rest && !a.beat && d > 9 && d < 22 && Math.abs(z.pos.y - lp.y) < 2.5 && g.time >= (a.beatT || 0)) this._restBeat(z, a);
+      if (!isCorpse(a.code) || Math.abs(z.pos.y - lp.y) > 2.5 || d > 4.2) continue;
       a.brT = (a.brT ?? rand(0.5, 2.5)) - dt;
       if (a.brT <= 0) { a.brT = rand(3.5, 6.5); ambushSfx('breath', { x: z.pos.x, y: z.pos.y + 0.5, z: z.pos.z }); }
     }
@@ -811,7 +813,7 @@ class Ambush {
       H.at = t + 0.6;
       if (this._habitPlace()) H.n++; else if (++H.fail > 8) H.want = H.n;
     }
-    if (!corpses.length && !H.n && !this.slots.length) return;
+    if ((!corpses.length && !H.n && !this.slots.length) || g.story?.ending?.active) return; // 結局進行中:裝死的就一直裝死
     const pl = this._players(), sh = this.shot, shot = t - sh.t < 0.35 ? sh : null;
     for (const z of corpses) this._tickCorpse(z, pl, t, step, shot);
     for (let i = this.slots.length - 1; i >= 0; i--) { const s = this.slots[i]; if (s && s.rest) this._tickSlot(s, pl, t); }
@@ -908,6 +910,7 @@ class Ambush {
       if (!this._seen({ x: z.pos.x, y: z.pos.y, z: z.pos.z }, false)) {
         if (a.pool) { this.props.removePool(a.pool); this.cpools = this.cpools.filter((q) => q !== a.pool); }
         z._ambEnd(false);
+        z.alive = false; // 連線:房主的 byId 還留著牠時,遠端的命中直接略過
         z.dispose();
         g.zombies.splice(i, 1);
         this.habit.left++; this.stats.habitLeft++;
@@ -915,6 +918,21 @@ class Ambush {
       }
       a.habit = false; a.t0 = g.time; a.maxT = rand(60, 100);
     }
+  }
+
+  // 休息時的殭屍節拍(本機):看不到的、裝死的那一邊傳來一點動靜(拖了一步、悶悶的一聲);每具一次,導演的休息預算
+  _restBeat(z, a) {
+    const g = this.g, c = g.camera?.position;
+    a.beatT = g.time + 6;
+    if (!c || g.world.hasLineOfSight(c.x, c.y, c.z, z.pos.x, z.pos.y + 0.6, z.pos.z)) return;
+    const D = g.horror?.director;
+    let ok = false;
+    try { ok = !!D?.request?.('zbeat', { pos: z.pos }); } catch { ok = false; }
+    if (!ok) return;
+    a.beat = true;
+    const pos = { x: z.pos.x, y: z.pos.y + 0.3, z: z.pos.z };
+    try { sfx.zStep?.(z.type, pos); sfx.thud?.(pos, false); } catch { /* 略 */ }
+    try { D.notify('zbeat', { pos: z.pos }); } catch { /* 略 */ }
   }
 
   // ======================= 假屍體 =======================
