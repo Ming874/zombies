@@ -392,12 +392,21 @@ const suitFloor = () => tpl('r8:suit', (b) => {
 function incinerator(R) {
   const ctx = R.ctx, ceil = ceilOf(R), fu = ctx.__b1?.furnace;
   if (fu) {
-    R.put(furnaceKit(ceil - 0.05), fu.x, fu.z - 0.5, Math.PI, {});
-    const a = R.tryPut(ashCart(), fu.x - 1.2, fu.z - 1.6, Math.PI + 0.35, {});
-    if (!a) R.putChecked(ashCart(), fu.x - 1.2, fu.z - 1.6, Math.PI + 0.35);
-    const S = R.run('S', (r) => r.t0 <= fu.x && r.t1 >= fu.x + 2.6);
-    if (S) R.atWall(tapedSheet('inclog', incLog(), 0.22, 0.3), S, fu.x + 2.3, { mount: 1.25 });
-    R.put(suitFloor(), fu.x + 1.4, fu.z - 2.3, 0.7, {});
+    // 爐口朝向 yaw(模板 +Z 朝房間);local(lx, lz) → 世界偏移。舊版固定在南牆(yaw = π)
+    const yaw = fu.yaw ?? Math.PI, c = Math.cos(yaw), s = Math.sin(yaw);
+    const at = (lx, lz) => [fu.x + lx * c + lz * s, fu.z - lx * s + lz * c];
+    const [kx, kz] = at(0, 0.5);
+    R.put(furnaceKit(ceil - 0.05), kx, kz, yaw, {});
+    const [ax, az] = at(1.2, 1.6);
+    const a = R.tryPut(ashCart(), ax, az, yaw + 0.35, {});
+    if (!a) R.putChecked(ashCart(), ax, az, yaw + 0.35);
+    const [lx, lz] = at(-2.3, 0);
+    const side = Math.abs(Math.sin(yaw)) > 0.7 ? (Math.sin(yaw) < 0 ? 'E' : 'W') : (Math.cos(yaw) < 0 ? 'S' : 'N');
+    const along = side === 'E' || side === 'W' ? lz : lx;
+    const Wr = R.run(side, (r) => r.t0 <= along - 0.3 && r.t1 >= along + 0.3);
+    if (Wr) R.atWall(tapedSheet('inclog', incLog(), 0.22, 0.3), Wr, along, { mount: 1.25 });
+    const [sx, sz] = at(-1.4, 2.3);
+    R.put(suitFloor(), sx, sz, yaw + 0.7, {});
   }
   // 北牆(橫段 x 84–96, z 52):封院期間堆起來的廢棄物山 + 棧板紙箱 + 告示 + 磅秤
   const N = R.run('N', (r) => r.plane < 53 && r.len > 6);
