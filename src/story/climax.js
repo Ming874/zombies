@@ -40,7 +40,7 @@ export function installClimax(game, S) {
   const flag = (k) => { const R = O()?.run; if (R) { if (!R.flags.has(k)) O().flag(k); } else if (!X.flags.has(k)) X.flags.set(k, true); }; // 走 objectives(房主同步給全隊)
   const fresh = () => ({ n7: null, tqLines: false, touqi: false, touqiT: 0, knobT: 0, opened: false, alarm: false, alarmPend: false, wave: 0, guard: null, guardDead: false, hoRang: false, hoState: null, hoP: null, hoT: 0, xlCut: false, elockSaid: false, logT: 0, restT0: 0 });
   let run = fresh();
-  S.climax = { get run() { return run; }, startGuardWave: () => startGuardWave(true), ringHo: () => ringHo(true) };
+  S.climax = { get run() { return run; }, startGuardWave: () => startGuardWave(true), ringHo: () => ringHo(true), startFinalWave: () => startFinalWave(), finalDone: () => !!run.final && (game.round > run.final || (game.round === run.final && game.phase !== 'fighting')) };
   S.busy = () => !!S.ending?.active || run.hoState === 'ringing' || run.hoState === 'talk' || LIVE7.has(run.n7?.ph); // 重要的戲正在演:別的對講機/提示先等
   const door207 = () => door207Of(game);
   // 燈的強度慢慢變(熄的時候閃兩下);只改 gate
@@ -147,15 +147,66 @@ export function installClimax(game, S) {
     if (run.wave && !force) return;
     if (!isHost() || game.state !== 'playing') return;
     const r0 = game.round || 1, N = Math.max(10, r0 + 1);
-    run.wave = N; run.alarmPend = false;
+    run.wave = N; run.alarmPend = false; run.waveT = game.time;
     try { if (game.shopUIOpen) game.closeShop?.(); } catch { /* 略 */ }
     game.startRound(N);
-    if (!game.net && N > r0 + 2) { // 單人:直接跳到第 10 次,但人數照「下兩波」(不會一下子暴增);看守 207 的保全一定在
-      const q = waveRoster(Math.min(N, r0 + 2)).filter((t) => t !== 'brute');
-      q.splice(Math.floor(q.length * 0.4), 0, 'brute');
-      game.queue = q; game.toSpawn = q.length;
-    } else if (!game.queue.includes('brute')) { game.queue.splice(Math.floor(game.queue.length * 0.4), 0, 'brute'); game.toSpawn = game.queue.length; }
-    X.after(3.8, () => game.ui?.banner?.('看守 207 的保全　劉家豪', '大新的保全 · 在 207 門口坐了三年 · 燈熄了就要通知董事長', 4200, 'red'));
+    // 「守住 207」(NARRATIVE N2):劉家豪不從一般的出生點出來 —— 他從二樓北走廊的另一頭走回 207 門口,要把門關回去;走廊的燈一陣一陣熄
+    // 單人:直接跳到第 10 次,但人數照「下兩波」(不會一下子暴增)
+    const q = (!game.net && N > r0 + 2 ? waveRoster(Math.min(N, r0 + 2)) : game.queue.slice()).filter((t) => t !== 'brute');
+    game.queue = q; game.toSpawn = q.length + 1; // +1 = 劉家豪(自己放,不在佇列裡)
+    X.after(4.5, () => spawnGuard());
+    run.dim = { t: 6, on: false, list: null };
+    X.after(3.8, () => game.ui?.banner?.('看守 207 的保全　劉家豪', '他要回去關上那扇門 · 守住 207', 4200, 'red'));
+  }
+  // 劉家豪出現在二樓北走廊離你遠的那一頭(看不到的地方),朝 207 走過來;找不到位置就照一般出生點
+  function spawnGuard() {
+    if (run.guard || !isHost() || game.state !== 'playing' || game.round !== run.wave) return;
+    const w = door207(), Lq = game.hospital?.layout, pp = p();
+    let at = null;
+    if (w && Lq) {
+      const walkable = (x, z) => (Lq.flagsAt(w.li, Math.floor(x / 2), Math.floor(z / 2)) & Lq.F.WALK) !== 0;
+      const ax = w.axis || 'z', dr = w.dirRoom || -1, rn = ax === 'z' ? [0, dr] : [dr, 0], tn = [-rn[1], rn[0]];
+      const cand = [];
+      for (const sd of [1, -1]) for (const d of [16, 13, 10, 8]) { const x = w.cx - rn[0] * 1.4 + tn[0] * sd * d, z = w.cz - rn[1] * 1.4 + tn[1] * sd * d; if (walkable(x, z)) { cand.push({ x, z, d: Math.hypot(x - pp.x, z - pp.z) + (Math.abs(pp.y - w.y) > 2 ? 0 : 0) }); break; } }
+      cand.sort((a, b) => b.d - a.d);
+      if (cand[0] && (Math.abs(pp.y - w.y) > 2 || cand[0].d > 7)) at = { x: cand[0].x, y: w.y, z: cand[0].z };
+    }
+    let z = null;
+    try { if (at) game._ambAt = at; z = game.spawnZombie?.('brute'); } catch (e) { console.warn('[climax] guard', e); } finally { game._ambAt = null; }
+    if (!z) { game.queue.splice(0, 0, 'brute'); return; } // 退路:照一般出生點
+    run.guard = z; z._guard = true; run.guardAt = at;
+  }
+  // 劉家豪那一波:207 附近二樓的燈一陣一陣熄掉(只改 gate;207 的檯燈不動)
+  function dimTick(step) {
+    const d = run.dim; if (!d) return;
+    const w = door207();
+    if (!d.list) { const F = game.hospital?.lights?.fixtures || [], lamp = lamp207(game); d.list = w ? F.filter((f) => f !== lamp && !f.prop && f.li === w.li && f.gate > 0 && !/exit|emergency/.test(f.kind) && Math.hypot(f.x - w.cx, f.z - w.cz) < 22) : []; d.g0 = d.list.map((f) => f.gate); }
+    const end = !(game.round === run.wave && game.phase === 'fighting');
+    if (end) { d.list.forEach((f, i) => { f.gate = d.g0[i]; }); run.dim = null; return; }
+    d.t -= step;
+    if (d.t > 0) return;
+    d.on = !d.on; d.t = d.on ? 2.6 : 7 + Math.random() * 5;
+    if (d.on) { try { ghost.breaker?.({ x: w.cx, y: w.y + 2.6, z: w.cz }); } catch { /* 略 */ } }
+    d.list.forEach((f, i) => X.after(d.on ? i * 0.05 : 0.1 + i * 0.03, () => { if (run.dim === d) f.gate = d.on ? 0.04 * d.g0[i] : d.g0[i]; }));
+  }
+  // 夜班組長倒下:門禁卡掉在他身上,走過去撿(每位玩家各自撿;互動系統的一個點,不新增模型)
+  function dropBadge(z) {
+    if (run.badgeDrop || X.inv.has('card.security')) return;
+    const q = { x: z.pos.x, y: z.pos.y + 0.35, z: z.pos.z };
+    run.badgeDrop = X.register(q, { id: 'h.ix.badge.drop', kind: 'item', name: '門禁卡', reach: 2.2, radius: 0.4, priority: 6, scope: 'run', once: true, prompt: '撿起門禁卡（夜班組長的）',
+      onUse: () => { X.inv.add('card.security'); game.ui?.pickup?.('門禁卡', '#e8d9a8', { sub: '大新照護中心 · 夜班組長 陳建宏' }); try { sfx.pickupItem?.(q); } catch { /* 略 */ } run.badgeDrop?.remove?.(); return true; } });
+    O()?.glintAt?.(q, 16);
+    X.after(1.2, () => game.ui?.feed?.('夜班組長倒下了。他胸前的口袋裡，有一張門禁卡。', { color: '#e3c98a', ms: 6500 }));
+  }
+  // 終章:你叫了金水伯的車,在急診車道守一波(照 startGuardWave 的做法開;佇列清完或約 60 秒就算撐過去)
+  function startFinalWave() {
+    if (run.final || !isHost() || game.state !== 'playing') return;
+    const r0 = game.round || 1;
+    if (game.phase === 'fighting') { run.final = r0; return; } // 正在打:這一波就是最後一波
+    try { if (game.shopUIOpen) game.closeShop?.(); } catch { /* 略 */ }
+    run.final = r0 + 1;
+    game.startRound(r0 + 1);
+    X.after(2.6, () => game.ui?.banner?.('最後一波', '金水伯在倒車 · 守住急診車道', 4200, 'red'));
   }
   function guardDown() {
     run.guardDead = true;
@@ -193,7 +244,7 @@ export function installClimax(game, S) {
   });
 
   // ---------- 每幀 ----------
-  X.on('reset', () => { try { ixs.alarmStop?.('h207'); } catch { /* 略 */ } run = fresh(); });
+  X.on('reset', () => { try { ixs.alarmStop?.('h207'); } catch { /* 略 */ } if (run.dim?.list) run.dim.list.forEach((f, i) => { f.gate = run.dim.g0[i]; }); try { run.badgeDrop?.remove?.(); } catch { /* 略 */ } run = fresh(); });
   O()?.on?.('flag', (f) => { if (f.name === 'h.boss10' && f.v) onBoss10(); });
   let acc = 0;
   X.tick((dt) => {
@@ -256,11 +307,13 @@ export function installClimax(game, S) {
     // 第 5 次招魂燈的巨屍 = 大新照護員 夜班組長(正典 §4 首領;身上有門禁卡):給他一個名字,等門禁卡的那幾分鐘才有對象
     if (!run.lead5 && game.round === 5 && game.phase === 'fighting' && !has('h.badge')) {
       const z = game.zombies.find((q) => q.alive && q.type === 'brute' && (q.dist ?? 99) < 30);
-      if (z) { run.lead5 = true; X.after(3, () => game.ui?.banner?.('大新夜班組長　陳建宏', '他以前是這裡的看護 · 門禁卡在他身上', 3800, 'red')); X.after(4.5, () => seq(game, [['xl', '大新的無線電說過，', 2.0, { combatOk: true, gap: 0.4 }], ['xl', '門禁卡在夜班組長身上。', 2.6, { combatOk: true, gap: 3 }], ['xl', '他以前是這裡的看護。', 2.4, { combatOk: true }], ['xl', '第一個打針的，就是他們。', 2.8, { combatOk: true }]])); } // 先讓「巨屍出現」的打法提示講完
+      if (z) { run.lead5 = true; run.boss5 = z; X.after(3, () => game.ui?.banner?.('大新夜班組長　陳建宏', '他以前是這裡的看護 · 門禁卡在他身上', 3800, 'red')); X.after(4.5, () => seq(game, [['xl', '大新的無線電說過，', 2.0, { combatOk: true, gap: 0.4 }], ['xl', '門禁卡在夜班組長身上。', 2.6, { combatOk: true, gap: 3 }], ['xl', '他以前是這裡的看護。', 2.4, { combatOk: true }], ['xl', '第一個打針的，就是他們。', 2.8, { combatOk: true }]])); } // 先讓「巨屍出現」的打法提示講完
     }
-    // 看守 207 的保全:那一波第一隻巨屍
+    if (run.boss5 && !run.boss5.alive && !run.badgeDrop) dropBadge(run.boss5);
+    // 看守 207 的保全:自己放的那一隻(退路:那一波第一隻巨屍)
+    if (run.dim) dimTick(step);
     if (run.wave && isHost()) {
-      if (!run.guard && game.round === run.wave) { const z = game.zombies.find((q) => q.alive && q.type === 'brute'); if (z) { run.guard = z; z._guard = true; } }
+      if (!run.guard && game.round === run.wave && game.time > (run.waveT || 0) + 8) { const z = game.zombies.find((q) => q.alive && q.type === 'brute'); if (z) { run.guard = z; z._guard = true; } }
       if (run.guard && !run.guard.alive && !run.guardDead) guardDown();
       if (!run.guardDead && game.round === run.wave && silent) guardDown(); // 沒抓到(或被別的方式解決):那一波結束就算
     }

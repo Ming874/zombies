@@ -67,14 +67,16 @@ const STEPS = [
   { id: 'h.s.unlock', act: 4, text: '打開 207', why: (c) => (c.O.has('h.207.elock') ? '門從裡面鎖著，等阿嬤回來' : '電子鎖＋門裡的旋鈕'), prog: (c) => (c.O.has('h.207.unlock') ? 2 : (c.O.has('h.207.elock') ? 1 : 0) + (c.O.has('h.207.knob') ? 1 : 0)), m: 2,
     hints: { xl: (c) => (c.O.has('h.207.elock') ? '門是從裡面鎖的。\n只有裡面的人開得了。我們等。' : '輸入密碼，或去照片前擲筊。\n兩條路都能開電子鎖。'),
       ama: (c) => (c.O.has('h.207.elock') ? '等阿嬤回來。' : '是她住進來的那一天。'), glint: (c) => (c.O.has('h.207.elock') ? null : c.at('h.ix.keypad')) } },
-  { id: 'h.s.boss', act: 4, text: '打倒看守 207 的保全', why: '門一開，他就醒了', cond: (c) => c.O.has('h.boss10') },
+  { id: 'h.s.boss', act: 4, text: '守住 207', why: '劉家豪要回來關上那扇門', cond: (c) => c.O.has('h.boss10') }, // 「守住 207」那一波(src/story/climax.js)
   { id: 'h.s.enter', act: 4, text: '進 207', why: '阿嬤在枕頭裡留了東西給你', cond: (c) => c.zone === 'f2_ward_207' && (c.D.got('hc.30') || (c.run.in207 = (c.run.in207 || 0) + 0.25) > 1.5), // 要真的走進 207
     onDone: (c) => c.page(),
     hints: { xl: '頭七那天的腳印……停在床邊。', ama: '枕頭……阿嬤放在枕頭裡。', glint: (c) => c.at('h.ix.pillow') } },
-  { id: 'h.s.wait', act: 5, text: '等金水伯的車', why: '他要來接你離開', onStart: (c) => c.later(2.5, () => { if (c.O.step() === 'h.s.wait' && !c.g.story?.busy?.()) c.talk([[XL, '金水伯的車要來了。', 2.2], [XL, '他會用對講機叫你。', 2.2]]); }), cond: (c) => c.O.has('h.truck') }, // 王醫師的電話(如果有)在這裡響;金水伯「車來囉」之後才往下
-  { id: 'h.s.bay', act: 5, text: '到一樓急診車道', why: '金水伯的車在那裡', cond: (c) => c.zone === 'f1_ambulance',
+  // 終章由你按下去(NARRATIVE N8):拿起任何一支電話(或店門口的對講機)叫金水伯的車 → 急診車道 → 守一波(佇列清完或約 60 秒)
+  { id: 'h.s.wait', act: 5, text: '叫金水伯的車', why: (c) => (c.O.has('h.callok') ? '拿起任何一支電話，或店門口的對講機' : '先把這一夜的事聽完'), cond: (c) => c.O.has('h.truck'),
+    hints: { xl: (c) => (c.O.has('h.callok') ? '金水伯在外面等你叫他。\n拿起電話，他聽得到。' : null) } }, // 王醫師的電話(如果有)先講完,才可以叫車
+  { id: 'h.s.bay', act: 5, text: '到一樓急診車道', why: '金水伯的車在那裡', cond: (c) => c.zone === 'f1_ambulance', onDone: (c) => c.g.story?.climax?.startFinalWave?.(),
     hints: { xl: '金水伯的車在急診車道，倒車燈亮著。快。' } },
-  { id: 'h.s.hold', act: 5, text: '在車旁撐 60 秒', why: '金水伯在倒車，等你上車', prog: (c) => Math.min(60, Math.floor(c.run.holdT)), m: 60,
+  { id: 'h.s.hold', act: 5, text: '守住急診車道', why: '金水伯在倒車，等你上車', prog: (c) => (c.g.story?.climax?.finalDone?.() ? 60 : Math.min(60, Math.floor(c.run.holdT))), m: 60,
     onDone: (c) => c.evac() },
 ];
 const BY = Object.fromEntries(STEPS.map((s) => [s.id, s]));
@@ -137,7 +139,7 @@ export function installObjectives(game) {
       const t0 = game.time;
       later(1.2, () => { const q = c.at('h.ix.pillow'); if (q && !D()?.got?.('hc.30')) { run.glint = q; run.glintT = 10; } });
       later(7, () => { if (!D()?.got?.('hc.30') && c.zone === 'f2_ward_207') c.ama('枕頭……阿嬤放在枕頭裡。'); }); // 她要你拿到那一頁(靜默期才說)
-      const go = () => { O.flag('h.truck'); truckCall(); };
+      const go = () => { O.flag('h.callok'); later(1.2, () => { if (run.cur === 'h.s.wait' && !game.story?.busy?.()) c.talk([[XL, '金水伯在外面。……你自己叫他。', 3.2], [XL, '拿起電話，他聽得到。', 2.4]]); }); };
       let out = 0;
       X()?.tick?.((dt) => {
         if (run.evac || game.state !== 'playing') return false;
@@ -268,11 +270,13 @@ export function installObjectives(game) {
       if (acc < 0.25) return true;
       const step = acc; acc = 0;
       // 門禁卡:招魂燈亮到最大的那一次(第 5 次)撐過去,夜班組長倒下的地方有一張卡(每位玩家各自撿;第 5 次以後的靜默才會是非戰鬥相位)
-      if (game.round >= 5 && game.phase !== 'fighting' && !X0.inv.has('card.security') && !run.card) {
+      // (夜班組長倒下時,卡掉在他身上:src/story/climax.js dropBadge;這裡是退路 —— 沒認出他、或他沒倒在這一波)
+      if (game.round >= 5 && game.phase !== 'fighting' && !X0.inv.has('card.security') && !run.card && !game.story?.climax?.run?.badgeDrop) {
         run.card = true; X0.inv.add('card.security'); game.ui?.pickup?.('門禁卡', '#e8d9a8', { sub: '夜班組長倒下的地方，掉著一張卡' }); sfx.pickupItem?.();
       }
       run.lastPh = game.phase;
       if (game.hospital?.zone?.id === 'f1_ambulance' && run.cur === 'h.s.hold') run.holdT += step;
+      if (run.cur === 'h.s.wait' && O.has('h.callok') && !run.called) callKimsui();
       const s = BY[run.cur];
       if (!s) return true;
       // 進度變了 → 重算卡住的時間
@@ -296,6 +300,17 @@ export function installObjectives(game) {
     });
   }
   setCur(STEPS[0].id);
+  // 叫車:你拿起一支沒在響的電話(撥號音)→ 線路接到店門口的對講機,金水伯接起來
+  function callKimsui() {
+    const P = (X0.phones || []).find((q) => q.state === 'off' && Math.hypot(q.pos.x - game.player.pos.x, q.pos.z - game.player.pos.z) < 3.5 && Math.abs(q.pos.y - game.player.pos.y) < 2.5);
+    const api = X0.map?.api;
+    if (!P || !api) return;
+    run.called = true;
+    try { P.tones?.(); ixs.lineNoise?.(true); } catch { /* 略 */ }
+    const t = api.speak({ who: KS, voice: 'old', parts: ['……喂？少年仔？是你喔？', '好，阿伯知道了。馬上到。', '急診車道。撐一下，阿伯倒車進去。'] }, { filter: 'phone', critical: true });
+    P.talk = t; P.state = 'call'; P.callEnd = game.time + (t?.dur || 8) + 0.4; // 照一般的來電收尾(掛上或講完)
+    later((t?.dur || 8) + 1.5, () => { O.flag('h.truck'); later(4, truckCall); });
+  }
   // 撤離:金水伯從發財車的大聲公喊(急診車道的方向;REDESIGN §2.5)
   function truckCall() {
     const api = X()?.map?.api, A = game.hospital?.anchors?.truck, m = A?.mesh;
