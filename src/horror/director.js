@@ -257,10 +257,13 @@ export class Director {
     if (this.dread < need && !o.force) return deny();
     return true;
   }
-  // 打鬥中的空檔可不可以放這個小鬼事件:回合開始 20 秒後、張力低(附近沒有活屍)、沒在追逐、這一波還有預算、上一個 35 秒前
+  // 打鬥中的空檔可不可以放這個小鬼事件:回合開始 20 秒後、張力低(附近沒有活屍)、沒在追逐、這一波還有預算、上一個 35 秒前。
+  // flow 有波內節奏(game._pace:高峰之後暫停出怪 8~15 秒)時,只排在暫停的那一段(那時張力門檻放寬到 0.5)
   fightGhostOk(kind) {
     if (!FIGHT_GHOST.has(kind) || this.phase !== 'fighting') return false;
-    if (this.roundT < 20 || this.tension > 0.35 || this.chasing) return false;
+    const pace = this.h.game?._pace, relax = !!pace && pace.relax > 0;
+    if (pace && typeof pace.relax === 'number' && !relax) return false;
+    if (this.roundT < 20 || this.tension > (relax ? 0.5 : 0.35) || this.chasing) return false;
     if (this.fightGhosts >= (FIGHT_BUDGET[this.level] ?? 1)) return false;
     return this.t - this.lastFightGhost >= 35 * this.I.cd;
   }

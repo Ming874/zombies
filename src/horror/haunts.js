@@ -102,10 +102,10 @@ export function hauntKinds(h) {
     return v;
   }
 
-  // ---- 鬼月禁忌的後果(N13):熄一把火(game.soul)、207 的燈少一點油(game.story.lamp,有的話)、記住 ----
+  // ---- 鬼月禁忌的後果(N13):熄一把火(game.soul)、207 的燈晃一下、少一點油(game.story.lamp;lamp 建議 0.04)、記住 ----
   function taboo(kind) {
     const lost = game.soul?.lose?.('taboo:' + kind) ?? false;
-    try { game.story?.lamp?.drain?.(0.1, 'taboo'); } catch { /* 燈還沒做好 */ }
+    try { game.story?.lamp?.drain?.(0.04, 'taboo'); } catch { /* 燈還沒做好 */ }
     game.flags?.inc?.('h.taboo.' + kind);
     h.remember?.('taboo.' + kind, { event: 'taboo', tag: 'taboo' });
     return lost;
