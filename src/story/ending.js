@@ -33,10 +33,35 @@ export function installEnding(game, S) {
   const M = () => game.motion || null, W = () => game.hospital || game.world?.hospital || null;
   const has = (k) => !!X.flags.has(k) || !!O()?.has?.(k);
   let el = null, run = null;
+  // 這一夜你怎麼過的(N14:結局只改一兩句,不顯示分數):收驚幾次、守住幾條禁忌(被叫名字沒回頭)
+  let play0 = { rite: 0, kept: 0 }, soulBound = null, horBound = null;
+  const bindPlay = () => {
+    const so = game.soul, h = H();
+    if (so?.on && so !== soulBound) { soulBound = so; so.on('ritual', (e) => { if (e?.state === 'done') play0.rite++; }); }
+    if (h?.on && h !== horBound) { horBound = h; h.on('story', (e) => { if (e?.id === 's3.name.ok') play0.kept++; }); }
+  };
+  X.on('reset', () => { play0 = { rite: 0, kept: 0 }; });
+  X.tick(() => { if (!soulBound || !horBound) bindPlay(); return !soulBound || !horBound; });
+  const taboos = () => ['hongbao', 'tap', 'name', 'whistle'].reduce((a, k) => a + (Number(X.flags.get?.('h.taboo.' + k)) || 0), 0);
+  // 最多兩句:燈怎麼顧的 → 收驚 → 禁忌 → 王醫師的電話(依序挑前兩個)
+  function epilogue() {
+    const out = [], ls = game.story?.lamp?.state?.() || {}, outs = ls.outs || 0, fills = ls.refuels || 0, lit = lamp207Lit(game);
+    if (lit && fills > 0 && outs === 0) out.push(['ks', '這一夜，是你替她加的油。\n那盞燈，一次都沒有熄。']);
+    else if (lit && outs > 0) out.push(['xl', outs > 1 ? '那盞燈熄過好幾次。\n每一次，都是你點回來的。' : '那盞燈熄過一次。\n是你把它點回來的。']);
+    if (play0.rite > 0) out.push(['xl', '照片前面，有人陪你數過十。\n……原來是她。']);
+    const tb = taboos();
+    if (tb >= 2) out.push(['ks', '七月有人在背後叫你，不要回頭。\n……她叫的，才要回。']);
+    else if (tb === 0 && play0.kept > 0) out.push(['ks', '她交代的禁忌，你都有記住。']);
+    if (has('h.ho.ignored')) out.push(['xl', '那通電話，你沒有接。\n……他大概還在等。']);
+    else if (has('h.ho.hung')) out.push(['xl', '你掛了他的電話。\n……她會說你做得對。']);
+    return out.slice(0, 2);
+  }
   const E = {
     get active() { return !!run && !run.done; },
-    state: () => (run ? { variant: run.variant, beat: run.beat, choices: { ...run.ch }, done: run.done } : null),
+    state: () => (run ? { variant: run.variant, beat: run.beat, choices: { ...run.ch }, done: run.done, ep: run.ep || null } : null),
     decide,
+    epilogue,
+    get play0() { return { ...play0, taboos: taboos() }; },
     play,
     skip: () => { if (run) run.skip = true; skipMotion(); },
   };
@@ -275,6 +300,9 @@ export function installEnding(game, S) {
         } else await talk('xl', '……今天，數完了。', { gap: 2.2 });
       }
       if (!d?.got?.('hc.30') && has('h.ho.heard')) { await talk('ho', '……謝謝你。', { gap: 1.4 }); sub('n', '電話掛了。', 2); await w(3); }
+      // 七之二、這一夜你怎麼過的(N14):燈、收驚、禁忌、電話,最多兩句
+      run.ep = epilogue();
+      if (run.ep.length) { run.beat = 'epilogue'; await w(0.8); for (const [who, t] of run.ep) await talk(who, t, { gap: 1.8 }); }
       // 八、207 的清晨(好/秘密)
       const A = W()?.anchors?.w207;
       if ((v === 'good' || v === 'secret') && solo && A?.view && !run.skip) {
@@ -322,6 +350,8 @@ export function installEnding(game, S) {
     const cnt = q('.st-count');
     for (let i = 0; i < 10 && !run.skip && game.phase !== 'fighting'; i++) { cnt.textContent = NUM[i]; cnt.classList.add('on'); try { M()?.dawn?.((i + 1) / 10); } catch { /* 略 */ } await w(1.1); cnt.classList.remove('on'); }
     if (game.phase !== 'fighting') await talk('ama', '……十。天亮了。', { gap: 1.2 });
+    run.ep = epilogue().slice(0, 1); // 多人:只一句
+    if (run.ep.length && game.phase !== 'fighting') await talk(run.ep[0][0], run.ep[0][1], { gap: 1.2 });
     try { M()?.dawn?.(0, 4000); } catch { /* 略 */ }
     game.ui?.banner?.('〈第七暝〉', `「${NAME[v]}」 · 謹以此紀念 1999 年與 2003 年，所有守在第一線的人。`, 9000, 'gold');
     run.beat = 'end'; run.done = true;
