@@ -141,11 +141,12 @@ export function spawnAffinity(type, s, L) {
 export const HOW_MUL = { head: 1.5, melee: 2, explosion: 1.25 };
 export const streakMul = (s) => 1 + 0.1 * clamp(s - 1, 0, 10); // 連殺倍率:每多一殺 +0.1,最高 ×2
 export const roundScore = (n, clean) => Math.round(250 * n * (clean ? 1.5 : 1));
-// 連殺門檻:[殺數, 名稱, 金幣獎勵]
-export const STREAKS = [[3, '三連殺', 0], [5, '五連殺', 10], [8, '殺戮狂潮', 15], [12, '血流成河', 20], [16, '無人能擋', 25], [20, '死神降臨', 30]];
+// 連殺門檻:[殺數, 字幕, 金幣獎勵]。[N6] 不再有「殺戮狂潮/死神降臨」這類稱號:他們曾經是病人。
+// 字幕只在少數門檻出現、只說數字(空字串 = 只給錢,不出字);分數倍率與錢照舊
+export const STREAKS = [[3, '', 0], [5, '', 10], [8, '一口氣倒下八個', 15], [12, '', 20], [16, '一口氣倒下十六個', 25], [20, '', 30]];
 export function streakTier(s) {
   for (let i = STREAKS.length - 1; i >= 0; i--) if (s === STREAKS[i][0]) return STREAKS[i];
-  if (s > 20 && s % 5 === 0) return [s, `${s} 連殺`, 30];
+  if (s > 20 && s % 5 === 0) return [s, s % 10 === 0 ? `一口氣倒下 ${s} 個` : '', 30];
   return null;
 }
 

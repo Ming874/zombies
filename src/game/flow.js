@@ -19,6 +19,8 @@ const STREAK_GAP = 4; // 連殺:兩次擊殺間隔 4 秒內
 const BONUS = { head: 0.5, melee: 1 }; // 爆頭 / 近戰額外金幣(基礎金幣倍率)
 const TYPE_NAME = { walker: '（建議，同 menu.js:14）活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+// [N6] 一波結束時的小字:世界裡的事,不是成績(數字在暫停選單)
+const QUIET = ['走廊安靜下來了', '外面只剩下雨聲', '牠們退回暗處了', '遠處有人在咳嗽', '燈篙暗下去了', '樓上的腳步停了', '風從破窗吹進來'];
 
 export const flowMethods = {
   // 世界建構時呼叫(在 world.buildNav 之前):店面與補給點都會登記碰撞盒。位置全部來自 world(world.shop / world.supplies)。
@@ -148,6 +150,7 @@ export const flowMethods = {
     this.healT = 0;
     this.stats = { kills: 0, headshots: 0, melee: 0, shots: 0, hits: 0, time: 0, streak: 0, bestStreak: 0, lastKill: -99, earned: 0, pickups: 0, byType: {}, score: 0, clean: 0, spent: 0 };
     this.rstats = null; // 本回合統計(startRound 建立)
+    this.lastRound = null; // [N6] 上一波的數字(暫停選單)
     this.ui.resetRun?.();
     this.ui.setCoins(0, true);
     this.ui.setScore?.(0, true);
@@ -377,15 +380,15 @@ export const flowMethods = {
     this.phase = 'collecting';
     this.collectT = 1.4;
     const n = this.round, p = this.player, S = this.stats, R = this.rstats;
-    // 回合小結:擊殺、爆頭、命中率、用時;整回合沒受傷 → 無傷獎勵
+    // 回合小結:擊殺、爆頭、命中率、用時;整回合沒受傷 → 無傷獎勵。
+    // [N6] 山谷不講分數:橫幅只說世界裡發生的事;數字收進 this.lastRound,暫停選單(menu.js onPause)與結算畫面才看得到
     this.roundClean = !!R && !(p.lastHurt >= R.t0);
-    let sub = '撿錢中…';
     if (R) {
       const k = S.kills - R.kills, h = S.headshots - R.heads, sh = S.shots - R.shots, acc = sh ? Math.round(((S.hits - R.hits) / sh) * 100) : 0;
-      sub = `擊殺 ${k} · 爆頭 ${h} · 命中率 ${acc}% · 用時 ${mmss(this.time - R.t0)}`;
       R.dur = this.time - R.t0;
+      this.lastRound = { n, kills: k, heads: h, acc, dur: R.dur, time: mmss(R.dur), clean: this.roundClean, bonus: 0, cleanBonus: 0 };
     }
-    this.ui.banner('這一波結束了', `招魂燈熄了 · ${sub}`, 3200, this.roundClean ? 'gold' : '');
+    this.ui.banner('招魂燈熄了', QUIET[(n - 1) % QUIET.length], 3200, '');
     // 回合分數
     const pts = roundScore(n, this.roundClean);
     this._addScore(pts);
@@ -414,14 +417,12 @@ export const flowMethods = {
     this.stats.earned += bonus + clean;
     if (clean) this.stats.clean++;
     this.ui.setCoins(this.player.coins);
-    this.ui.coinGain(bonus + clean);
-    this.ui.feed(`清場獎勵 <b>+${bonus}</b>`, { icon: 'coin', color: '#f2c84b', html: true });
-    if (clean) this.ui.feed(`毫髮無傷 <b>+${clean}</b>`, { icon: 'heal', color: '#7fe08f', html: true });
+    this.ui.coinGain(bonus + clean); // 錢包旁邊小小跳一下;清場/無傷的明細只在暫停選單(lastRound)
+    if (this.lastRound?.n === n) { this.lastRound.bonus = bonus; this.lastRound.cleanBonus = clean; }
     const where = [this.shop?.levelId, this.shop?.zoneName].filter(Boolean).join(' ') || '金水商行';
     const next = waveKind(n + 1), sp = SPECIAL[next];
-    const warn = sp ? ` · 下一波：${sp.name}` : '';
-    this.ui.banner('金水商行開門了', `休息 ${this.restT} 秒 · 到 ${where} 按 [E] 買東西 · [N] 直接開始下一波${warn}`, 5200, 'gold');
-    this.ui.feed('金水商行開門了', { icon: 'cart', color: '#ffb347' });
+    // 順序:捲門聲 → 劇情的歌與對講機 → 最後才是這行小字(休息秒數與 [N] 在 HUD 的回合欄一直看得到)
+    this.ui.banner('鐵門拉起來了', `金水伯在 ${where} 等你${sp ? ` · 下一波：${sp.name}` : ''}`, 4200, '');
     this.tutorial?.('shop');
   },
 
@@ -537,17 +538,16 @@ export const flowMethods = {
     this._addScore(Math.round((POINTS[z.type] || 100) * mul));
     const tag = how === 'melee' ? '近戰' : head ? '爆頭' : how === 'explosion' ? '爆炸' : '';
     this.ui.killPop(base + bonus, tag, how === 'melee' ? 'melee' : head ? 'head' : '');
-    this.ui.streak?.(S.streak, streakMul(S.streak), STREAK_GAP, this.time);
+    this.ui.streak?.(S.streak >= 5 ? S.streak : 0, streakMul(S.streak), STREAK_GAP, this.time); // [N6] 連殺計數只在 5 隻以上才亮(倍率照算)
     const name = TYPES[z.type]?.name || TYPE_NAME[z.type] || '殭屍';
     const tier = streakTier(S.streak);
     if (z.type === 'brute' || how === 'melee' || (head && z.type === 'bloater')) { // 一般爆頭只在準心旁跳字,不洗訊息列
       this.ui.feed(`${tag ? `${tag} · ` : ''}擊殺 ${name} <b>+${base + bonus}</b>`, { icon: how === 'melee' ? 'knife' : head ? 'head' : 'skull', color: z.type === 'brute' ? '#ff6a5a' : head ? '#ff9a6a' : '#e8e3d6', html: true });
     }
-    if (tier) { // 連殺門檻:訊息 + 金幣獎勵(掉在屍體上,回合結束一起收)
+    if (tier) { // 連殺門檻:金幣獎勵(掉在屍體上,回合結束一起收);[N6] 字幕很少、很淡,沒有稱號(waves.js STREAKS)
       const [, label, coins] = tier;
       if (coins > 0) { this.coins.drop(z.pos.x, z.pos.y, z.pos.z, coins); S.earned += coins; }
-      this.ui.feed(`${label}${coins ? ` <b>+${coins}</b>` : ''} · 分數 ×${streakMul(S.streak).toFixed(1)}`, { icon: 'bolt', color: '#ffcf5a', html: true, ms: 3600 });
-      if (S.streak >= 5) sfx.killConfirm();
+      if (label) this.ui.feed(label, { color: '#a8a294', ms: 2400 });
     }
     this.pickups?.roll(z, this);
   },
@@ -680,7 +680,7 @@ export const flowMethods = {
     // 回合資訊
     if (this.phase === 'fighting') { if (this.spawnHeld) this.ui.setRoundText('招魂燈還沒亮……'); else this.ui.setZombies(this.zombiesLeft()); } // [motion] 預熱中先不出怪:不要說謊
     else if (this.phase === 'shop' || this.phase === 'break') this.ui.setRest(this.restT, !this.net, SPECIAL[waveKind(this.round + 1)]?.name || '');
-    else if (this.phase === 'collecting') this.ui.setRoundText('撿錢中…');
+    else if (this.phase === 'collecting') this.ui.setRoundText('招魂燈熄了');
     this.ui.update(this, dt);
   },
 

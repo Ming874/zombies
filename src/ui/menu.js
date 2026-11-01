@@ -229,7 +229,9 @@ export class Menu {
     const g = this.game, el = $('pauseRun');
     if (!on || !g || !el) return;
     const S = g.stats || {};
-    el.innerHTML = g.state === 'playing' ? `第 <b>${g.round || 1}</b> 波 · 擊殺 <b>${S.kills || 0}</b> · 分數 <b>${(S.score || 0).toLocaleString('en-US')}</b> · 錢 <b>${g.player?.coins || 0}</b>` : '';
+    const L = g.lastRound; // [N6] 上一波的數字只在這裡看(一波結束的橫幅不講分數)
+    const last = L ? `<br><small>第 ${L.n} 波：擊殺 <b>${L.kills}</b> · 爆頭 <b>${L.heads}</b> · 命中率 <b>${L.acc}%</b> · 用時 <b>${L.time}</b>${L.bonus ? ` · 清場 <b>+${L.bonus}</b>` : ''}${L.cleanBonus ? ` · 毫髮無傷 <b>+${L.cleanBonus}</b>` : ''}</small>` : '';
+    el.innerHTML = g.state === 'playing' ? `第 <b>${g.round || 1}</b> 波 · 擊殺 <b>${S.kills || 0}</b> · 分數 <b>${(S.score || 0).toLocaleString('en-US')}</b> · 錢 <b>${g.player?.coins || 0}</b>${last}` : '';
   }
 
   // ---------- 面板 ----------
