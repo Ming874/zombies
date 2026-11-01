@@ -7,24 +7,28 @@ import { sfx } from '../audio.js';
 
 const MAX_STACK = 99;
 
-// key → { name, kind, def(預設數量), aliases(中英文別名) }
+// key → { name 名稱, short 短名(物品格子), cat 種類(控制面板分色), desc 一行說明, kind 套用方式, def 預設數量, aliases 中英文別名 }
+// 有 def 的物品才吃數量;max 是上限
 export const ITEMS = {
-  pistol: { name: WEAPONS.pistol.name, kind: 'weapon', aliases: ['glock', '手槍'] },
-  revolver: { name: WEAPONS.revolver.name, kind: 'weapon', aliases: ['python', '左輪', '左輪手槍'] },
-  shotgun: { name: WEAPONS.shotgun.name, kind: 'weapon', aliases: ['870', '霰彈槍', '散彈槍'] },
-  ak47: { name: WEAPONS.ak47.name, kind: 'weapon', aliases: ['ak', 'ak-47'] },
-  m4a1: { name: WEAPONS.m4a1.name, kind: 'weapon', aliases: ['m4'] },
-  barrett: { name: WEAPONS.barrett.name, kind: 'weapon', aliases: ['m82', 'sniper', '巴雷特', '狙擊槍'] },
-  rpg: { name: WEAPONS.rpg.name, kind: 'weapon', aliases: ['rpg7', 'rpg-7', 'bazooka', '火箭筒'] },
-  rocket: { name: '火箭彈', kind: 'rocket', def: 3, aliases: ['rockets', '火箭', '火箭彈'] },
-  ammo: { name: '全部彈藥補滿', kind: 'ammo', aliases: ['彈藥', '子彈'] },
-  grenade: { name: '手榴彈', kind: 'grenade', def: 1, aliases: ['grenades', 'nade', '手榴彈'] },
-  medkit: { name: '醫療包', kind: 'medkit', def: 1, aliases: ['medkits', 'med', '醫療包'] },
-  armor: { name: '重型防彈背心', kind: 'armor', aliases: ['vest', '護甲', '背心', '防彈背心'] },
-  coins: { name: '金幣', kind: 'coins', def: 1000, aliases: ['coin', 'money', 'cash', '金幣', '錢'] },
-  hp: { name: '生命回滿', kind: 'hp', aliases: ['heal', 'health', '生命', '補血', '回血'] },
-  all: { name: '全部武器與補給', kind: 'all', aliases: ['everything', '全部'] },
+  pistol: { name: WEAPONS.pistol.name, short: '手槍', cat: 'weapon', kind: 'weapon', desc: WEAPONS.pistol.desc, aliases: ['glock', '手槍'] },
+  revolver: { name: WEAPONS.revolver.name, short: '左輪', cat: 'weapon', kind: 'weapon', desc: WEAPONS.revolver.desc, aliases: ['python', '左輪', '左輪手槍'] },
+  shotgun: { name: WEAPONS.shotgun.name, short: '霰彈槍', cat: 'weapon', kind: 'weapon', desc: WEAPONS.shotgun.desc, aliases: ['870', '霰彈槍', '散彈槍'] },
+  ak47: { name: WEAPONS.ak47.name, short: 'AK-47', cat: 'weapon', kind: 'weapon', desc: WEAPONS.ak47.desc, aliases: ['ak', 'ak-47'] },
+  m4a1: { name: WEAPONS.m4a1.name, short: 'M4A1', cat: 'weapon', kind: 'weapon', desc: WEAPONS.m4a1.desc, aliases: ['m4'] },
+  barrett: { name: WEAPONS.barrett.name, short: '巴雷特', cat: 'weapon', kind: 'weapon', desc: WEAPONS.barrett.desc, aliases: ['m82', 'sniper', '巴雷特', '狙擊槍'] },
+  rpg: { name: WEAPONS.rpg.name, short: 'RPG-7', cat: 'weapon', kind: 'weapon', desc: '火箭筒，火箭彈一起補滿', aliases: ['rpg7', 'rpg-7', 'bazooka', '火箭筒'] },
+  rocket: { name: '火箭彈', short: '火箭彈', cat: 'ammo', kind: 'rocket', def: 3, max: MAX_STACK, desc: 'RPG-7 的彈藥，還沒有 RPG-7 會一起給', aliases: ['rockets', '火箭', '火箭彈'] },
+  ammo: { name: '補滿彈藥', short: '彈藥', cat: 'ammo', kind: 'ammo', desc: '身上每把槍的子彈都補滿', aliases: ['彈藥', '子彈', '彈匣'] },
+  grenade: { name: '手榴彈', short: '手榴彈', cat: 'throw', kind: 'grenade', def: 1, max: MAX_STACK, desc: '按 G 投擲，約 3 秒後爆炸', aliases: ['grenades', 'nade', '手榴彈'] },
+  medkit: { name: '醫療包', short: '醫療包', cat: 'med', kind: 'medkit', def: 1, max: MAX_STACK, desc: '按 H 使用，回復 50 生命', aliases: ['medkits', 'med', '醫療包'] },
+  armor: { name: '重型防彈背心', short: '護甲', cat: 'armor', kind: 'armor', desc: '護甲補到 100', aliases: ['vest', '護甲', '背心', '防彈背心'] },
+  coins: { name: '金幣', short: '金幣', cat: 'coins', kind: 'coins', def: 1000, max: 1e6, desc: '在金水商行買東西用', aliases: ['coin', 'money', 'cash', '金幣', '錢'] },
+  hp: { name: '補滿生命', short: '生命', cat: 'hp', kind: 'hp', desc: '生命直接補到全滿', aliases: ['heal', 'health', '生命', '補血', '回血'] },
+  all: { name: '全部武器與補給', short: '全部', cat: 'all', kind: 'all', desc: '所有武器、彈藥、手榴彈、醫療包、護甲一次給齊', aliases: ['everything', '全部'] },
 };
+
+// 種類 → 顯示名稱(控制面板的分色與 /help 表格)
+export const CATS = { weapon: '武器', ammo: '彈藥', throw: '投擲物', med: '醫療', armor: '護甲', coins: '金幣', hp: '生命', all: '全部' };
 
 const ALIAS = new Map();
 for (const [k, it] of Object.entries(ITEMS)) { ALIAS.set(k, k); for (const a of it.aliases) ALIAS.set(a.toLowerCase(), k); }
@@ -37,8 +41,11 @@ export const itemNames = () => Object.keys(ITEMS);
 export function clampCount(key, n) {
   const it = ITEMS[key];
   const v = Number.isFinite(n) ? Math.floor(n) : it?.def ?? 1;
-  return Math.max(1, Math.min(it?.kind === 'coins' ? 1e6 : MAX_STACK, v));
+  return Math.max(1, Math.min(maxCount(key), v));
 }
+// 這個物品吃不吃數量、上限多少
+export const countable = (key) => ITEMS[key]?.def !== undefined;
+export const maxCount = (key) => ITEMS[key]?.max ?? MAX_STACK;
 
 function giveWeapon(game, id) {
   const w = game.weapons, def = WEAPONS[id];

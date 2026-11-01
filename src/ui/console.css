@@ -1,20 +1,94 @@
+/* F8 控制面板:深色底、米黃紙色的字(跟主選單、HUD 同一套),紙本的標籤當標題。
+   分色:指令、玩家、數量、錯誤各一色;物品依種類(武器、彈藥、投擲物、醫療、護甲、金幣、生命)。輸入框著色層、選單色條、物品格子、/help 共用。
+   [perf] 不用 filter / backdrop-filter(遊戲畫面每幀在變,合成器每幀都要重算)。 */
 #hzcon {
-  position: fixed; left: 16px; bottom: 120px; z-index: 1500; width: min(760px, calc(100vw - 32px));
-  font: 14px/1.5 ui-monospace, Consolas, "Cascadia Mono", "Microsoft JhengHei", monospace; color: #e6e2d0;
-  background: rgba(6, 9, 8, 0.88); border: 1px solid rgba(160, 210, 170, 0.3); border-radius: 4px;
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.55); display: none; text-shadow: 0 1px 1px #000;
+  --bg: rgba(12, 12, 11, .95); --line: rgba(255, 255, 255, .09); --text: #e3dccb; --muted: #8d877b; --amber: #ffb347; --paper: #d8ccae; --ink: #2a2620;
+  --k-cmd: #ffb347; --k-pl: #b9a2ff; --k-num: #6fd3e6; --k-err: #ff5a4a; --k-hist: #a39d90;
+  --k-weapon: #ef8a5d; --k-ammo: #d7b06c; --k-throw: #a9c66a; --k-med: #5fd3a9; --k-armor: #7eaaea; --k-coins: #f5cf4a; --k-hp: #f27c98; --k-all: #e3dccb;
+  --ui: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+  --mono: "Cascadia Mono", Consolas, "Microsoft JhengHei", monospace;
+  position: fixed; left: 16px; bottom: 112px; z-index: 1500; width: min(800px, calc(100vw - 32px)); box-sizing: border-box;
+  font: 14px/1.5 var(--ui); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-top: 2px solid rgba(255, 179, 71, .55);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .7), 0 0 0 1px rgba(0, 0, 0, .5); display: none; text-shadow: 0 1px 1px #000; user-select: none;
 }
 #hzcon.on { display: block; }
-#hzcon .hd { display: flex; justify-content: space-between; padding: 5px 10px; font-size: 12px; letter-spacing: 1px; color: #9fe0a0; border-bottom: 1px solid rgba(160, 210, 170, 0.18); }
-#hzcon .hd span:last-child { color: #7f9a86; letter-spacing: 0; }
-#hzcon .log { max-height: 38vh; min-height: 3em; overflow-y: auto; padding: 6px 10px; white-space: pre-wrap; word-break: break-word; user-select: text; }
-#hzcon .log div { padding: 1px 0; }
-#hzcon .log .cmd { color: #8fb4ff; }
-#hzcon .log .ok { color: #9fe0a0; }
-#hzcon .log .err { color: #ff7a6a; }
-#hzcon .log .info { color: #c9c4b0; }
-#hzcon .log .dim { color: #7f8a82; }
-#hzcon .row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid rgba(160, 210, 170, 0.18); }
-#hzcon .row b { color: #9fe0a0; }
-#hzcon input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: #f1ece0; font: inherit; caret-color: #9fe0a0; }
-#hzcon .hint { padding: 0 10px 6px; font-size: 12px; color: #7f9a86; min-height: 1.4em; white-space: pre-wrap; }
+#hzcon * { box-sizing: border-box; }
+#hzcon svg { display: block; width: 100%; height: 100%; }
+#hzcon kbd { font: 700 11px/1.4 var(--mono); padding: 0 5px; border: 1px solid rgba(255, 255, 255, .28); border-bottom-width: 2px; border-radius: 3px; color: #fff; background: rgba(255, 255, 255, .05); text-shadow: none; }
+#hzcon code { font-family: var(--mono); }
+
+/* 種類 → 顏色(--c) */
+#hzcon .c-cmd { --c: var(--k-cmd); } #hzcon .c-pl { --c: var(--k-pl); } #hzcon .c-num { --c: var(--k-num); } #hzcon .c-hist { --c: var(--k-hist); }
+#hzcon .c-weapon { --c: var(--k-weapon); } #hzcon .c-ammo { --c: var(--k-ammo); } #hzcon .c-throw { --c: var(--k-throw); } #hzcon .c-med { --c: var(--k-med); }
+#hzcon .c-armor { --c: var(--k-armor); } #hzcon .c-coins { --c: var(--k-coins); } #hzcon .c-hp { --c: var(--k-hp); } #hzcon .c-all { --c: var(--k-all); }
+
+/* 標題:一張米黃紙標籤 */
+#hzcon .hd { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 4px; }
+#hzcon .hd b { font-size: 13px; letter-spacing: 6px; padding: 2px 8px 2px 14px; color: var(--ink); text-shadow: none; transform: rotate(-.6deg);
+  background: linear-gradient(#e2d7bb, var(--paper)); box-shadow: 0 1px 0 rgba(0, 0, 0, .5), inset 0 0 6px rgba(120, 90, 40, .25); }
+#hzcon .hd span { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+/* 紀錄 */
+#hzcon .log { max-height: 30vh; min-height: 5.6em; overflow-y: auto; padding: 6px 10px; margin-top: 4px; border-top: 1px solid var(--line); user-select: text; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .18) transparent; }
+#hzcon .ln { display: flex; gap: 6px; align-items: flex-start; padding: 1px 0; word-break: break-word; }
+#hzcon .ln > i { flex: none; width: 15px; height: 15px; margin-top: 3px; }
+#hzcon .ln > span { min-width: 0; }
+#hzcon .ln.cmd { font: 13.5px/1.5 var(--mono); color: var(--text); margin-top: 4px; }
+#hzcon .ln.cmd b { color: var(--muted); }
+#hzcon .ln.ok { color: #7fe08f; }
+#hzcon .ln.err { color: #ff7a6a; }
+#hzcon .ln.tip { color: #ffcf7a; }
+#hzcon .ln.info { color: #c9c2b0; }
+#hzcon .ln.dim { color: var(--muted); font-size: 12.5px; }
+#hzcon .it { display: inline-flex; align-items: center; gap: 4px; color: var(--c); vertical-align: -3px; }
+#hzcon .it svg, #hzcon .it .ic { width: 16px; height: 16px; flex: none; }
+#hzcon .it .ic.w { width: 26px; }
+
+/* 輸入列:輸入框的字透明,底下的著色層(.pt)畫出上色的字;兩者字型、大小、位置完全一樣 */
+#hzcon .row { position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-top: 1px solid var(--line); background: rgba(0, 0, 0, .3); }
+#hzcon .row > b { font: 700 16px var(--mono); color: var(--amber); }
+#hzcon .ed { position: relative; flex: 1; min-width: 0; height: 24px; }
+#hzcon .ed input, #hzcon .ed .pt { position: absolute; inset: 0; margin: 0; padding: 0; border: 0; font: 15px/24px var(--mono); letter-spacing: 0; font-variant-ligatures: none; white-space: pre; }
+#hzcon .ed input { z-index: 1; width: 100%; height: 24px; background: transparent; outline: 0; color: transparent; caret-color: var(--amber); text-shadow: none; }
+#hzcon .ed input::selection { background: rgba(255, 179, 71, .3); color: transparent; }
+#hzcon .ed input::placeholder { color: #6c675d; }
+#hzcon .ed .pt { overflow: hidden; pointer-events: none; color: var(--text); }
+#hzcon .ed .pt > span { display: inline-block; }
+#hzcon .x-cmd { color: var(--k-cmd); }
+#hzcon .x-pl { color: var(--k-pl); }
+#hzcon .x-num { color: var(--k-num); }
+#hzcon .x-it { color: var(--c); }
+#hzcon .x-err { color: var(--k-err); text-decoration: underline wavy rgba(255, 90, 74, .85); text-underline-offset: 2px; text-decoration-skip-ink: none; }
+#hzcon .x-pend { color: var(--text); text-decoration: underline dotted rgba(255, 255, 255, .4); text-underline-offset: 2px; }
+#hzcon .x-extra { color: var(--muted); text-decoration: line-through; }
+
+/* 補全選單:浮在輸入框上方 */
+#hzcon .menu { position: absolute; left: 6px; right: 6px; bottom: calc(100% + 2px); z-index: 3; display: none; background: rgba(18, 17, 15, .985);
+  border: 1px solid rgba(255, 179, 71, .3); box-shadow: 0 -10px 30px rgba(0, 0, 0, .6); }
+#hzcon .menu.on { display: block; }
+#hzcon .mh { display: flex; justify-content: space-between; gap: 12px; padding: 5px 10px 4px; font-size: 12px; color: var(--amber); letter-spacing: 1px; border-bottom: 1px solid var(--line); }
+#hzcon .mh span:last-child { color: var(--muted); letter-spacing: 0; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+#hzcon .ml { max-height: min(296px, 40vh); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .18) transparent; }
+#hzcon .mi { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 3px 10px 3px 7px; border-left: 3px solid var(--c); cursor: pointer; }
+#hzcon .mi + .mi { border-top: 1px solid rgba(255, 255, 255, .035); }
+#hzcon .mi .ic { flex: none; width: 32px; height: 22px; display: flex; align-items: center; justify-content: center; color: var(--c); }
+#hzcon .mi .ic svg { width: 22px; height: 22px; }
+#hzcon .mi .ic.w svg { width: 32px; height: 20px; }
+#hzcon .mi code { flex: none; min-width: 6.5em; font-size: 14px; color: var(--c); white-space: nowrap; }
+#hzcon .mi b { flex: none; font-weight: 700; color: var(--text); white-space: nowrap; }
+#hzcon .mi .ds { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hzcon .mi em { flex: none; font: normal 11px var(--ui); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); padding: 0 6px; }
+#hzcon .mi.sel { background: color-mix(in srgb, var(--c) 13%, rgba(255, 255, 255, .03)); }
+#hzcon .mi.sel b { color: #fff; }
+#hzcon .mi.sel::after { content: "Tab"; flex: none; font: 700 10.5px/1.4 var(--mono); padding: 0 5px; border: 1px solid rgba(255, 255, 255, .28); border-bottom-width: 2px; border-radius: 3px; color: #fff; }
+#hzcon .mi.c-hist code { min-width: 0; }
+
+/* 提示列:用法 / 錯誤怎麼改 / 按 Enter 會發生什麼 */
+#hzcon .hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 26px; padding: 2px 10px 6px 30px; font-size: 12.5px; color: var(--muted); }
+#hzcon .hint > span { display: inline-flex; align-items: center; gap: 4px; }
+#hzcon .hint svg { width: 13px; height: 13px; flex: none; }
+#hzcon .hint .e { color: #ff7a6a; }
+#hzcon .hint .r { color: #a9e8b0; }
+#hzcon .hint .t { color: #ffcf7a; }
+#hzcon .hint .u { font-family: var(--mono); color: var(--muted); }
+#hzcon .hint .u b { color: var(--amber); font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
