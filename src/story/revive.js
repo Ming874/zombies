@@ -1,4 +1,4 @@
-// 「阿嬤叫你回來」(STORY_v2 §3.5):倒下時阿嬤用收驚的叫法叫你「阿孫，轉來喔！」,你就「回神」了。
+// 「阿嬤叫你回來」(STORY_v2 §3.5):倒下時阿嬤用收驚的叫法叫你「阿孫，回來喔！」,你就醒過來了。
 // 她叫得動你幾次 = 難度:簡單 無限(越後面越小聲)、普通 3、困難 1、惡夢 0(「無人叫你」)。
 //
 // 單人:HP 歸零 → 不是馬上死:世界褪色、心跳慢下來、〈望春風〉、她叫你 → game.motion.revive()(黑、她的一句、眨眼張開)
@@ -15,11 +15,11 @@ import { settings } from '../ui/settings.js';
 const CALLS = { easy: Infinity, normal: 3, hard: 1, nightmare: 0 };
 const HP = { easy: 50, normal: 35, hard: 30, nightmare: 25 };
 // 她叫你(字卡上的一句):依剩下幾次變小
-const CALL = { strong: '阿孫，回神喔！', mid: '阿孫——回神喔！', weak: '阿孫……回來……', faint: '……阿孫……' };
+const CALL = { strong: '阿孫，回來喔！', mid: '阿孫——回來喔！', weak: '阿孫……回來……', faint: '……阿孫……' };
 // 醒來之後,她在耳邊說的一句(只到 2003 年:你三歲以前的事)
 const SMALL = [
   '你小時候跌倒，阿嬤也是這樣叫你。\n叫一聲，你就自己爬起來。',
-  '天黑了，阿嬤在護理站門口叫你，\n你就跑過來，鞋子都穿反了。',
+  '天黑了，阿嬤在護理站門口叫你，\n你跑過來，鞋子都穿反了。',
   '阿嬤叫你，你都會回來。……對不對？',
 ];
 
@@ -122,8 +122,8 @@ export function installRevive(game, S) {
     const L = [];
     if (t === 'faint') L.push(['ama', '……回來就好。', 2.2, { ear: 'left', gap: 1.2, many: true }]);
     else L.push(['ama', SMALL[(n - 1) % SMALL.length], undefined, { ear: 'left', gap: 1.2, many: true }]);
-    if (t === 'weak') L.push(['ama', '阿嬤的力氣……剩不多了。', 3.2, { ear: 'left', gap: 1.6, many: true }]);
-    if (n === 1) L.push(['xl', '又倒下去了？', 1.8, { combatOk: true }], ['xl', '收音機剛剛整個沒聲音。', 2.6, { combatOk: true }], ['xl', '……是她又叫你了，對不對？', 2.8, { combatOk: true }]); // 小美聽不到阿嬤,只聽到收音機安靜(REDESIGN §7)
+    if (t === 'weak') L.push(['ama', '阿嬤的力氣……沒剩多少了。', 3.2, { ear: 'left', gap: 1.6, many: true }]);
+    if (n === 1) L.push(['xl', '你剛剛倒下去了？', 1.8, { combatOk: true }], ['xl', '收音機整個沒聲音。', 2.6, { combatOk: true }], ['xl', '……是她叫你回來的，對不對？', 2.8, { combatOk: true }]); // 小美聽不到阿嬤,只聽到收音機安靜(REDESIGN §7)
     else if (t === 'mid') L.push(['xl', '……她的聲音，比剛剛小了。', 3]);
     else if (t === 'weak') L.push(['xl', '……她剛剛那一聲，好遠。', 2.8]);
     seq(game, [1.4, ...L], { alive: () => game.state === 'playing' });

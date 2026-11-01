@@ -166,7 +166,7 @@ export function installLamp(game) {
     });
   };
   function onLow() {
-    note('lamp.low', '207 的燈在閃：後巷的發電機快沒油了。去 B1 鍋爐房扛柴油過去加。');
+    note('lamp.low', '207 的燈在閃，後巷那台發電機快沒油了。去 B1 鍋爐房扛一桶柴油過去加。');
     if (game.time - run.lowSaid < 120 || run.lowPend) return;
     run.lowPend = true;
     atRest((ok) => {
@@ -180,7 +180,7 @@ export function installLamp(game) {
   function onOut() {
     run.state = 'dying'; run.stT = 0;
     genOff = true;
-    note('lamp.out', '207 的燈熄了。替發電機加油，燈還點得回來。');
+    note('lamp.out', '207 的燈熄了。替發電機加了油，燈還點得回來。');
     try { sfx.loopStop?.(GEN_LOOP); } catch { /* 略 */ }
     if (!run.outSaid) {
       run.outSaid = true;

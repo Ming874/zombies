@@ -71,7 +71,7 @@ export function installEnding(game, S) {
     const d = document.createElement('div');
     d.className = 'st-line'; d.dataset.w = who;
     const tag = { xl: '收音機 · 小美', ks: '金水伯', ama: '阿嬤', xa: '收音機 · 阿嬤', ho: '電話 · 王醫師', pa: '醫院廣播' }[who];
-    d.innerHTML = `${tag ? `<small>${tag}</small>` : ''}${esc(text)}`;
+    d.innerHTML = `${tag ? `<small>${tag}</small>` : ''}${esc(text).replace(/\n/g, '<br>')}`; // 一則最多兩行(\n)
     box.appendChild(d);
     requestAnimationFrame(() => d.classList.add('on'));
     const hold = Math.max(2.6, secs + 1.4);
@@ -188,15 +188,15 @@ export function installEnding(game, S) {
       if (solo) { place(pose207()); try { W()?.anchors?.truck?.mesh && (W().anchors.truck.mesh.visible = true); } catch { /* 略 */ } }
       try { game.setMood?.('shop'); } catch { /* 略 */ }
       dawn(0);
-      await mid(solo ? ['最後一次，招魂燈熄了。', '發財車沒有開出去。它繞到後巷，停在鐵網旁邊。'] : ['最後一次招魂燈熄了。'], 1.6);
+      await mid(solo ? ['最後一次，招魂燈熄了。', '發財車沒有開走。', '它繞到後巷，停在鐵網旁邊。'] : ['最後一次，招魂燈熄了。'], 1.6);
       bars(true);
       await black(false, 2600);
       // 二、金水伯
       run.beat = 'alley';
       await w(1.2);
       await talk('ks', '……阿伯想再看一次。', { gap: 1.4 });
-      await talk('ks', '2003 年，我們每天晚上都站在這裡。');
-      await talk('ks', '你阿母抱著你，你一直指那扇窗。', { gap: 2 });
+      await talk('ks', '2003 年，我們每天晚上\n都站在這裡。');
+      await talk('ks', '你阿母抱著你，\n你一直指著那扇窗。', { gap: 2 });
       // 三、紙條
       if (d?.got?.('hc.09')) {
         run.beat = 'note';
@@ -206,8 +206,8 @@ export function installEnding(game, S) {
           S.flag?.('h.x.note'); try { X.flags.set('meta.note.kimsui', true); } catch { /* 略 */ }
           sub('n', '他看了很久。', 2); await w(3.2);
           await talk('ks', '……她沒有死？', { gap: 1.2 });
-          await talk('ks', '我揹下山的那個女孩，她沒有死？', { gap: 2.2 });
-          if (has('h.ho.heard')) { await talk('ks', '那個王醫師，921 那年跟我說，'); await talk('ks', '送到醫院就救不回來了。'); await talk('ks', '……他騙我。騙了二十七年。', { gap: 2 }); }
+          await talk('ks', '我揹下山的那個女孩……\n她沒有死？', { gap: 2.2 });
+          if (has('h.ho.heard')) { await talk('ks', '那個王醫師，921 那年跟我說，\n送到醫院就救不回來了。'); await talk('ks', '……他騙我。騙了二十七年。', { gap: 2 }); }
           await talk('ks', '……小美。', { gap: 2.4 });
           sub('n', '對講機那頭，沒有人回答。', 2.4); await w(3.4);
         }
@@ -227,9 +227,10 @@ export function installEnding(game, S) {
       // 五、數到十
       run.beat = 'count';
       const nc = S.calls || 0; // 今晚阿嬤叫了你幾次(src/story/revive.js)
-      if (nc > 0) await talk('xl', `今天晚上，那個阿嬤叫了你${nc === 1 ? '一' : nc === 2 ? '兩' : nc === 3 ? '三' : '好幾'}次。……我都聽到了。`, { gap: 1.4 });
+      if (nc > 0) await talk('xl', `今天晚上，那個阿嬤叫了你${nc === 1 ? '一' : nc === 2 ? '兩' : nc === 3 ? '三' : '好幾'}次。\n……我都聽到了。`, { gap: 1.4 });
       await talk('xl', '{暱稱}，你在發抖。', { gap: 1 });
-      await talk('xl', '我跟你講。怕的時候，數到十。……我們一起數。', { gap: 1.2 });
+      await talk('xl', '我跟你講。怕的時候，數到十。', { gap: 0.8 });
+      await talk('xl', '……我們一起數。', { gap: 1.2 });
       const hum207 = (v === 'good' || v === 'secret') && !!W()?.anchors?.w207?.view;
       tweenDawn(0, 1, 26);
       const cnt = q('.st-count');
@@ -267,7 +268,7 @@ export function installEnding(game, S) {
         await talk('ks', '……每天晚上都亮著。二十三年了。', { gap: 2.4 });
         if (v === 'good' || v === 'secret') {
           blink();
-          sub('n', '207 的燈暗了一下——像有人把手放在開關上，又停住。', 3.4); await w(4.6);
+          sub('n', '207 的燈暗了一下。\n像有人把手放在開關上，又停住。', 3.4); await w(4.6);
           await talk('xl', '……秀英姐。', { gap: 1.6 });
           await talk('xl', '再等我一下。', { gap: 1 });
           await talk('xl', '我自己去關。', { gap: 2.6 });
@@ -285,7 +286,7 @@ export function installEnding(game, S) {
         const c = A.chair || A.door || A.view;
         try { ghost.cart?.({ x: c.x, y: (c.y ?? A.view.y) + 0.4, z: c.z }, 7); } catch { /* 略 */ }
         await w(2.2);
-        sub('n', '推車的輪子聲，從 207 走到護理站，停了下來。', 3.2);
+        sub('n', '推車的輪子聲從 207 出來，\n走到護理站，停了。', 3.2);
         await w(4.4);
         try { sfx.folk('ama', A.lamp || c); } catch { /* 冷卻中 */ }
         await w(4);
@@ -294,7 +295,7 @@ export function installEnding(game, S) {
       run.beat = 'cards';
       await black(true, 1800);
       bars(false);
-      if (v === 'secret') { run.beat = 'cctv'; await mid(['監視器最後一格畫面：', '2F 走廊空無一人，推車自己停在新生兒室門口。', '保溫箱旁的小供桌上，多了一碗冒著熱氣的油飯。'], 3.4); run.beat = 'cards'; }
+      if (v === 'secret') { run.beat = 'cctv'; await mid(['監視器的最後一格畫面：', '二樓走廊沒有人。', '推車自己停在新生兒室門口。', '保溫箱旁的小供桌上，', '多了一碗還冒著熱氣的油飯。'], 3.4); run.beat = 'cards'; }
       run.skip = false; // 略過只略到片尾;片尾自己可以再略
       await cards(v);
     } catch (e) { console.warn('[ending]', e); }

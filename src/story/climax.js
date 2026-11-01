@@ -25,13 +25,14 @@ const HO = {
     '你好。我是王志明。\n以前在這間醫院，大家叫我王醫師。',
     '林護理長是你阿嬤吧。\n你們長得很像。',
     // 回收「207 的家屬被等著」(太平間名單、6 號冰櫃、清理隊內線、打字機):是大新的系統「通知」你;可是叫你來的那通電話,他也不知道是誰打的
-    '冰櫃的名單上，207 的家屬\n寫著「已通知」。那是我們的系統。',
-    '可是那天晚上的來電紀錄，\n只有一通，是從 207 打出去的。',
+    '太平間的名單寫著「207 家屬：已通知」。\n通知你的，是我們的系統。',
+    '可是那天晚上，總機只記到一通電話。\n是從 207 打出去的。',
     '……我不知道是誰打的。',
     '你剛剛打開的那扇門，\n我二十三年沒有打開過。',
-    '那天晚上，我關掉二樓的燈。\n她打開檯燈，擋在床前。\n她說：『這間是我的病人。』',
+    '那天晚上，我關掉二樓的燈。\n她打開檯燈，擋在床前。',
+    '她說：「這間是我的病人。」',
     '針是我拿的。我拉她，針就……',
-    '這二十三年，207 那台發電機的油錢，\n都是我付的。',
+    '207 那台發電機的油錢，\n二十三年來，都是我付的。',
     '枕頭裡那一頁，請留在 207。\n燈會一直亮著。對大家都好。',
     '鬼門一關，這一切就結束了。\n你可以回家了。',
   ],
@@ -133,7 +134,7 @@ export function installClimax(game, S) {
     run.elockSaid = true;
     if (!has('h.207.knob')) {
       try { X.doors.lock('f2_ward_207', { text: '207 · 電子鎖開了，可是門從裡面鎖住了' }); } catch { /* 略 */ }
-      X.after(2.5, () => seq(game, [['xl', '電子鎖的紅燈熄了。……可是門把轉不動。', 3.4], ['xl', '旋鈕在裡面。有人從裡面鎖著。', 3.2]]));
+      X.after(2.5, () => seq(game, [['xl', '電子鎖的紅燈熄了。\n……可是門把轉不動。', 3.4], ['xl', '旋鈕在門裡面。\n有人從裡面鎖著。', 3.2]]));
       X.after(12, () => seq(game, [['ama', '等阿嬤回來。', undefined, { ear: 'left' }]]));
     }
   }
@@ -142,7 +143,7 @@ export function installClimax(game, S) {
     flag('h.207.open');
     const w = door207(), q = w ? { x: w.cx, y: w.y + 2.6, z: w.cz } : null;
     try { ixs.alarmStart?.('h207', q || p()); X.after(9, () => ixs.alarmStop?.('h207')); } catch { /* 略 */ }
-    seq(game, [0.8, ['pa', '207 警報。207 警報。', 5], ['pa', '保全人員，請到二樓。', 3], ['xl', '……你開了那扇門。整棟樓都在響。', 3.2, { combatOk: true }], ['xl', '大新的無線電在叫一個名字。', 3, { combatOk: true }], ['xl', '劉家豪。他在那扇門口，坐了三年。', 3.4, { combatOk: true }]]); // 廣播說廣播的,小美說她從無線電聽到的(REDESIGN §7)
+    seq(game, [0.8, ['pa', '207 警報。207 警報。', 5], ['pa', '保全人員，請到二樓。', 3], ['xl', '……你開了那扇門。\n整棟樓都在響。', 3.2, { combatOk: true }], ['xl', '大新的無線電在叫一個名字。', 3, { combatOk: true }], ['xl', '劉家豪。\n他在那扇門口，坐了三年。', 3.4, { combatOk: true }]]); // 廣播說廣播的,小美說她從無線電聽到的(REDESIGN §7)
     if (!isHost()) return;
     if (game.phase === 'fighting') run.alarmPend = true; // 這一波打完再來
     else X.after(9, () => startGuardWave());
@@ -230,7 +231,7 @@ export function installClimax(game, S) {
     const q = p();
     let best = null, bd = Infinity;
     for (const P of list) { let d = Math.hypot(P.pos.x - q.x, P.pos.z - q.z) + Math.abs(P.pos.y - q.y) * 6; try { const f = game.world.flowDistance(P.pos.x, P.pos.y, P.pos.z); if (Number.isFinite(f)) d = Math.min(d, f + Math.abs(P.pos.y - q.y) * 2); } catch { /* 略 */ } if (d < bd) { bd = d; best = P; } }
-    const parts = HO.parts.map((t) => (/^枕頭裡那一頁/.test(t) && D()?.got?.('hc.30') ? '你拿了那一頁。……她的字，一直都很工整。' : t)); // 已經拿了:他知道(監視器)
+    const parts = HO.parts.map((t) => (/^枕頭裡那一頁/.test(t) && D()?.got?.('hc.30') ? '你拿了那一頁。\n……她的字，一直都很工整。' : t)); // 已經拿了:他知道(監視器)
     if (!best || !best.startRing({ ...HO, parts }, 45)) return false;
     run.hoRang = true; run.hoP = best; run.hoState = 'ringing'; run.hoT = game.time;
     if (!game.net && game.phase === 'shop') game.restT = Math.max(game.restT, 48); // 單人:這通電話不要被下一波打斷
@@ -244,7 +245,7 @@ export function installClimax(game, S) {
     const T = (ln.parts || HO.parts).reduce((a, t) => a + 0.9 + [...t].length * 0.26 + 0.35, 0);
     run.hoEnd = game.time + T * 0.92;
     if (!game.net && game.phase === 'shop') game.restT = Math.max(game.restT, T + 10);
-    X.after(T * 0.48, () => { if (P.state === 'call' && run.hoState === 'talk') { run.xlCut = true; seq(game, [['xl', '……他在跟你講話對不對？掛掉。拜託，掛掉。', undefined, { ear: 'left' }]]); } });
+    X.after(T * 0.48, () => { if (P.state === 'call' && run.hoState === 'talk') { run.xlCut = true; seq(game, [['xl', '……他在跟你講話，對不對？\n掛掉。拜託，掛掉。', undefined, { ear: 'left' }]]); } });
   });
 
   // ---------- 每幀 ----------
@@ -265,7 +266,7 @@ export function installClimax(game, S) {
     if (!run.lead && h && (n7 || h.quiet >= 7) && Dr?.silent && !run.touqi && (Dr.roundT || 0) > 2.5) {
       run.lead = true;
       const at = near207(7);
-      seq(game, [['xl', '第七次燈熄了。', 2.2], ['xl', '我們這邊說，人走後第七天，', 3], ['xl', '會回家看一眼，叫頭七。', 2.8], ['xl', '……收音機好安靜。', 2.2], at ? ['xl', '不要走開，站著就好。', 2.6] : ['xl', '二樓北邊，207 門口。\n好像有人在那裡等你。', 4.2]]); // 她不認識阿嬤:這是她的推論(REDESIGN §7)
+      seq(game, [['xl', '第七次燈熄了。', 2.2], ['xl', '老人家說，人走了以後第七天，', 3], ['xl', '會回家看一眼。這叫頭七。', 2.8], ['xl', '……收音機好安靜。', 2.2], at ? ['xl', '不要走開，站著就好。', 2.6] : ['xl', '二樓北邊，207 門口。\n好像有人在那裡等你。', 4.2]]); // 她不認識阿嬤:這是她的推論(REDESIGN §7)
       if (n7) n7.ph = 'go';
     }
     if (n7 && live7) {
@@ -296,7 +297,7 @@ export function installClimax(game, S) {
     if (run.touqi && run.knobT && game.time >= run.knobT) { run.knobT = 0; knob(); }
     // 有人在配電盤上把 207 的迴路關掉(苦結局「熄燈」是玩家自己的選擇):小美會冷,阿嬤只說一句
     const lit = X.flags.get('h.pwr.207') !== false;
-    if (run.lit !== undefined && run.lit && !lit && !run.offSaid) { run.offSaid = true; X.after(2, () => seq(game, [['xl', '……二樓有一盞燈熄了。', 2.4], ['xl', '我突然好冷。……你那邊也是嗎？', 3.2]])); X.after(9, () => seq(game, [['ama', '燈……不要關。她怕黑。', undefined, { ear: 'right' }]])); }
+    if (run.lit !== undefined && run.lit && !lit && !run.offSaid) { run.offSaid = true; X.after(2, () => seq(game, [['xl', '……二樓有一盞燈熄了。', 2.4], ['xl', '我突然好冷。\n……你那邊也是嗎？', 3.2]])); X.after(9, () => seq(game, [['ama', '燈……不要關。她怕黑。', undefined, { ear: 'right' }]])); }
     run.lit = lit;
     // 迴路關了,207 的檯燈(也就是後巷看到的那扇窗)真的熄掉:只改強度(gate);有守燈系統(game.story.lamp)時由它管
     if (!game.story?.lamp && lit !== run.litG && !S.ending?.active) { const f = lamp207(game); if (f) { run.litG = lit; fadeGate(f, lit ? 1 : 0, lit ? 0.6 : 1.4); } }
@@ -311,7 +312,7 @@ export function installClimax(game, S) {
     // 第 5 次招魂燈的巨屍 = 大新照護員 夜班組長(正典 §4 首領;身上有門禁卡):給他一個名字,等門禁卡的那幾分鐘才有對象
     if (!run.lead5 && game.round === 5 && game.phase === 'fighting' && !has('h.badge')) {
       const z = game.zombies.find((q) => q.alive && q.type === 'brute' && (q.dist ?? 99) < 30);
-      if (z) { run.lead5 = true; run.boss5 = z; X.after(3, () => game.ui?.banner?.('大新夜班組長　陳建宏', '他以前是這裡的看護 · 門禁卡在他身上', 3800, 'red')); X.after(4.5, () => seq(game, [['xl', '大新的無線電說過，', 2.0, { combatOk: true, gap: 0.4 }], ['xl', '門禁卡在夜班組長身上。', 2.6, { combatOk: true, gap: 3 }], ['xl', '他以前是這裡的看護。', 2.4, { combatOk: true }], ['xl', '第一個打針的，就是他們。', 2.8, { combatOk: true }]])); } // 先讓「巨屍出現」的打法提示講完
+      if (z) { run.lead5 = true; run.boss5 = z; X.after(3, () => game.ui?.banner?.('大新夜班組長　陳建宏', '他以前是這裡的看護 · 門禁卡在他身上', 3800, 'red')); X.after(4.5, () => seq(game, [['xl', '大新的無線電說過，', 2.0, { combatOk: true, gap: 0.4 }], ['xl', '門禁卡在夜班組長身上。', 2.6, { combatOk: true, gap: 3 }], ['xl', '他以前是這裡的看護。', 2.4, { combatOk: true }], ['xl', '最早被打針的，就是他們。', 2.8, { combatOk: true }]])); } // 先讓「巨屍出現」的打法提示講完
     }
     if (run.boss5 && !run.boss5.alive && !run.badgeDrop) dropBadge(run.boss5);
     // 看守 207 的保全:自己放的那一隻(退路:那一波第一隻巨屍)
@@ -326,7 +327,7 @@ export function installClimax(game, S) {
     if (run.hoState === 'ringing' && run.hoP && run.hoP.state === 'idle' && game.time - run.hoT > 2) { run.hoState = 'ignored'; flag('h.ho.ignored'); X.after(2, () => seq(game, [['xl', '……不接也好。', undefined, {}]])); }
     if (run.hoState === 'talk' && run.hoP && run.hoP._ended && run.hoP.state === 'call') { // 他說完了(聽筒還在耳邊)
       run.hoState = 'heard'; flag('h.ho.heard'); D()?.addCard?.('hc.20', { by: 'call' });
-      X.after(2.2, () => seq(game, [['xl', '……我都聽到了。', 2.2], ['xl', D()?.got?.('hc.30') ? '他知道你拿了。……沒關係。' : '他叫你把那一頁留下來。……你自己判斷。', 3.6]]));
+      X.after(2.2, () => seq(game, [['xl', '……我都聽到了。', 2.2], ['xl', D()?.got?.('hc.30') ? '他知道你拿了。……沒關係。' : '他要你把那一頁留下來。\n……你自己決定。', 3.6]]));
     }
     if (run.hoState === 'talk' && run.hoP) {
       if (run.hoP.state !== 'call') { // 掛了
@@ -334,7 +335,7 @@ export function installClimax(game, S) {
         run.hoState = heard ? 'heard' : 'hung';
         flag(heard ? 'h.ho.heard' : 'h.ho.hung');
         if (heard) D()?.addCard?.('hc.20', { by: 'call' });
-        X.after(1.6, () => (heard ? seq(game, [['xl', '……我都聽到了。', 2.2], ['xl', '他叫你把那一頁留下來。……你自己判斷。', 3.6]]) : seq(game, [['xl', '……掛得好。', 1.8], ['xl', '我在這邊拍手。你沒聽到而已。', 3]])));
+        X.after(1.6, () => (heard ? seq(game, [['xl', '……我都聽到了。', 2.2], ['xl', '他要你把那一頁留下來。\n……你自己決定。', 3.6]]) : seq(game, [['xl', '……掛得好。', 1.8], ['xl', '我在這邊幫你拍手。\n你沒聽到而已。', 3]])));
       }
     }
     void step;

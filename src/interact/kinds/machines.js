@@ -357,7 +357,7 @@ export const pa = {
         const all = api.lineList('PA');
         const l = pool.length ? pool[idx++ % pool.length] : all[(R() * all.length) | 0];
         ix.after(2.2, () => {
-          api.say('', '（你的聲音從天花板的喇叭傳出去，在走廊盡頭繞了一圈）', 2800);
+          api.say('', '（你的聲音從天花板的喇叭傳出去，\n在走廊盡頭繞了一圈。）', 2800);
           if (l) ix.after(3.4, () => { const h = api.speak(l, { filter: 'pa' }); ix.after(h.dur + 0.4, () => sfx.pa('down')); });
         });
         ix.flags.inc('h.pa');
