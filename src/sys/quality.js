@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { stageConfig, warmMaterials } from './warmup.js';
 import { GpuProfiler } from '../gfx/gpuprof.js';
+import { gpuKind } from '../ui/gpuhint.js';
 
 // ===== 畫質管理 → game.quality =====
 // 預設檔 low / medium / high / ultra(首次自動依 GPU 挑選,之後記在 localStorage)。
@@ -18,10 +19,11 @@ export const PRESETS = {
   // 陰影類型一律 pcf(低畫質只是關掉陰影):類型是所有 program 的參數,換預設檔時不要連類型也換
   low: { label: '低', shadows: false, shadowType: 'pcf', shadowScale: 0.5, shadowLights: 0, bloom: false, msaa: 0, pixelMin: 0.6, pixelMax: 0.85, lights: 4, particles: 100, fog: 'low', decals: 0.4, anisotropy: 2, drawDistance: 70, flashFar: 12, ao: 0, ssr: 0, vol: 0, taa: false, pcss: false, boostMax: 1 },
   medium: { label: '中', shadows: true, shadowType: 'pcf', shadowScale: 0.5, shadowLights: 1, bloom: true, msaa: 2, pixelMin: 0.6, pixelMax: 1.0, lights: 6, particles: 160, fog: 'medium', decals: 0.7, anisotropy: 4, drawDistance: 90, flashFar: 14, ao: 1, ssr: 1, vol: 1, taa: false, pcss: false, boostMax: 1.1 },
-  high: { label: '高', shadows: true, shadowType: 'pcf', shadowScale: 1, shadowLights: 2, bloom: true, msaa: 4, pixelMin: 0.7, pixelMax: 1.25, lights: 8, particles: 240, fog: 'high', decals: 1, anisotropy: 8, drawDistance: 120, flashFar: 18, ao: 2, ssr: 2, vol: 2, taa: true, pcss: false, boostMax: 1.25 },
-  ultra: { label: '極致', shadows: true, shadowType: 'pcf', shadowScale: 2, shadowLights: 4, bloom: true, msaa: 4, pixelMin: 0.85, pixelMax: 1.5, lights: 12, particles: 400, fog: 'high', decals: 1, anisotropy: 16, drawDistance: 150, flashFar: 28, ao: 3, ssr: 3, vol: 3, taa: true, pcss: true, boostMax: 1.5 },
+  high: { label: '高', shadows: true, shadowType: 'pcf', shadowScale: 1, shadowLights: 2, bloom: true, msaa: 4, pixelMin: 0.7, pixelMax: 1.25, lights: 8, particles: 240, fog: 'high', decals: 1, anisotropy: 8, drawDistance: 120, flashFar: 18, ao: 2, ssr: 2, vol: 2, taa: true, taaMsaa: false, pcss: false, boostMax: 1.25 },
+  ultra: { label: '極致', shadows: true, shadowType: 'pcf', shadowScale: 2, shadowLights: 4, bloom: true, msaa: 4, pixelMin: 0.85, pixelMax: 1.5, lights: 12, particles: 400, fog: 'high', decals: 1, anisotropy: 16, drawDistance: 150, flashFar: 28, ao: 3, ssr: 3, vol: 3, taa: true, taaMsaa: true, pcss: true, boostMax: 1.5 },
 };
 // [gpu] ao/ssr/vol:0 關、1~3 等級(src/gfx/pipeline.js LEVELS);taa:時間反鋸齒;pcss:手電筒/月光的柔和半影;
+//   taaMsaa:TAA 開著時場景還要不要 MSAA(只有極致;高畫質靠 TAA 抗鋸齒,場景緩衝不多重取樣 → 內顯省約 2 ms;手持武器仍是 msaa 倍);
 //   boostMax:CPU 是瓶頸、GPU 有餘裕時渲染倍率最多拉到 dpr × boostMax(超取樣)。全部只改 uniform / RT 尺寸,不重編 shader
 const COMMON = { dynamicRes: true, targetFps: 60 };
 // 會改變 shader program 參數的設定:先在背景依新設定編好全部材質,編完才真正套用(見 syncProgramKeys)
@@ -63,6 +65,9 @@ export function detectPreset(gl) {
   if (/swiftshader|llvmpipe|software|basic render|microsoft basic/.test(s)) return { preset: 'low', gpu: s };
   if (mobile) return { preset: 'low', gpu: s };
   if (/rtx|gtx 1[06-9]|gtx 16|radeon rx|rx [5-9]\d{2,3}|arc a[57]|apple m[1-9] (pro|max|ultra)|apple m[2-9]/.test(s)) return { preset: 'high', gpu: s };
+  // 內顯(和 CPU 共用記憶體頻寬與功耗):AMD 780M/890M 的字串是 "radeon(tm) 890m graphics",以前落到下面的 /radeon|amd/ 變成高畫質
+  // (實測 890M 高畫質大廳約 30 fps)→ 中畫質,並標記 igpu(自動調整反應快一點、不做超取樣)
+  if (gpuKind(s) === 'integrated') return { preset: 'medium', gpu: s, igpu: true };
   if (/intel|uhd|iris|mali|adreno|apple gpu|vega [3-8]\b|radeon\(tm\) graphics|mx\d{3}/.test(s)) return { preset: 'medium', gpu: s };
   if (/nvidia|geforce|radeon|amd/.test(s)) return { preset: 'high', gpu: s };
   return { preset: (nav.hardwareConcurrency || 4) >= 8 && (nav.deviceMemory || 8) >= 8 ? 'high' : 'medium', gpu: s };
@@ -92,6 +97,7 @@ export class Quality {
     const gl = game.renderer.getContext();
     this.gpu = new GpuProfiler(gl);
     this.detected = detectPreset(gl);
+    this.igpu = !!this.detected.igpu; // 內顯:GPU 瓶頸時降得快、不往上超取樣
     const saved = load();
     this.preset = saved && PRESETS[saved.preset] ? saved.preset : this.detected.preset;
     this.over = (saved && saved.over) || {};
@@ -187,7 +193,7 @@ export class Quality {
   minScale() { return this.get('pixelMin'); }
   maxScale() { return Math.max(this.baseMax(), this.boostCap()); }
   baseMax() { return Math.max(this.minScale(), Math.min(this.get('pixelMax'), Math.max(1, this.dpr) * (this.preset === 'ultra' ? 1.5 : 1))); }
-  boostCap() { return Math.min(2, Math.max(this.baseMax(), Math.max(1, this.dpr) * (this.get('boostMax') || 1))); }
+  boostCap() { return this.igpu ? this.baseMax() : Math.min(2, Math.max(this.baseMax(), Math.max(1, this.dpr) * (this.get('boostMax') || 1))); }
   startScale() { return clamp(Math.min(this.dpr, this.get('pixelMax')), this.get('pixelMin'), this.baseMax()); }
 
   setScale(s, force = false) {
@@ -252,7 +258,7 @@ export class Quality {
       const n = this.get('msaa');
       for (const rt of [g.composer.renderTarget1, g.composer.renderTarget2]) if (rt && rt.samples !== n) { rt.samples = n; rt.dispose(); }
     }
-    if (g.gfx && (first || ['ao', 'ssr', 'vol', 'taa', 'msaa', 'pcss'].some(has))) this.applyGfx();
+    if (g.gfx && (first || ['ao', 'ssr', 'vol', 'taa', 'msaa', 'taaMsaa', 'pcss'].some(has))) this.applyGfx();
     if (has('anisotropy')) {
       const a = Math.min(this.get('anisotropy'), r.capabilities.getMaxAnisotropy());
       const seen = new Set(), todo = [];
@@ -307,7 +313,7 @@ export class Quality {
     const g = this.game;
     if (!g.gfx) return;
     const boost = this.level >= 1 ? 1 : this.level <= -3 ? -1 : 0;
-    g.gfx.configure({ ao: this.get('ao') | 0, ssr: this.get('ssr') | 0, vol: this.get('vol') | 0, taa: !!this.get('taa'), msaa: this.get('msaa') | 0, boost });
+    g.gfx.configure({ ao: this.get('ao') | 0, ssr: this.get('ssr') | 0, vol: this.get('vol') | 0, taa: !!this.get('taa'), msaa: this.get('msaa') | 0, taaMsaa: !!this.get('taaMsaa'), boost });
     // composer 緩衝:GfxPass 有效果時手持武器在它的多重取樣輸出裡畫 → 之後的全螢幕 pass 不需要 MSAA
     const n = g.gfx.any ? 0 : this.get('msaa') | 0;
     if (g.composer) for (const rt of [g.composer.renderTarget1, g.composer.renderTarget2]) if (rt && rt.samples !== n) { rt.samples = n; rt.dispose(); }
@@ -321,10 +327,12 @@ export class Quality {
   //   GPU 瓶頸 → 往下減(先收回超取樣與效果,再降解析度)。背景編譯中(staging)不動。
   control() {
     const t = now(), budget = 1000 / this.get('targetFps');
-    if (this.staging || this.frame.n < 40 || t - this.lastChange < 900) return;
-    const frame = this.frame.avg(40), cpu = this.cpu.avg(40);
+    // 內顯:往下調的反應時間縮短(換階後 0.5 秒就重新判斷、超載 0.25 秒就降、平均窗 24 幀;差很多時一次降兩階)
+    const gap = this.igpu ? 500 : 900, hold = this.igpu ? 250 : 400, n = this.igpu ? 24 : 40;
+    if (this.staging || this.frame.n < 40 || t - this.lastChange < gap) return;
+    const frame = this.frame.avg(n), cpu = this.cpu.avg(n);
     const hasGpu = this.gpu.ms != null && this.gpuA.n >= 30;
-    const A = hasGpu ? this.gpuA.avg(40) : null, B = hasGpu ? this.gpuB.avg(40) : null, sub = this.sub.avg(40);
+    const A = hasGpu ? this.gpuA.avg(n) : null, B = hasGpu ? this.gpuB.avg(n) : null, sub = this.sub.avg(n);
     const gpuBound = hasGpu ? A + B > frame * 0.86 && A > sub * 1.3 + 1.2 : frame > budget * 1.18 && cpu < frame * 0.62;
     const cpuBound = !gpuBound && frame > budget * 1.05;
     this.bound = gpuBound ? 'gpu' : cpuBound ? 'cpu' : 'ok';
@@ -340,7 +348,7 @@ export class Quality {
     }
     if (gpuBound) {
       if (!this.overT) this.overT = t;
-      if (t - this.overT > 400) { this.overT = 0; this.upBlock = Math.min(60000, this.upBlock * 2); this.step(-1); }
+      if (t - this.overT > hold) { this.overT = 0; this.upBlock = Math.min(60000, this.upBlock * 2); this.step(this.igpu && frame > budget * 1.6 ? -2 : -1); }
       return;
     }
     this.overT = 0;
@@ -360,8 +368,8 @@ export class Quality {
   }
   // 自動調整走一階;回傳是否真的有變(到頂/到底就不動)
   step(d) {
-    const lv = this.level + d;
-    if (lv < -5 || lv > 8) return false;
+    const lv = Math.max(-5, Math.min(8, this.level + d)); // 內顯一次降兩階時到底就停在 -5
+    if (lv === this.level) return false;
     const fx = this.get('ao') > 0 || this.get('ssr') > 0 || this.get('vol') > 0;
     const s = this.levelState(lv).scale;
     const fxChange = fx && ((this.level < 1) !== (lv < 1) || (this.level <= -3) !== (lv <= -3));

@@ -418,3 +418,20 @@ void main() {
   }
   gl_FragColor = vec4( max( c, 0.0 ), 1.0 );
 }`;
+
+// ---- 輸出(手持武器畫好之後)→ composer 緩衝,同時做原本 SanitizeShader 那一道(src/game/post.js):
+// NaN/Inf/負值/≥ 60 → 0,超過 2 的高光平滑壓到約 8 以下(Bloom 不會炸成一整片)。少一道全螢幕 HalfFloat 讀寫;
+// 有 GPU 效果時 post.js 的清 NaN pass 停用(GfxPass.render 設定),低畫質(沒有效果、直接畫進 composer)照舊用那一道
+export const BLIT = /* glsl */`
+uniform sampler2D tSrc;
+varying vec2 vUv;
+${COMMON}
+void main() {
+  vec4 c = texelFetch( tSrc, ivec2( gl_FragCoord.xy ), 0 );
+  if ( ! ( c.r >= 0.0 && c.r < 60.0 ) ) c.r = 0.0;
+  if ( ! ( c.g >= 0.0 && c.g < 60.0 ) ) c.g = 0.0;
+  if ( ! ( c.b >= 0.0 && c.b < 60.0 ) ) c.b = 0.0;
+  float m = max( c.r, max( c.g, c.b ) );
+  if ( m > 2.0 ) { float e = m - 2.0; c.rgb *= ( 2.0 + e / ( 1.0 + e / 6.0 ) ) / m; }
+  gl_FragColor = vec4( c.rgb, 1.0 );
+}`;

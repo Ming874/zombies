@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { alphaGuard } from './gbuf.js';
 import './pcss.js'; // 柔和半影的 ShaderChunk 修改(要在任何 shader 編譯之前)
+import './lightcull.js'; // 光源範圍外的像素跳過 RE_Direct(ShaderChunk 修改,同上)
 import * as S from './shaders.js';
 import { WET } from '../map/weather/wet.js';
+import { Occluder } from './occlude.js';
 
 // ===== GfxPass:場景 pass + GPU 寫實效果(取代 composer 的第一個 RenderPass)=====
 // 只多十來個全螢幕 draw(CPU 幾乎不變),把閒著的 GPU 拿來做:
@@ -68,7 +70,7 @@ export class GfxPass extends Pass {
     this.hzName = 'scene';
     this.game = game;
     this.guard = alphaGuard(game.renderer.getContext());
-    this.cfg = { ao: 2, ssr: 2, vol: 2, taa: true, msaa: 4, boost: 0, aoStrength: 1, ssrStrength: 1.3, volStrength: 1, sharp: 0.18, flashK: 0.12, moonK: 0.3, lampK: 0.45 };
+    this.cfg = { ao: 2, ssr: 2, vol: 2, taa: true, msaa: 4, taaMsaa: false, boost: 0, aoStrength: 1, ssrStrength: 1.3, volStrength: 1, sharp: 0.18, flashK: 0.12, moonK: 0.3, lampK: 0.45 };
     this.live = { ao: 0, ssr: 0, vol: 0, taa: false };
     this.frame = 0;
     this.submitMs = 0; // 場景繪製的 JS 時間(自動調整用來分辨 CPU/GPU 瓶頸)
@@ -130,8 +132,9 @@ export class GfxPass extends Pass {
       uInvView: this.mSSR.uniforms.uInvView, uVP: { value: this.vp }, uPrevVP: { value: this.prevVP }, uReset: { value: 1 }, uAlpha: { value: 0.1 },
     }, 'gfx.taa');
     this.mCopy = mk(S.COPY, { tSrc: tex(null), uSharp: { value: 0.18 } }, 'gfx.copy');
-    this.mBlit = mk(S.COPY, { tSrc: tex(this.outRT.texture), uSharp: { value: 0 } }, 'gfx.blit');
-    this.materials = [this.mPrep, this.mAO, this.mAOBlur, this.mDown, this.mSSR, this.mVol, this.mComp, this.mTAA, this.mCopy, this.mBlit];
+    this.mBlit = mk(S.BLIT, { tSrc: tex(this.outRT.texture) }, 'gfx.blit'); // 含清 NaN + 高光壓縮(取代 post.js 的 SanitizeShader pass)
+    this.occ = new Occluder(game.renderer); // 金水商行/補給櫃的遮擋查詢(src/gfx/occlude.js)
+    this.materials = [this.mPrep, this.mAO, this.mAOBlur, this.mDown, this.mSSR, this.mVol, this.mComp, this.mTAA, this.mCopy, this.mBlit, this.occ.material];
     this.configure({});
   }
 
@@ -142,7 +145,11 @@ export class GfxPass extends Pass {
     const before = this.live.taa;
     this.live = { ao: lv('ao'), ssr: lv('ssr'), vol: lv('vol'), taa: !!c.taa };
     if (this.live.taa !== before) this.reset = 2;
-    for (const t of [this.sceneRT, this.outRT]) if (t.samples !== (c.msaa | 0)) { t.samples = c.msaa | 0; t.dispose(); }
+    // 場景緩衝:TAA 開著時不多重取樣(TAA 的抖動本身就是抗鋸齒;4× HalfFloat 色彩 + 深度的寫入與解析在內顯上約 2 ms),
+    // 極致(taaMsaa)才兩個都用。輸出緩衝(手持武器畫在上面,不經過 TAA)照舊多重取樣 → 武器邊緣不鋸齒
+    const sceneN = this.live.taa && !c.taaMsaa ? 0 : c.msaa | 0;
+    if (this.sceneRT.samples !== sceneN) { this.sceneRT.samples = sceneN; this.sceneRT.dispose(); this.reset = 2; }
+    if (this.outRT.samples !== (c.msaa | 0)) { this.outRT.samples = c.msaa | 0; this.outRT.dispose(); }
     const A = LEVELS.ao[this.live.ao], R = LEVELS.ssr[this.live.ssr], V = LEVELS.vol[this.live.vol];
     if (A) { const u = this.mAO.uniforms; u.uSlices.value = A.slices; u.uSteps.value = A.steps; u.uRadius.value = A.radius; }
     if (R) { const u = this.mSSR.uniforms; u.uSteps.value = R.steps; u.uMaxDist.value = R.dist; u.uMaxRough.value = R.rough; }
@@ -231,18 +238,52 @@ export class GfxPass extends Pass {
     u.uLN.value = n;
   }
 
+  // 天空(深度 = 1 的全螢幕球)與遠方天際線原本 renderOrder -1000/-999 最先畫:每個像素都先跑一次 5 階 fbm 雲,
+  // 之後幾乎全被牆蓋掉。改成不透明物件最後才畫(天際線先、天空後;都只在深度還是 1 的背景像素通過深度測試)→
+  // 室內幾乎不用算天空。畫面不變:天空 depthWrite 關、z = w;天際線 z = 0.99999w;透明物件(暴風雲、閃電)本來就在不透明之後。
+  // 只改執行期的 renderOrder(src/map 不動);找不到(還沒建好)就每 60 幀再找一次
+  orderSky(scene) {
+    if (this._skyOK || (this.frame & 63) !== 1) return;
+    const sky = scene.getObjectByName('sky'), line = scene.getObjectByName('skyline');
+    if (!sky) return;
+    sky.renderOrder = 1e6 + 1;
+    if (line) line.renderOrder = 1e6;
+    this._skyOK = true;
+  }
+
+  // 遮擋查詢的對象:商行整組、每座補給櫃(重建世界時會換新物件 → 每 60 幀對一次清單)
+  syncOcc() {
+    if ((this.frame % 60) !== 2) return;
+    const g = this.game, want = [];
+    if (g.shop?.group) want.push(g.shop.group);
+    for (const s of g.supplies?.list || []) if (s.root) want.push(s.root);
+    for (const it of this.occ.items.slice()) if (!want.includes(it.obj)) this.occ.remove(it.obj);
+    for (const o of want) this.occ.add(o);
+  }
+  // 場景繪製(含遮擋查詢):被確定擋住的大物件先藏起來,畫完還原,再在同一個深度上畫查詢盒
+  drawScene(renderer, cam) {
+    const g = this.game, occ = this.occ, moon = g.hospital?.atmo?.moon;
+    this.syncOcc();
+    occ.hide(cam, !!(moon && moon.castShadow && moon.shadow.needsUpdate));
+    const t0 = performance.now();
+    try { renderer.render(g.scene, cam); } finally { occ.restore(); }
+    this.submitMs = performance.now() - t0;
+    occ.query(renderer, cam);
+  }
+
   render(renderer, writeBuffer, readBuffer) {
     const g = this.game, cam = g.camera, prof = g.quality?.gpu, L = this.live, U = this.U;
+    this.orderSky(g.scene);
     const ac = renderer.autoClear;
     renderer.autoClear = false;
     if (g.weaponPass) g.weaponPass.enabled = !this.any; // 有效果時手持武器在這個 pass 裡畫(見 outRT)
+    if (g.sanitizePass) g.sanitizePass.enabled = !this.any; // 有效果時清 NaN 併在最後的 mBlit 裡
     // 不需要任何效果(低畫質):直接畫進 composer 的緩衝,省掉一次複製與解析
     if (!this.any) {
+      this.frame++;
       renderer.setRenderTarget(readBuffer);
       renderer.clear(true, true, false);
-      const t0 = performance.now();
-      renderer.render(g.scene, cam);
-      this.submitMs = performance.now() - t0;
+      this.drawScene(renderer, cam);
       prof?.split('post');
       renderer.autoClear = ac;
       this.reset = 2;
@@ -264,9 +305,7 @@ export class GfxPass extends Pass {
     renderer.setRenderTarget(this.sceneRT);
     renderer.clear(true, true, false);
     this.guard.set(true);
-    const t0 = performance.now();
-    try { renderer.render(g.scene, cam); } finally { this.guard.set(false); }
-    this.submitMs = performance.now() - t0;
+    try { this.drawScene(renderer, cam); } finally { this.guard.set(false); }
     prof?.split('post');
     const e = pm.elements;
     U.uProjInfo.value.set(1 / e[0], 1 / e[5], e[8], e[9]);
