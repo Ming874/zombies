@@ -26,10 +26,10 @@ const CAMP = { R: 4, T: 40, WARN: 2.5 };
 const DARK_KEEP = new Set(['exit', 'emergency', 'candle', 'fire', 'monitor', 'lamp', 'nightlight', 'street', 'sodium', 'beacon']);
 const DARK_K = 0.06, DARK_ZONE_KEEP = new Set(['f2_ward_207']); // 207 的窗(守燈)不熄
 const BONUS = { head: 0.5, melee: 1 }; // 爆頭 / 近戰額外金幣(基礎金幣倍率)
-const TYPE_NAME = { walker: '（建議，同 menu.js:14）活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
+const TYPE_NAME = { walker: '活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍', screamer: '尖叫的', stalker: '潛行的', surgeon: '手術者', burned: '焦屍', hazmat: '清理隊員', straitjacket: '束縛病患' }; // types.js 沒有名字時的備援(同 menu.js TYPE_NAMES)
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 // [N6] 一波結束時的小字:世界裡的事,不是成績(數字在暫停選單)
-const QUIET = ['走廊安靜下來了', '外面只剩下雨聲', '牠們退回暗處了', '遠處有人在咳嗽', '燈篙暗下去了', '樓上的腳步停了', '風從破窗吹進來'];
+const QUIET = ['走廊安靜下來了', '外面只剩下雨聲', '牠們退回暗處了', '遠處有人在咳嗽', '屋頂的燈暗下去了', '樓上的腳步停了', '風從破窗吹進來'];
 
 export const flowMethods = {
   // 世界建構時呼叫(在 world.buildNav 之前):店面與補給點都會登記碰撞盒。位置全部來自 world(world.shop / world.supplies)。

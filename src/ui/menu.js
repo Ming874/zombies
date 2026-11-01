@@ -10,8 +10,9 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const HEART = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M16 27.5S4.5 20 4.5 12.3C4.5 8.6 7.3 6 10.6 6c2.3 0 4.3 1.3 5.4 3.2C17.1 7.3 19.1 6 21.4 6c3.3 0 6.1 2.6 6.1 6.3C27.5 20 16 27.5 16 27.5z"/><path fill="currentColor" d="M15 1.5h2v4h3v2h-3v5h-2v-5h-3v-2h3z"/><path fill="none" stroke="currentColor" stroke-width="1.2" opacity=".7" d="M11 13.5c1.5 2.5 3 3.5 5 3.5s3.5-1 5-3.5"/></svg>';
 const pct = (v) => `${Math.round(v * 100)}%`;
-const TYPE_ORDER = ['walker', 'runner', 'crawler', 'bloater', 'brute'];
-const TYPE_NAMES = { walker: '（建議）活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
+// 結算的擊殺分類:全部 11 種(追獵者不會被打死,不列)
+const TYPE_ORDER = ['walker', 'runner', 'crawler', 'bloater', 'screamer', 'stalker', 'surgeon', 'burned', 'straitjacket', 'hazmat', 'brute'];
+const TYPE_NAMES = { walker: '活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍', screamer: '尖叫的', stalker: '潛行的', surgeon: '手術者', burned: '焦屍', hazmat: '清理隊員', straitjacket: '束縛病患' };
 const PRESET_NAME = { low: '低', medium: '中', high: '高', ultra: '極致' };
 // [類型, 鍵, 標籤, …]:range(min, max, step, 格式, 說明)/ toggle(說明)/ seg(選項, 說明)/ btn(按鈕文字, 說明)
 const SETTINGS = [
@@ -249,7 +250,8 @@ export class Menu {
     const S = g.stats || {};
     const L = g.lastRound; // [N6] 上一波的數字只在這裡看(一波結束的橫幅不講分數)
     const last = L ? `<br><small>第 ${L.n} 波：擊殺 <b>${L.kills}</b> · 爆頭 <b>${L.heads}</b> · 命中率 <b>${L.acc}%</b> · 用時 <b>${L.time}</b>${L.bonus ? ` · 清場 <b>+${L.bonus}</b>` : ''}${L.cleanBonus ? ` · 毫髮無傷 <b>+${L.cleanBonus}</b>` : ''}</small>` : '';
-    el.innerHTML = g.state === 'playing' ? `第 <b>${g.round || 1}</b> 波 · 擊殺 <b>${S.kills || 0}</b> · 分數 <b>${(S.score || 0).toLocaleString('en-US')}</b> · 錢 <b>${g.player?.coins || 0}</b>${last}` : '';
+    const dn = g.diff?.().name; // [w4] 目前的難度
+    el.innerHTML = g.state === 'playing' ? `${dn ? `${esc(dn)} · ` : ''}第 <b>${g.round || 1}</b> 波 · 擊殺 <b>${S.kills || 0}</b> · 分數 <b>${(S.score || 0).toLocaleString('en-US')}</b> · 錢 <b>${g.player?.coins || 0}</b>${last}` : '';
   }
 
   // ---------- 面板 ----------

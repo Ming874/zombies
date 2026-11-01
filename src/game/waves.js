@@ -25,7 +25,7 @@ export const SPECIAL = {
 const LATE3 = ['dark', 'rush', 'swarm'], LATE2 = ['alarm', 'pa'];
 export function waveKind(n) {
   if (n >= 5 && n % 5 === 0) return 'boss';
-  if (n === 6) return 'pa'; // 封院第 6 天:「鄭玉蘭護理長，請至一樓大廳。」
+  if (n === 6) return 'pa'; // 封院第 6 天:廣播把林護理長叫到一樓大廳(正典;台詞歸 story)
   if (n >= 8 && n % 5 === 3) return LATE3[((n - 8) / 5) % 3]; // 第 8 波 = 停電(正典招牌)
   if (n >= 11 && n % 5 === 1) return LATE2[((n - 11) / 5) % 2];
   return '';
