@@ -55,7 +55,7 @@ export const WEAPONS = {
     stats: { damage: 0.44, rate: 0.9, accuracy: 0.72, range: 0.75, mobility: 0.66 },
   },
   barrett: {
-    name: '巴雷特', desc: 'Barrett M82A1 · .50 BMG 半自動狙擊', price: 650, damage: 260, rpm: 70, auto: false,
+    name: '巴雷特', desc: 'Barrett M82A1 · .50 BMG 半自動狙擊', price: 1350, damage: 260, rpm: 70, auto: false,
     mag: 10, reserveStart: 20, reserveCap: 50, reload: 3.6, spread: 0.06, kick: 0.15, pitch: 0.075,
     hold: [0.22, -0.225, -0.74], slot: 6, ads: { zoom: 6, spread: 0.0005, time: 0.42, scope: true, optic: 'sniper' }, penetrate: 3, penMul: 0.7,
     falloff: null, minDmg: 1, bloom: 0, moveSpread: 1.0, recoil: { yaw: [0], rand: 0.35 },
@@ -201,11 +201,11 @@ export class WeaponSystem {
     }
   }
 
-  // 每回合開始補給兩個彈匣
+  // 每回合開始每把槍補給一個彈匣([w4 經濟] 以前兩個:彈藥幾乎不用買)
   resupply() {
     for (const id in this.inv) {
       const d = WEAPONS[id];
-      this.inv[id].reserve = Math.min(d.reserveCap, this.inv[id].reserve + this.stat(id, 'mag') * 2);
+      this.inv[id].reserve = Math.min(d.reserveCap, this.inv[id].reserve + this.stat(id, 'mag'));
     }
   }
 

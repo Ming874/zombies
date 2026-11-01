@@ -19,7 +19,7 @@ import { sfx } from './audio.js';
 //   'buy' 可購買、'poor' 錢不夠、'part' 買不起補滿但可買部分彈藥、'owned' 已擁有(可裝備)、'equipped' 使用中、'max' 已滿/已滿級、'na' 未到貨
 // =====================================================================
 export const WEAPON_ITEMS = ['pistol', 'revolver', 'shotgun', 'ak47', 'm4a1', 'barrett'];
-const PRICE_FALLBACK = { pistol: 0, revolver: 120, shotgun: 180, ak47: 300, m4a1: 450, barrett: 650 };
+const PRICE_FALLBACK = { pistol: 0, revolver: 120, shotgun: 180, ak47: 300, m4a1: 450, barrett: 1350 };
 const INFO_FALLBACK = {
   shotgun: { name: '霰彈槍', desc: 'Remington 870 · 12 號霰彈' },
   barrett: { name: '巴雷特', desc: 'M82A1 · .50 BMG 反器材步槍' },

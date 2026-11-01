@@ -12,12 +12,20 @@ import { precompile } from './sys/warmup.js';
 
 // ---------- 掉落數值(集中調整) ----------
 // ammo / med / grenade 為每次擊殺的機率;big = 必掉大彈藥箱(取代一般彈藥)
+// [w4 經濟] 手榴彈掉落 ×2 左右(焦屍、膿腫者、清理隊員都在要求爆炸;補給櫃與開場彈匣收緊了,火力改從地上撿);
+// 第三波的新類型各自有一列(以前全部套行屍)
 export const DROP_TABLE = {
-  walker: { ammo: 0.16, med: 0.045, grenade: 0.012 },
-  runner: { ammo: 0.18, med: 0.05, grenade: 0.015 },
-  crawler: { ammo: 0.16, med: 0.05, grenade: 0.012 },
-  bloater: { ammo: 0.3, med: 0.12, grenade: 0.06 },
-  brute: { ammo: 0, med: 0.7, grenade: 0.5, big: true },
+  walker: { ammo: 0.16, med: 0.045, grenade: 0.026 },
+  runner: { ammo: 0.18, med: 0.05, grenade: 0.03 },
+  crawler: { ammo: 0.16, med: 0.05, grenade: 0.026 },
+  bloater: { ammo: 0.3, med: 0.12, grenade: 0.12 },
+  brute: { ammo: 0, med: 0.7, grenade: 0.75, big: true },
+  screamer: { ammo: 0.18, med: 0.06, grenade: 0.04 },
+  stalker: { ammo: 0.22, med: 0.06, grenade: 0.04 },
+  surgeon: { ammo: 0.2, med: 0.12, grenade: 0.03 },
+  burned: { ammo: 0.2, med: 0.05, grenade: 0.07 },
+  hazmat: { ammo: 0.34, med: 0.1, grenade: 0.12 },
+  straitjacket: { ammo: 0.2, med: 0.06, grenade: 0.03 },
 };
 
 export const DROP_RULES = {
@@ -874,8 +882,9 @@ export class Pickups {
 // =====================================================================
 // 補給點:world.supplies = [{ kind: 'ammo' | 'health', x, y, z, level }]
 // 實體模型(彈藥補給櫃 / 醫療櫃),E 鍵使用;每次燈篙每位玩家一次,用完亮紅燈並顯示冷卻。
+// [w4 經濟] 彈藥櫃只補「手上這把」;每個櫃子每位玩家一夜最多 night 次(用完就整夜亮紅燈 → 要換樓層找下一個)
 // =====================================================================
-export const SUPPLY_RULES = { reach: 1.9, reachY: 1.3 };
+export const SUPPLY_RULES = { reach: 1.9, reachY: 1.3, night: 3 };
 const SUP = {
   ammo: { name: '彈藥補給櫃', color: 0xffb347, css: '#ffc35a', verb: '補充彈藥' },
   health: { name: '醫療櫃', color: 0x5dff9a, css: '#7dffae', verb: '使用醫療櫃' },
@@ -1042,11 +1051,12 @@ export class Supplies {
     st.lampMat.color.setRGB(...(ready ? [0.3, 2, 0.6] : [2.2, 0.15, 0.1]));
   }
 
-  // 新回合:所有補給點重新可用
-  newRound() { for (const st of this.list) { st.used.clear(); this._state(st, true); } }
-  reset() { this.newRound(); }
+  // 新回合:所有補給點重新可用(一夜的次數 st.uses 不清);新的一局(reset)才全部歸零
+  newRound() { for (const st of this.list) { st.used.clear(); this._state(st, this.left(st, { id: 'local' }) > 0); } }
+  reset() { for (const st of this.list) st.uses = null; this.newRound(); }
 
-  canUse(st, p) { return !st.used.has(p.id ?? 'local'); }
+  left(st, p) { return SUPPLY_RULES.night - (st.uses?.get(p.id ?? 'local') || 0); } // 這一夜還能用幾次
+  canUse(st, p) { return !st.used.has(p.id ?? 'local') && this.left(st, p) > 0; }
 
   // 玩家可互動的最近補給點
   nearest(p) {
@@ -1060,24 +1070,25 @@ export class Supplies {
   }
 
   promptFor(st, p) {
-    const S = SUP[st.kind];
-    return this.canUse(st, p) ? { text: `按 [E] ${S.verb}`, dim: false } : { text: `${S.name} · 已使用，下一波補充`, dim: true };
+    const S = SUP[st.kind], n = this.left(st, p);
+    if (this.canUse(st, p)) return { text: `按 [E] ${S.verb}（今晚還能用 ${n} 次）`, dim: false };
+    return { text: n > 0 ? `${S.name} · 已使用，下一波補充` : `${S.name} · 今晚用完了`, dim: true };
   }
 
   // 使用;回傳 { ok, msg }
   use(st, game) {
     const p = game.player, w = game.weapons, ui = game.ui, S = SUP[st.kind];
-    if (!this.canUse(st, p)) { say('pickupDeny', 'deny'); return { ok: false, msg: '這一波已經用過了' }; }
+    if (!this.canUse(st, p)) { say('pickupDeny', 'deny'); return { ok: false, msg: this.left(st, p) > 0 ? '這一波已經用過了' : '今晚用完了' }; }
     if (st.kind === 'ammo') {
-      const ids = Object.keys(w.inv).filter((id) => WEAPONS[id]);
-      if (ids.every((id) => w.inv[id].mag >= magOf(w, id) && w.inv[id].reserve >= WEAPONS[id].reserveCap)) {
+      const id = w.current, inv = w.inv[id];
+      if (!inv || !WEAPONS[id] || (inv.mag >= magOf(w, id) && inv.reserve >= WEAPONS[id].reserveCap)) {
         say('pickupDeny', 'deny');
-        ui.pickup('彈藥已滿', '#a3a39a');
+        ui.pickup(`${WEAPONS[id]?.name || ''} 彈藥已滿`, '#a3a39a');
         return { ok: false, msg: '彈藥已滿' };
       }
-      for (const id of ids) { w.inv[id].mag = Math.max(w.inv[id].mag, magOf(w, id)); w.inv[id].reserve = Math.max(w.inv[id].reserve, WEAPONS[id].reserveCap); }
+      inv.mag = Math.max(inv.mag, magOf(w, id)); inv.reserve = Math.max(inv.reserve, WEAPONS[id].reserveCap);
       if (game.updateAmmoHud) game.updateAmmoHud();
-      ui.pickup('彈藥補滿', S.css, { icon: 'ammo', sub: `${S.name} · 所有武器`, panel: 'ammo' });
+      ui.pickup(`${WEAPONS[id].name} 彈藥補滿`, S.css, { icon: 'ammo', sub: `${S.name} · 只補手上這把 · 今晚還能用 ${this.left(st, p) - 1} 次`, panel: 'ammo' });
       say('pickupAmmo', 'switch');
     } else {
       const gain = p.maxHp - p.hp;
@@ -1088,6 +1099,7 @@ export class Supplies {
       say('heal', 'pickupMed');
     }
     st.used.add(p.id ?? 'local');
+    (st.uses ||= new Map()).set(p.id ?? 'local', (st.uses.get(p.id ?? 'local') || 0) + 1);
     this._state(st, false);
     if (game.net?.send) game.net.send('supplyUse', { i: this.list.indexOf(st) });
     return { ok: true };
