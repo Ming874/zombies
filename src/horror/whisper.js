@@ -4,7 +4,7 @@ import { syllabify } from '../audio/ghost.js';
 import { captions } from '../ui/captions.js';
 
 // 耳邊低語:從文字表挑一句(每局不重複)、播放雙耳合成語音、同步顯示靈異字幕。
-// say(lineId | text, { ear, subtitle, filter, priority, pos, mode, g, orbit }) → handle { id, ear, end, dur, line, kill(), stop() } | null
+// say(lineId | text, { ear, subtitle, filter, priority, pos, mode, g, orbit, rate }) → handle { id, ear, end, dur, line, kill(), stop() } | null
 // filter 'pa' = 醫院廣播(大新系統的合成女聲,從天花板喇叭);orbit = 繞著頭轉 { r, w(弧度/秒), a(起始角,0 = 正後方) }
 const A = _internal.A;
 const TAG = { phone: '電話', radio: '收音機', pa: '醫院廣播' }; // STORY.md §11.1 的字幕標籤
@@ -94,12 +94,13 @@ export class Whispers {
     const mode = murmur ? 'murmur' : o.mode ?? L.mode ?? 'syllabic';
     const g = o.g ?? (pa ? 0.42 : 0.55);
     const voice = pa ? { voiced: 1, voiceGain: 0.5, noise: 0.25, f0: 228, pitch: 1.16, rate: 4.4, breath: false, clicks: false } : {}; // 合成、甜美、制式(§11.1)
+    if (o.rate) voice.rate = o.rate; // 說話速度(音節/秒):回憶裡 2003 年的人用正常語速(memdata.js MEM_RATE),字幕才浮得完
     let hnd = null, h2 = null;
     if (ear === 'both') {
-      hnd = ghost.whisper({ text: L.text, ear: 'left', filter, mode, g: g * 0.85, prio: 7, pitch: 1.12 });
-      h2 = ghost.whisper({ text: L.text, ear: 'right', filter, mode, g: g * 0.8, prio: 7, delay: 0.13, pitch: 1.04 });
+      hnd = ghost.whisper({ text: L.text, ear: 'left', filter, mode, g: g * 0.85, prio: 7, pitch: 1.12, rate: o.rate });
+      h2 = ghost.whisper({ text: L.text, ear: 'right', filter, mode, g: g * 0.8, prio: 7, delay: 0.13, pitch: 1.04, rate: o.rate });
     } else hnd = ghost.whisper({ text: L.text, ear: ear === 'world' ? 'near' : ear, filter, mode, g, prio: pa ? 8 : 7, pos: ear === 'world' ? pos : null, orbit: o.orbit, ...voice });
-    const sy = hnd ? null : syllabify(L.text, pa ? 4.4 : mode === 'murmur' ? 4.2 : 3.3);
+    const sy = hnd ? null : syllabify(L.text, o.rate ?? (pa ? 4.4 : mode === 'murmur' ? 4.2 : 3.3));
     const dur = hnd ? hnd.dur : 0.55 + sy.dur + 0.9;
     const kill = () => { hnd?.kill?.(); h2?.kill?.(); };
     this.cur = { prio, end: t + dur, kill, id: L.id };

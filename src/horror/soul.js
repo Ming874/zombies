@@ -65,10 +65,10 @@ export function installSoul(game, H) {
       run.lostN++;
       keepMuffle();
       emit('lost', { why });
-      game.ui?.feed?.('三把火都熄了。到 2F 護理站阿嬤的遺照前，站著不要動。', { icon: 'warn', color: '#9fb8d8', ms: 7000 });
+      game.ui?.feed?.('三把火都熄了。休息時到 2F 護理站，在阿嬤的照片前站著不要動。', { icon: 'warn', color: '#9fb8d8', ms: 7000 });
     } else if (run.n === MAX - 1 && !run.taught) {
       run.taught = true;
-      game.ui?.feed?.('身上的一把火熄了。', { icon: 'warn', color: '#9fb8d8', ms: 4200 });
+      game.ui?.feed?.('身上的三把火，熄了一把。', { icon: 'warn', color: '#9fb8d8', ms: 4200 });
     }
     return true;
   }
