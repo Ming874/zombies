@@ -5,7 +5,8 @@
 // 門外:護理站一盞暖色壁燈照著遺照(收驚、問事的地方),門邊地上是金水伯放的便當(「放門口,敲三下」)。
 // 給體驗導演的錨點(kind 'anchor'):hospital.js 收進 H.anchors.w207(結局:天亮時從門口看陪病椅 → 床 → 窗)。
 import { tpl, G } from './parts.js';
-import { labRect, decalRect } from './atlas.js';
+import { labRect, decalRect, glowRect } from './atlas.js';
+import { text } from './tex.js';
 import { D } from './geo.js';
 import { glowSwatch } from './art.js';
 import { hospitalBed, bedTags, nightstand, headwall, curtainSet } from './medical.js';
@@ -110,8 +111,51 @@ const bentoStack = (n, seed) => tpl(`w207:bento:${n}:${seed}`, (b) => {
 const wallLampWarm = () => tpl('w207:walllamp', (b) => {
   b.box('enamel_cream', 0.1, 0.14, 0.02, 0, 0, 0.01, { r: 0.008 });
   b.rod('chrome', 0.008, [0, 0, 0.02], [0, 0.04, 0.2], { seg: 5 });
-  b.lathe('enamel_cream', [[0.01, 0], [0.03, -0.01], [0.085, -0.085], [0.088, -0.09]], 0, 0.06, 0.24, { seg: 18 });
-  b.sph(G(glowSwatch('warm', '#ffd89a')), 0.03, 0, 0.03, 0.24, { ws: 10, hs: 8 });
+  b.lathe('enamel_cream', [[0.01, 0], [0.035, -0.01], [0.09, -0.1], [0.095, -0.135]], 0, 0.06, 0.24, { seg: 18 }); // [w4 scene] 燈罩加深:遠處看不到燈泡(不再被 bloom 吹成白點)
+  b.sph(G(glowSwatch('warm', '#ffd89a')), 0.024, 0, 0.045, 0.24, { ws: 10, hs: 8 });
+});
+// [w4 scene] 凸出牆面的雙面燈箱「護理站」(和走廊垂直,從走廊兩端 13 m 外都讀得到);和壁燈同一路緊急電
+const nurseSignRect = () => glowRect('w207:nsign', 192, 64, (c, w, h) => {
+  c.fillStyle = '#f0e6c8'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#1f5a46'; c.fillRect(0, 0, 44, h);
+  c.fillStyle = '#f0e6c8'; c.fillRect(18, 14, 8, 36); c.fillRect(8, 28, 28, 8);
+  text(c, '護理站', 118, h / 2 + 2, { size: 38, color: '#1f4a3a', weight: '900' });
+  c.fillStyle = 'rgba(80,60,30,0.12)'; c.fillRect(150, 6, 30, 14); c.fillRect(60, 46, 22, 10);
+});
+const nurseSign = () => tpl('w207:nsign', (b) => {
+  const L = 1.12, H = 0.4, T = 0.12; // 沿 z(凸出牆面)、高、厚(沿 x)
+  b.box('enamel_cream', T, H + 0.04, L + 0.04, 0, 0, L / 2 + 0.07, { r: 0.01 });
+  b.plane(G(nurseSignRect()), L - 0.04, H - 0.04, T / 2 + 0.002, 0, L / 2 + 0.07, { ry: Math.PI / 2 });
+  b.plane(G(nurseSignRect()), L - 0.04, H - 0.04, -T / 2 - 0.002, 0, L / 2 + 0.07, { ry: -Math.PI / 2 });
+  b.box('chrome', 0.03, 0.03, 0.08, 0, 0.1, 0.04); b.box('chrome', 0.03, 0.03, 0.08, 0, -0.1, 0.04); // 支架
+});
+// 護理站的長櫃台延伸段 + 牆上的呼叫燈板 + 病歷車(白漆鐵櫃、綠色檯面,和原本的櫃台同款)
+const callBoardRect = () => glowRect('w207:callboard', 128, 48, (c, w, h) => {
+  c.fillStyle = '#20241f'; c.fillRect(0, 0, w, h);
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) {
+    const lit = (i === 6 && j === 0) || (i === 1 && j === 1);
+    c.fillStyle = lit ? '#ff4a30' : '#4a3a30'; c.beginPath(); c.arc(12 + i * 15, 14 + j * 20, 4.5, 0, 7); c.fill();
+  }
+  text(c, '207', 12 + 6 * 15, 30, { size: 7, color: '#c8c0a8', weight: 'normal' });
+});
+const nurseCounter = (len) => tpl(`w207:ncounter:${len}`, (b) => {
+  const D2 = 0.56, Hc = 1.02;
+  b.box('enamel_white', len, Hc - 0.06, D2, 0, (Hc - 0.06) / 2, 0, { r: 0.008 });
+  b.box('pl_green', len - 0.02, 0.36, 0.01, 0, 0.32, D2 / 2 + 0.003);
+  b.box('enamel_gray', len + 0.04, 0.04, D2 + 0.06, 0, Hc - 0.02, 0.02, { r: 0.006 });
+  b.box('enamel_white', len, 0.05, 0.03, 0, 0.025, D2 / 2 - 0.02);
+  // 檯面上:交班簿、電話、病歷夾
+  b.box('paper', 0.3, 0.02, 0.22, -len / 2 + 0.4, Hc + 0.01, 0.02, { ry: 0.1 });
+  b.box('pl_beige', 0.2, 0.07, 0.2, len / 2 - 0.35, Hc + 0.035, -0.05, { r: 0.02 });
+  b.box('pl_blue', 0.24, 0.025, 0.32, 0.05, Hc + 0.0125, 0.0, { ry: -0.2 });
+  b.plane(G(callBoardRect()), 0.62, 0.24, 0.1, 1.62, -D2 / 2 + 0.006);
+});
+const chartCart = () => tpl('w207:chartcart', (b) => {
+  b.box('steel', 0.46, 0.04, 0.4, 0, 0.92, 0);
+  b.box('steel', 0.46, 0.04, 0.4, 0, 0.12, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box('steel', 0.025, 0.86, 0.025, sx * 0.21, 0.52, sz * 0.18);
+  for (let i = 0; i < 7; i++) b.box(i % 3 === 0 ? 'pl_red' : i % 3 === 1 ? 'pl_blue' : 'pl_green', 0.04, 0.3, 0.3, -0.16 + i * 0.053, 1.09, 0, { rz: (i % 2 ? 0.05 : -0.04) });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.cyl('rubber', 0.04, 0.03, sx * 0.19, 0.04, sz * 0.16, { axis: 'x', seg: 8 });
 });
 
 export function dress207(R, zone, ceil) {
@@ -190,10 +234,14 @@ export function dress207(R, zone, ceil) {
   const wallZ = z1 + 2;
   const lampT = tpl('w207:hubwrap', (b) => b.add(wallLampWarm(), 0, 0, 0, 0, 0, 0));
   R.put(lampT, x0 + 5.75, wallZ + 0.01, 0, { y: y + 2.05 });
-  R.light({ x: x0 + 5.75, y: y + 1.85, z: wallZ + 0.55, color: 0xffb070, intensity: 4.0, distance: 3.9, kind: 'lamp', flicker: 0, glow: 0.38, zone: 'f2_corridor' });
+  // [w4 scene] 暖光離牆 1.2 m、半徑 6.6 m(強度不變):照亮的是一塊地板和對面的牆,不是一顆燈泡;不要光暈片(近看會被 bloom 吹白)
+  R.light({ x: x0 + 5.75, y: y + 2.0, z: wallZ + 1.2, color: 0xffb070, intensity: 4.0, distance: 6.6, kind: 'lamp', flicker: 0, glow: 0, zone: 'f2_corridor', pri: 9, far: 1000 }); // pri:從走廊另一頭 13 m 外也優先被光源池選到
   anchor('w207.hub', { x: x0 + 5.5, y, z: wallZ + 0.6 });
-  // 便當:門西側靠牆,兩疊 + 一個塑膠袋裡的(最後幾天沒人拿)
-  R.put(bentoStack(4, 1), x0 + 1.45, wallZ + 0.22, 0.1);
-  R.put(bentoStack(3, 2), x0 + 1.12, wallZ + 0.3, -0.25);
-  R.put(bentoStack(2, 3), x0 + 1.75, wallZ + 0.42, 0.5);
+  R.put(nurseSign(), x0 + 6.75, wallZ + 0.01, 0, { y: y + 2.5 });
+  R.tryPut(nurseCounter(2.2), x0 + 8.1, wallZ + 0.3, 0, { force: true });
+  R.tryPut(chartCart(), x0 + 9.55, wallZ + 0.4, 0.15, { force: true });
+  // 便當:門東側、壁燈的光圈裡(金水伯放的,最後幾天沒人拿)
+  R.put(bentoStack(4, 1), x0 + 3.95, wallZ + 0.24, 0.1);
+  R.put(bentoStack(3, 2), x0 + 4.28, wallZ + 0.3, -0.25);
+  R.put(bentoStack(2, 3), x0 + 4.1, wallZ + 0.6, 0.5);
 }
