@@ -141,8 +141,10 @@ export class Book {
     const tabs = `<nav class="dd-tabs"><button data-tab="notes" class="${this.tab === 'notes' ? 'on' : ''}">到目前為止${nfresh && this.tab !== 'notes' ? '<i>新</i>' : ''}</button><button data-tab="words" class="${this.tab === 'words' ? 'on' : ''}">可以用的詞 <small>${D.words().length}</small></button><button data-tab="cards" class="${this.tab === 'cards' ? 'on' : ''}">線索 <small>${cards.length}</small>${fresh && this.tab !== 'cards' ? '<i>新</i>' : ''}</button><button class="dd-x" title="收起">×</button></nav>`;
     let body = '';
     if (this.tab === 'notes') { // 〈到目前為止〉:下一步 + 你現在知道的事(新的在上面)
-      const nx = notes?.next?.(), items = notes?.list?.() || [], seen = this.notesSeen ?? -1;
-      body = `<div class="dd-next"><b>下一步：</b>${nx ? `${esc(nx.goal)}${nx.why ? `<small>｜${esc(nx.why)}</small>` : ''}` : '活下去，等天亮。'}</div>`
+      const nx = notes?.next?.(), items = notes?.list?.() || [], seen = this.notesSeen ?? -1, qs = notes?.questions?.() || [];
+      // 問題帳本(N15):還不知道的事;知道了就劃掉(還開著的排前面)
+      const ask = qs.length ? `<div class="dd-ask"><h4>還不知道的事</h4><ul>${[...qs.filter((x) => !x.done), ...qs.filter((x) => x.done)].map((x) => `<li class="${x.done ? 'done' : ''}">${esc(x.text)}${x.done && x.ans ? `<small>${esc(x.ans)}</small>` : ''}</li>`).join('')}</ul></div>` : '';
+      body = `<div class="dd-next"><b>下一步：</b>${nx ? `${esc(nx.goal)}${nx.why ? `<small>｜${esc(nx.why)}</small>` : ''}` : '活下去，等天亮。'}</div>` + ask
         + (items.length ? `<ol class="dd-notes">${items.map((it) => `<li class="${it.t > seen ? 'new' : ''}">${esc(it.text)}</li>`).join('')}</ol>` : '<div class="dd-empty">還沒有寫什麼。</div>');
       notes?.seen?.(); this.notesSeen = this.game.time;
     } else if (this.tab === 'words') {

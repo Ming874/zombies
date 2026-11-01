@@ -30,9 +30,22 @@ const NOTES = [
   ['truck', (c) => c.has('h.truck'), '金水伯的車在急診車道等你。'],
 ];
 
+// 問題帳本(NARRATIVE N15):〈到目前為止〉最上面列出「還不知道的事」;知道了就劃掉,後面寫一句答案。
+//   [k, 問題, 什麼時候開始問, 什麼時候知道了, 答案];知道了 = null 的是第一章不回答的(系列問題,一直留著)
+const ASK = [
+  ['why', '阿嬤為什麼叫你回來？', (c) => c.started, (c) => c.got('hc.30'), '枕頭裡那一頁：阿嬤沒有不要回家。'],
+  ['who', '207 裡面那個沒有名字的病人是誰？', (c) => c.has('h.where207'), (c) => c.got('hc.31') || c.has('h.m6'), '是小美。'],
+  ['night', '封院第 7 晚，207 發生了什麼事？', (c) => c.bookOpened || c.has('h.m3'), (c) => !!c.solved(), '三句都聖筊了。'],
+  ['lamp', '整間醫院都停電了，207 的燈為什麼還亮著？', (c) => c.has('h.where207'), (c) => c.lampKnown(), '後巷有一台 207 專用的發電機。'],
+  ['fuel', '是誰一直在付那台發電機的油錢？', (c) => c.lampKnown(), (c) => c.paid() || c.has('h.ho.heard'), '王醫師，二十三年都是他自己付的。'],
+  ['call', '打電話叫你來的，到底是誰？', (c) => c.has('h.ho.heard'), null, null],
+  ['xiaomei', '小美現在在哪裡？', (c) => c.got('hc.31') || c.has('h.m6'), null, null],
+];
+
 export function installNotes(game, S) {
   const X = game.interact, O = () => game.objectives, D = () => game.deduce;
-  let run = { items: [], seen: new Set(), started: false, bookOpened: false, lastSeen: 0 };
+  const fresh = () => ({ items: [], seen: new Set(), started: false, bookOpened: false, lastSeen: 0, cardOK: new Set(), ask: new Map() });
+  let run = fresh();
   const c = {
     get started() { return run.started; },
     get bookOpened() { return run.bookOpened; },
@@ -41,6 +54,11 @@ export function installNotes(game, S) {
     step: () => O()?.step?.(),
     inv: (id) => !!X.inv?.has?.(id),
     card: (id) => !!run.cardOK?.has(id), // 這一局碰到的(收卡或讀到那份文件)
+    got: (id) => !!D()?.got?.(id) || !!run.cardOK?.has(id), // 這一局碰到的(含跨局保留的卡這一局又看到)
+    solved: () => !!D()?.solved?.(),
+    // 知道 207 的燈是後巷那台發電機在供電(油快沒了、熄了、加過油,或請款單、王醫師的電話)
+    lampKnown: () => ['lamp.low', 'lamp.out', 'lamp.fill', 'fuel.paid'].some((k) => run.seen.has(k)) || (game.story?.lamp?.state?.().refuels || 0) > 0 || c.has('h.ho.heard'),
+    paid: () => run.seen.has('fuel.paid'), // 打字機打完那張請款單(src/interact/lines.js tw.fuel)
   };
   function add(k, text) {
     if (run.seen.has(k)) return false;
@@ -57,13 +75,15 @@ export function installNotes(game, S) {
     get fresh() { return run.items.filter((i) => i.t > run.lastSeen).length; },
     seen() { run.lastSeen = game.time; },
     bookOpened() { run.bookOpened = true; },
+    // 問題帳本:開始問了的問題(照 ASK 的順序);done = 知道了(劃掉),ans = 一句答案
+    questions: () => ASK.filter(([k]) => run.ask.has(k)).map(([k, text, , , ans]) => { const a = run.ask.get(k); return { k, text, done: !!a.done, ans: a.done ? ans : null, t: a.t }; }),
   };
   // 線索卡跨局保留:這一局「新拿到」的才算(上一局拿過的卡,這一局要再碰到一次才寫進來)
   const NOTE_ID = { H10: 'hc.30', H03: 'hc.31' };
   D()?.on?.('card', (e) => { (run.cardOK ||= new Set()).add(e.id); });
   X.on('note', (n) => { const id = NOTE_ID[n?.id]; if (id) (run.cardOK ||= new Set()).add(id); });
   O()?.on?.('flag', (f) => { if (f.name === 'h.m6' && f.v) (run.cardOK ||= new Set()).add('hc.31'); });
-  X.on('reset', () => { run = { items: [], seen: new Set(), started: false, bookOpened: false, lastSeen: 0, cardOK: new Set() }; });
+  X.on('reset', () => { run = fresh(); });
   let acc = 0;
   X.tick((dt) => {
     if (game.state !== 'playing') return true;
@@ -71,6 +91,16 @@ export function installNotes(game, S) {
     acc = 0;
     if (!run.started && game.round >= 1) run.started = true;
     for (const [k, cond, text] of NOTES) { if (!run.seen.has(k)) { let ok = false; try { ok = cond(c); } catch { ok = false; } if (ok) add(k, text); } }
+    // 問題帳本:新的問題閃一下「＋筆記」;知道了就劃掉(筆記本開著就重畫)
+    let ch = false;
+    for (const [k, , open, known] of ASK) {
+      let a = run.ask.get(k);
+      try {
+        if (!a && open(c)) { a = { t: game.time, done: false }; run.ask.set(k, a); ch = true; try { D()?.noteFlash?.(); } catch { /* 略 */ } }
+        if (a && !a.done && known && known(c)) { a.done = true; a.doneT = game.time; ch = true; }
+      } catch { /* 略 */ }
+    }
+    if (ch) { try { D()?.redraw?.(); } catch { /* 略 */ } }
     return true;
   });
   return N;
