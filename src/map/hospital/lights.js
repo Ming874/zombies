@@ -209,7 +209,7 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
       }
     }
     // 稀疏的壞天花燈(螢幕光/夜燈/檯燈的房間)
-    const sparse = SPARSE[lt] || (lt === 'emergency' ? (zone.theme === 'stairwell' ? [0.5, 0, 0.5] : [0.4, 0, 0.6]) : null);
+    const sparse = SPARSE[lt] || (lt === 'emergency' ? (zone.theme === 'stairwell' ? [0.55, 0.45, 0] : [0.4, 0, 0.6]) : null);
     if (sparse) {
       for (const [c0, r0, c1, r1] of zone.rects) {
         const w = (c1 - c0 + 1) * 2, h = (r1 - r0 + 1) * 2;
@@ -231,8 +231,8 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
     const wl = lt === 'candle' ? 'sconce' : lt === 'fire' ? 'sodium' : lt;
     if (wl === 'emergency' || wl === 'sodium' || wl === 'nightlight' || wl === 'sconce') {
       const faces = K.faces.filter((f) => f.zone === zone && f.kind === 'room' && f.li === li && f.a1 - f.a0 >= 1.9);
-      const step = wl === 'nightlight' ? 7 : wl === 'emergency' ? (zone.theme === 'stairwell' ? 5 : 7.5) : wl === 'sconce' ? (zone.theme === 'ossuary' ? 3.5 : 6.5) : 8.5;
-      let acc = R() * step;
+      const step = wl === 'nightlight' ? 7 : wl === 'emergency' ? (zone.theme === 'stairwell' ? 13 : 7.5) : wl === 'sconce' ? (zone.theme === 'ossuary' ? 3.5 : 6.5) : 8.5;
+      let acc = R() * step, white = zone.theme === 'stairwell' && wl === 'emergency'; // [w4 scene] 樓梯間每層第一盞壁燈改成壞掉但還亮的白燈(紅色以外的對比光)
       for (const f of faces) {
         for (let a = f.a0 + 0.8; a < f.a1 - 0.6; a += 0.5) {
           acc += 0.5;
@@ -242,6 +242,7 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
           const x = isH ? a : f.fixed + f.nx * off, z = isH ? f.fixed + f.nz * off : a;
           const yy = f.y + (wl === 'nightlight' ? 0.32 : wl === 'emergency' ? 2.45 : wl === 'sconce' ? 1.95 : 2.75);
           if (yy > f.y + f.top - 0.15) continue;
+          if (white) { white = false; add({ x, y: yy + 0.15, z, li, zone, kind: 'fluoro_dying', R, axis: isH ? 'x' : 'z', wall: f, shape: 'lens', color: 0xe4eee2, states: [0.55, 0.45, 0], dim: 0.9 }); continue; }
           add({ x, y: yy, z, li, zone, kind: wl, R, axis: isH ? 'x' : 'z', wall: f, color: wl === 'nightlight' && R() < 0.4 ? 0x9ab4ff : undefined });
         }
       }
