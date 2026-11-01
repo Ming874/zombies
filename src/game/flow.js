@@ -16,6 +16,11 @@ import { waveRoster, wavePace, waveKind, hpMul, SPECIAL, restTime, roundBonus, c
 export const REST_TIME = 30; // 每回合結束後的休息(商店開放)秒數(首領回合前 40 秒,見 waves.js restTime)
 const HEAL = { time: 2, amount: 50 }; // 醫療包:2 秒內回 50
 const STREAK_GAP = 4; // 連殺:兩次擊殺間隔 4 秒內
+// [w4 節奏] 波內的高峰與山谷(L4D 的 build-up → peak → relax):張力 ≥ PEAK 維持 PEAK_HOLD 秒 → 暫停出怪 RELAX 秒
+// (場上的照打),之後補一段連發。總數不變,只改「什麼時候出」。兩次山谷之間至少隔 RELAX_COOL 秒
+const PACE = { PEAK: 0.62, HOLD: 4, RELAX: [8, 15], COOL: 18, MIN_LEFT: 4 };
+// [w4 反站樁] 同一個點(4m 內)站超過 CAMP_T 秒:先在身後放一個聲音預警,WARN 秒後出生點可以出在身後 14~40m(權重 ×3)
+const CAMP = { R: 4, T: 40, WARN: 2.5 };
 const BONUS = { head: 0.5, melee: 1 }; // 爆頭 / 近戰額外金幣(基礎金幣倍率)
 const TYPE_NAME = { walker: '（建議，同 menu.js:14）活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍' };
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -185,6 +190,7 @@ export const flowMethods = {
     this.spawnEvery = P.interval;
     this.spawnBurst = P.burst;
     this.spawnTimer = P.delay;
+    this._pace = { hot: 0, relax: 0, cool: 12, n: 0, burst: P.burst + 1 }; // [w4 節奏]
     this.phase = 'fighting';
     this.weapons.resupply();
     this._shopCloseT = 0; // 捲門:店裡沒人才拉下(updateRound 檢查);玩家在裡面就等他出來,不會被關在店裡
@@ -230,11 +236,12 @@ export const flowMethods = {
     const players = this.players.filter((p) => p.alive !== false && !p.downed);
     if (!players.length) players.push(this.player);
     const calm = (this._calmT || 0) > 12;
+    const camp = this.campBehind?.(); // [w4 反站樁] 站樁太久:身後 14m 外可以出,而且優先(出生前已經有聲音預警)
     const cand = [];
     for (const s of w.spawns) {
       if (s.bad || (s.vent && type !== 'crawler')) continue;
       const sy = s.y || 0;
-      let ed = Infinity, lv = 9, seen = false, behind = false;
+      let ed = Infinity, lv = 9, seen = false, behind = false, back = false;
       for (const p of players) {
         const dx = s.x - p.pos.x, dz = s.z - p.pos.z, ddy = sy - p.pos.y, hd = Math.hypot(dx, dz);
         ed = Math.min(ed, hd + Math.abs(ddy) * 2);
@@ -243,10 +250,13 @@ export const flowMethods = {
           const ey = p.pos.y + (p.eyeH || 1.6);
           seen = w.hasLineOfSight(p.pos.x, ey, p.pos.z, s.x, sy + 1.5, s.z) || w.hasLineOfSight(p.pos.x, ey, p.pos.z, s.x, sy + 0.4, s.z);
         }
-        if (p === this.player && hd < 25 && Math.abs(ddy) < 2.5 && -dx * Math.sin(p.yaw) - dz * Math.cos(p.yaw) < -hd * 0.35) behind = true;
+        if (p === this.player && Math.abs(ddy) < 2.5 && -dx * Math.sin(p.yaw) - dz * Math.cos(p.yaw) < -hd * 0.35) {
+          if (hd < (camp ? 14 : 25)) behind = true;
+          else if (camp && hd <= 40) back = true;
+        }
       }
       const fd = w.flowDistance ? w.flowDistance(s.x, sy, s.z) : ed;
-      cand.push({ s, ed, lv, seen, behind, fd });
+      cand.push({ s, ed, lv, seen, behind, back, fd });
     }
     const lo = calm ? 14 : 18, hi = calm ? 35 : 55;
     const weight = (q) => {
@@ -257,6 +267,7 @@ export const flowMethods = {
       k *= spawnAffinity(type, q.s, L); // [zombies-w3] 手術者在手術室、焦屍在鍋爐房…
       if (now - (q.s._used ?? -99) < 6) k *= 0.15;
       if (Number.isFinite(q.fd)) k *= q.fd < lo + 4 ? 0.7 : q.fd > (calm ? 30 : 42) ? 0.6 : 1;
+      if (q.back) k *= 3; // [w4 反站樁]
       return k;
     };
     const tiers = [
@@ -273,8 +284,9 @@ export const flowMethods = {
       let sum = 0;
       for (const q of pool) sum += (q.wt = weight(q));
       let r = Math.random() * sum;
-      for (const q of pool) if ((r -= q.wt) <= 0) { q.s._used = now; return q.s; }
+      for (const q of pool) if ((r -= q.wt) <= 0) { q.s._used = now; this._lastBack = q.back; return q.s; }
       pool[0].s._used = now;
+      this._lastBack = pool[0].back;
       return pool[0].s;
     }
     return maxFd < Infinity ? null : w.spawns.find((s) => !s.bad) || w.spawns[0];
@@ -282,6 +294,7 @@ export const flowMethods = {
 
   spawnZombie(type = this.queue.shift() || 'walker') {
     const at = this._ambAt; // [ambush] 埋伏現身:指定位置(所有玩家都看不到的掩蔽點/天花板),不加隨機偏移
+    this._lastBack = false;
     const s = at || this.pickSpawn(type);
     const j = at ? 0 : s.vent ? 0.15 : 1.1; // 出生點周圍 0.6m 內保證淨空(collision.js 檢查過)
     const pos = { x: s.x + (Math.random() - 0.5) * j, y: s.y || 0, z: s.z + (Math.random() - 0.5) * j };
@@ -294,6 +307,7 @@ export const flowMethods = {
     z._farT = 0;
     this.zombies.push(z);
     this.toSpawn = Math.max(0, this.toSpawn - 1);
+    if (this._lastBack && !at) { z.alerted = true; sfx.groan?.(type, { x: pos.x, y: pos.y + 1.4, z: pos.z }); } // [w4 反站樁] 從身後來的:出生時先叫一聲(聲音預警)
     this.ambush?.onSpawn(z); // [ambush] 部分改放到埋伏點(角落裝死 / 天花板上)
     if (type === 'brute') this.ui.banner('巨屍出現', '他會咆哮後衝鋒 · 引他撞牆再打頭', 3500, 'red');
     return z;
@@ -328,11 +342,13 @@ export const flowMethods = {
     if (this.phase === 'fighting') {
       let alive = 0, near = Infinity, lurk = 0; // lurk:埋伏中的(不佔同場上限,但回合要等牠們)
       for (const z of this.zombies) if (z.alive) { if (z.amb?.dormant) { lurk++; continue; } alive++; if (z.dist < near && Math.abs(z.dy || 0) < 3) near = z.dist; }
-      // 壓力:太久沒有殭屍接近玩家(12m 內)→ 出怪間隔減半、出生點挑近一點、遠處閒晃的殭屍移近(長回合不會冷場)
-      this._calmT = near < 12 ? 0 : (this._calmT || 0) + dt;
-      this.spawnTimer -= dt * (this._calmT > 8 ? 2 : 1);
       const held = this.ambush?.reserved || 0; // [ambush] 預留給虛擬埋伏點的(還沒現身、仍算在 toSpawn 裡)
-      if (!this.spawnHeld && this.toSpawn > held && alive < this.maxAlive && this.spawnTimer <= 0) {
+      const relax = this._updatePace(dt, near, alive, held); // [w4 節奏] 山谷:暫停出怪
+      this._updateCamp(dt); // [w4 反站樁]
+      // 壓力:太久沒有殭屍接近玩家(12m 內)→ 出怪間隔減半、出生點挑近一點、遠處閒晃的殭屍移近(長回合不會冷場);山谷裡不算
+      this._calmT = near < 12 || relax ? 0 : (this._calmT || 0) + dt;
+      this.spawnTimer -= dt * (this._calmT > 8 ? 2 : 1);
+      if (!this.spawnHeld && !relax && this.toSpawn > held && alive < this.maxAlive && this.spawnTimer <= 0) {
         if (this.spawnZombie()) alive++; // 這一幀剛出的也算活著(否則最後一隻出生的那一幀會誤判清場)
         if (this.spawnBurst > 0) { this.spawnBurst--; this.spawnTimer = 0.45; } else this.spawnTimer = this.spawnEvery * (0.7 + Math.random() * 0.6);
       }
@@ -354,6 +370,45 @@ export const flowMethods = {
       if (this.restT <= 0) this.nextRound();
     }
   },
+
+  // [w4 節奏] 張力:單人/房主本機導演的 tension(唯讀),再和「全隊最近的殭屍距離 + 場上數量」取大(合作時隊友被包圍也算)。
+  // 回傳這一幀是不是山谷(不出怪)
+  _updatePace(dt, near, alive, held) {
+    const pc = this._pace;
+    if (!pc) return false;
+    if (pc.relax > 0) {
+      pc.relax -= dt;
+      if (pc.relax > 0) return true;
+      pc.cool = PACE.COOL; // 山谷結束:補一段連發(下一段)
+      this.spawnBurst = Math.max(this.spawnBurst, pc.burst);
+      this.spawnTimer = Math.min(this.spawnTimer, 0.6);
+      return false;
+    }
+    if (pc.cool > 0) { pc.cool -= dt; return false; }
+    if (this.spawnHeld || this.toSpawn - held < PACE.MIN_LEFT) { pc.hot = 0; return false; } // 最後幾隻不放山谷(收尾規則接手)
+    const team = Math.max(0, Math.min(1, 1 - (near - 2) / 14)) * 0.75 + Math.min(1, alive / 10) * 0.15;
+    const ten = Math.max(this.horror?.director?.tension || 0, team);
+    pc.hot = ten >= PACE.PEAK ? pc.hot + dt : Math.max(0, pc.hot - dt * 0.5);
+    if (pc.hot < PACE.HOLD) return false;
+    pc.hot = 0; pc.n++;
+    pc.relax = PACE.RELAX[0] + Math.random() * (PACE.RELAX[1] - PACE.RELAX[0]);
+    return true;
+  },
+  // [w4 反站樁] 只看本機玩家(單人/房主;合作時隊友的站樁不追,寫在報告裡)
+  _updateCamp(dt) {
+    const c = this._camp || (this._camp = { x: 0, y: 0, z: 0, t: 0, on: false, armT: 0, acc: 0, warnT: -99 });
+    if ((c.acc += dt) < 1) return;
+    c.acc = 0;
+    const p = this.player.pos;
+    if (Math.hypot(p.x - c.x, p.z - c.z) > CAMP.R || Math.abs(p.y - c.y) > 1.5) { c.x = p.x; c.y = p.y; c.z = p.z; c.t = 0; c.on = false; return; }
+    c.t += 1;
+    if (c.t < CAMP.T || c.on) return;
+    c.on = true; c.armT = this.time + CAMP.WARN; // 預警:身後 18m 左右有東西在叫,再過幾秒才會真的從那邊來
+    const yaw = this.player.yaw || 0, bx = p.x + Math.sin(yaw) * 18, bz = p.z + Math.cos(yaw) * 18;
+    sfx.groan?.('walker', { x: bx, y: p.y + 1.4, z: bz });
+    c.warnT = this.time;
+  },
+  campBehind() { const c = this._camp; return !!(c?.on && this.phase === 'fighting' && this.time >= c.armT); },
 
   // 離所有玩家太遠的殭屍(卡住的由殭屍自己處理):沒人看得到一段時間後移到較近的隱蔽出生點(大地圖保持節奏);
   // 冷場(_calmT > 15 秒)時最遠的那隻馬上移近
