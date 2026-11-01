@@ -5,6 +5,7 @@ import './pcss.js'; // 柔和半影的 ShaderChunk 修改(要在任何 shader �
 import './lightcull.js'; // 光源範圍外的像素跳過 RE_Direct(ShaderChunk 修改,同上)
 import * as S from './shaders.js';
 import { WET } from '../map/weather/wet.js';
+import { Occluder } from './occlude.js';
 
 // ===== GfxPass:場景 pass + GPU 寫實效果(取代 composer 的第一個 RenderPass)=====
 // 只多十來個全螢幕 draw(CPU 幾乎不變),把閒著的 GPU 拿來做:
@@ -132,7 +133,8 @@ export class GfxPass extends Pass {
     }, 'gfx.taa');
     this.mCopy = mk(S.COPY, { tSrc: tex(null), uSharp: { value: 0.18 } }, 'gfx.copy');
     this.mBlit = mk(S.COPY, { tSrc: tex(this.outRT.texture), uSharp: { value: 0 } }, 'gfx.blit');
-    this.materials = [this.mPrep, this.mAO, this.mAOBlur, this.mDown, this.mSSR, this.mVol, this.mComp, this.mTAA, this.mCopy, this.mBlit];
+    this.occ = new Occluder(game.renderer); // 金水商行/補給櫃的遮擋查詢(src/gfx/occlude.js)
+    this.materials = [this.mPrep, this.mAO, this.mAOBlur, this.mDown, this.mSSR, this.mVol, this.mComp, this.mTAA, this.mCopy, this.mBlit, this.occ.material];
     this.configure({});
   }
 
@@ -249,6 +251,26 @@ export class GfxPass extends Pass {
     this._skyOK = true;
   }
 
+  // 遮擋查詢的對象:商行整組、每座補給櫃(重建世界時會換新物件 → 每 60 幀對一次清單)
+  syncOcc() {
+    if ((this.frame % 60) !== 2) return;
+    const g = this.game, want = [];
+    if (g.shop?.group) want.push(g.shop.group);
+    for (const s of g.supplies?.list || []) if (s.root) want.push(s.root);
+    for (const it of this.occ.items.slice()) if (!want.includes(it.obj)) this.occ.remove(it.obj);
+    for (const o of want) this.occ.add(o);
+  }
+  // 場景繪製(含遮擋查詢):被確定擋住的大物件先藏起來,畫完還原,再在同一個深度上畫查詢盒
+  drawScene(renderer, cam) {
+    const g = this.game, occ = this.occ, moon = g.hospital?.atmo?.moon;
+    this.syncOcc();
+    occ.hide(cam, !!(moon && moon.castShadow && moon.shadow.needsUpdate));
+    const t0 = performance.now();
+    try { renderer.render(g.scene, cam); } finally { occ.restore(); }
+    this.submitMs = performance.now() - t0;
+    occ.query(renderer, cam);
+  }
+
   render(renderer, writeBuffer, readBuffer) {
     const g = this.game, cam = g.camera, prof = g.quality?.gpu, L = this.live, U = this.U;
     this.orderSky(g.scene);
@@ -260,9 +282,7 @@ export class GfxPass extends Pass {
       this.frame++;
       renderer.setRenderTarget(readBuffer);
       renderer.clear(true, true, false);
-      const t0 = performance.now();
-      renderer.render(g.scene, cam);
-      this.submitMs = performance.now() - t0;
+      this.drawScene(renderer, cam);
       prof?.split('post');
       renderer.autoClear = ac;
       this.reset = 2;
@@ -284,9 +304,7 @@ export class GfxPass extends Pass {
     renderer.setRenderTarget(this.sceneRT);
     renderer.clear(true, true, false);
     this.guard.set(true);
-    const t0 = performance.now();
-    try { renderer.render(g.scene, cam); } finally { this.guard.set(false); }
-    this.submitMs = performance.now() - t0;
+    try { this.drawScene(renderer, cam); } finally { this.guard.set(false); }
     prof?.split('post');
     const e = pm.elements;
     U.uProjInfo.value.set(1 / e[0], 1 / e[5], e[8], e[9]);
