@@ -27,7 +27,7 @@ import { installEnding } from './ending.js';
 import { installRevive } from './revive.js';
 import { installNotes } from './notes.js';
 import { installMoments } from './moments.js';
-import { voiceLock, seq } from './voice.js';
+import { voiceLock, seq, door207 as door207Of } from './voice.js';
 import * as THREE from 'three';
 
 // 提示的時間(秒,卡在同一步多久):小美 / 阿嬤 / 閃一下
@@ -45,7 +45,7 @@ const STEPS = [
   { id: 'h.s.find207', act: 2, text: '找到 207 號房（二樓北邊）', why: '阿嬤叫你來看那盞燈', onStart: (c) => c.later(7, () => { if (c.O.step() === 'h.s.find207' && !c.g.story?.ending?.active) c.talk([[XL, '……金水伯問的那盞燈。', 2.4], [XL, '大新的無線電說，二樓北邊。', 3.2]]); }), cond: (c) => { const w = c.door207(); return !!w && c.near(w.cx, w.y, w.cz, 3.2); },
     onDone: (c) => { c.O.flag('h.where207'); if (c.g.story?.moments?.m3) c.g.story.moments.m3(); else c.later(2, () => c.talk([[XL, '收音機在這扇門前面，叫得好大聲。', 3.0], [XL, '……裡面到底有什麼？', 2.4]])); }, // M3:門後的聲音
     hints: { xl: '207 在二樓。北邊那一排病房，你自己數。', ama: '207……阿嬤在那裡等你。', glint: (c) => { const w = c.door207(); return w ? { x: w.cx, y: w.y + 1.4, z: w.cz } : null; } } },
-  { id: 'h.s.how207', act: 2, text: '查出 207 的門怎麼開', why: '門被電子鎖鎖住了', prog: (c) => [c.D.has('hc.15'), c.D.has('hc.27'), c.run.xlHow].filter(Boolean).length, m: 2,
+  { id: 'h.s.how207', act: 2, text: '查出 207 的門怎麼開', why: '門被電子鎖鎖住了', prog: (c) => [c.D.got('hc.15'), c.D.got('hc.27'), c.run.xlHow].filter(Boolean).length, m: 2, // 這一局碰到的才算(重玩不會一進門就完成)
     onStart: (c) => c.later(30, () => { if (c.O.step() !== 'h.s.how207') return; c.talk([[XL, '我偷聽了三個禮拜大新的無線電。', 3.2], [XL, '他們說，207 的鎖是三樓監控室管的。', 3.4]], () => { c.run.xlHow = true; }); }),
     onDone: (c) => { c.O.flag('h.area.morgue'); c.later(1.5, () => c.talk([[XL, '要開那扇門，三樓得先有電。', 2.8], [XL, '地下室的配電盤，少了 3 支保險絲。', 3.4]])); },
     hints: { xl: '大新的無線電說過，\n207 的鎖是三樓管的。', ama: '紅色的插頭不要拔。\n阿嬤把燈接在那裡。', glint: (c) => c.at('h.look.panel2f') } },
@@ -54,7 +54,7 @@ const STEPS = [
   { id: 'h.s.gen', act: 3, text: '把保險絲裝回配電盤（鍋爐房）', why: '讓三樓監控室有電', skip: (c) => c.O.has('h.207.elock'), cond: (c) => c.X.flags.has('h.gen.on'),
     onDone: (c) => { c.O.flag('h.gen.on'); c.O.flag('h.pwr.monitor'); c.O.flag('h.area.3f'); c.later(2, () => c.talk([[XL, '燈回來了，三樓也有電了。', 3.2], [XL, '監控室要刷卡。大新的人身上有。', 3.0]])); },
     hints: { xl: '保險絲有了，配電盤在鍋爐房。', ama: '電……要再接起來。', glint: (c) => c.at('h.ix.fusebox') } },
-  { id: 'h.s.code', act: 3, text: '查出 207 的密碼', why: '是那個病人住進來的日子', onStart: (c) => c.later(9, () => { if (c.O.step() === 'h.s.code' && !c.g.story?.busy?.()) c.talk([[XL, '「監控室的鍵盤要輸入密碼。」', 3.4], [XL, '……那一床的病人，是哪一天來的？', 2.8]]); }), skip: (c) => c.O.has('h.207.elock'), prog: (c) => (c.X.flags.has('know.code0924') ? 2 : [c.D.has('hc.10'), c.D.has('hc.07'), c.D.has('hc.25') || !!c.D.state().k2].filter(Boolean).length), m: 2,
+  { id: 'h.s.code', act: 3, text: '查出 207 的密碼', why: '是那個病人住進來的日子', onStart: (c) => c.later(9, () => { if (c.O.step() === 'h.s.code' && !c.g.story?.busy?.()) c.talk([[XL, '「監控室的鍵盤要輸入密碼。」', 3.4], [XL, '……那一床的病人，是哪一天來的？', 2.8]]); }), skip: (c) => c.O.has('h.207.elock'), prog: (c) => (c.X.flags.has('h.code.known') ? 2 : [c.D.got('hc.10'), c.D.got('hc.07'), c.D.got('hc.25') || c.X.flags.has('h.ks.921')].filter(Boolean).length), m: 2, // h.code.known:以前聖筊過,你記得密碼(src/story/deduce.js)
     hints: { xl: '密碼是一個日子。\n207 的病人，哪一天住進來的？', ama: '是她住進來的那一天。', glint: (c) => c.at('h.ix.terminal') } },
   { id: 'h.s.badge', act: 3, text: '拿到監控室的門禁卡', why: '在夜班組長身上（第 5 波）', onStart: (c) => c.later(5, () => { if (c.O.step() === 'h.s.badge' && !c.g.story?.busy?.()) c.talk([[XL, '監控室要刷卡。', 1.8], [XL, '卡在大新的夜班組長身上，第 5 波。', 3.6]]); }), skip: (c) => c.O.has('h.207.elock'), cond: (c) => c.X.inv.has('card.security') || c.O.has('h.badge'),
     onDone: (c) => c.O.flag('h.badge'),
@@ -68,7 +68,7 @@ const STEPS = [
     hints: { xl: (c) => (c.O.has('h.207.elock') ? '門是從裡面鎖的。\n只有裡面的人開得了。我們等。' : '輸入密碼，或去照片前擲筊。\n兩條路都能開電子鎖。'),
       ama: (c) => (c.O.has('h.207.elock') ? '等阿嬤回來。' : '是她住進來的那一天。'), glint: (c) => (c.O.has('h.207.elock') ? null : c.at('h.ix.keypad')) } },
   { id: 'h.s.boss', act: 4, text: '打倒看守 207 的保全', why: '門一開，他就醒了', cond: (c) => c.O.has('h.boss10') },
-  { id: 'h.s.enter', act: 4, text: '進 207', why: '阿嬤在枕頭裡留了東西給你', cond: (c) => c.D.has('hc.30') || (c.zone === 'f2_ward_207' && (c.run.in207 = (c.run.in207 || 0) + 0.25) > 1.5),
+  { id: 'h.s.enter', act: 4, text: '進 207', why: '阿嬤在枕頭裡留了東西給你', cond: (c) => c.zone === 'f2_ward_207' && (c.D.got('hc.30') || (c.run.in207 = (c.run.in207 || 0) + 0.25) > 1.5), // 要真的走進 207
     onDone: (c) => c.page(),
     hints: { xl: '頭七那天的腳印……停在床邊。', ama: '枕頭……阿嬤放在枕頭裡。', glint: (c) => c.at('h.ix.pillow') } },
   { id: 'h.s.wait', act: 5, text: '等金水伯的車', why: '他要來接你離開', onStart: (c) => c.later(2.5, () => { if (c.O.step() === 'h.s.wait' && !c.g.story?.busy?.()) c.talk([[XL, '金水伯的車要來了。', 2.2], [XL, '他會用對講機叫你。', 2.2]]); }), cond: (c) => c.O.has('h.truck') }, // 王醫師的電話(如果有)在這裡響;金水伯「車來囉」之後才往下
@@ -112,7 +112,7 @@ export function installObjectives(game) {
   Object.defineProperty(game.objectives, 'run', { get: () => run, configurable: true }); // 除錯用(每一局換新的物件)
 
   // ---------- 情境(給 STEPS 的條件與動作) ----------
-  const door207 = () => X()?.doors?.list?.find((w) => w.lock?.door === 'f2_ward_207') || null;
+  const door207 = () => door207Of(game);
   const c = {
     g: game, O, get X() { return X(); }, get D() { return D(); }, get run() { return run; }, get zone() { return game.hospital?.zone?.id || null; },
     door207, later,
@@ -135,15 +135,15 @@ export function installObjectives(game) {
     // 進了 207:枕頭微微發亮(閃一下);拿起那一頁、或離開 207、或 30 秒之後 → 金水伯的車來了
     page() {
       const t0 = game.time;
-      later(1.2, () => { const q = c.at('h.ix.pillow'); if (q && !D()?.has?.('hc.30')) { run.glint = q; run.glintT = 10; } });
-      later(7, () => { if (!D()?.has?.('hc.30') && c.zone === 'f2_ward_207') c.ama('枕頭……阿嬤放在枕頭裡。'); }); // 她要你拿到那一頁(靜默期才說)
+      later(1.2, () => { const q = c.at('h.ix.pillow'); if (q && !D()?.got?.('hc.30')) { run.glint = q; run.glintT = 10; } });
+      later(7, () => { if (!D()?.got?.('hc.30') && c.zone === 'f2_ward_207') c.ama('枕頭……阿嬤放在枕頭裡。'); }); // 她要你拿到那一頁(靜默期才說)
       const go = () => { O.flag('h.truck'); truckCall(); };
       let out = 0;
       X()?.tick?.((dt) => {
         if (run.evac || game.state !== 'playing') return false;
         out = c.zone === 'f2_ward_207' ? 0 : out + dt;
         const ho = game.story?.climax?.run, hoBusy = !!ho && !!O.has('h.boss10') && (!ho.hoRang || ho.hoState === 'ringing' || ho.hoState === 'talk') && game.time - t0 < 300; // 王醫師的電話先講完(他在看守 207 的保全倒下之後的第一次靜默打來;找不到電話就不等)
-        if (!hoBusy && (D()?.has?.('hc.30') || out > 4 || game.time - t0 > 30)) { later(ho?.hoRang ? 9.5 : D()?.has?.('hc.30') ? 5 : 1.5, go); return false; } // 電話之後讓小美先說完
+        if (!hoBusy && (D()?.got?.('hc.30') || out > 4 || game.time - t0 > 30)) { later(ho?.hoRang ? 9.5 : D()?.got?.('hc.30') ? 5 : 1.5, go); return false; } // 電話之後讓小美先說完
         return true;
       });
     },

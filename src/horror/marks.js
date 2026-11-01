@@ -6,7 +6,7 @@ import { bloodWriting, dripPath, rng } from '../art/stainset.js';
 // 痕跡與「看得見的靈異」:濕腳印、玻璃上的手印、牆上的字、門縫下的光與走過的影子、隔簾後的人影、鏡子裡的臉、
 // 電視雜訊裡的臉、電梯門縫的光。腳印與手印各用一個 InstancedMesh(每個實例自己的透明度),
 // 字跡每則一個網格(貼圖不同,最多 MAXW 則,舊的回收)。全部受燈光與手電筒照明(標準材質),不投影。
-const MAXF = 28, MAXH = 14, MAXW = 10;
+const MAXF = 28, MAXH = 14, MAXW = 10, KEEPF = 28; // KEEPF:留給劇情的腳印(頭七走回 207 的那一排),隨機的腳印不會蓋掉
 const FONT_HAND = '"DFKai-SB", "BiauKai", "標楷體", "KaiTi", "STKaiti", serif';
 const FONT_SANS = '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
 
@@ -121,16 +121,16 @@ function instMat(map, o) {
   m.customProgramCacheKey = () => 'ghost-inst-alpha';
   return m;
 }
-function instPool(geo, mat, n, name) {
-  const im = new THREE.InstancedMesh(geo, mat, n);
+function instPool(geo, mat, n, name, keep = 0) {
+  const im = new THREE.InstancedMesh(geo, mat, n + keep);
   im.name = name;
-  const a = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+  const a = new THREE.InstancedBufferAttribute(new Float32Array(n + keep), 1);
   a.setUsage(THREE.DynamicDrawUsage);
   geo.setAttribute('aAlpha', a);
   im.count = 0; im.frustumCulled = false; im.castShadow = false; im.receiveShadow = false; im.raycast = () => {};
   const items = [];
-  for (let i = 0; i < n; i++) items.push({ i, on: false, t: 0, born: 0, alpha: 0, target: 0, life: 0 });
-  return { im, a, items, next: 0 };
+  for (let i = 0; i < n + keep; i++) items.push({ i, on: false, t: 0, born: 0, alpha: 0, target: 0, life: 0 });
+  return { im, a, items, next: 0, ring: n, kn: 0 };
 }
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
 
@@ -206,7 +206,7 @@ export class Marks {
   _feet() {
     if (!this.feet) {
       const g = new THREE.PlaneGeometry(0.13, 0.26); g.rotateX(-Math.PI / 2);
-      this.feet = instPool(g, instMat(footTexture(), { color: 0x0c0f10, roughness: 0.06, metalness: 0.1 }), MAXF, 'ghost-feet');
+      this.feet = instPool(g, instMat(footTexture(), { color: 0x0c0f10, roughness: 0.06, metalness: 0.1 }), MAXF, 'ghost-feet', KEEPF);
       this.root.add(this.feet.im);
     }
     return this.feet;
@@ -220,7 +220,9 @@ export class Marks {
     return this.hands;
   }
   _put(P, x, y, z, yaw, o = {}) {
-    const it = P.items[P.next]; P.next = (P.next + 1) % P.items.length;
+    let it;
+    if (o.keep && P.items.length > P.ring) { it = P.items[P.ring + (P.kn % (P.items.length - P.ring))]; P.kn++; } // 劇情的腳印:自己的格子
+    else { it = P.items[P.next]; P.next = (P.next + 1) % P.ring; }
     _e.set(o.rx ?? 0, yaw, o.rz ?? 0); _q.setFromEuler(_e); _s.setScalar(o.s ?? 1);
     if (o.mirror) _s.x *= -1;
     P.im.setMatrixAt(it.i, _m4.compose(_p.set(x, y, z), _q, _s));
@@ -231,7 +233,7 @@ export class Marks {
     return it;
   }
   // 一個濕腳印(x,z 地面;yaw 前進方向;left 左腳)
-  foot(x, y, z, yaw, left, o = {}) { const ox = Math.cos(yaw) * (left ? -0.1 : 0.1), oz = -Math.sin(yaw) * (left ? -0.1 : 0.1); return this._put(this._feet(), x + ox, y + 0.012, z + oz, yaw + Math.PI, { mirror: left, life: o.life ?? 26, alpha: 0.75, fade: 0.25 }); }
+  foot(x, y, z, yaw, left, o = {}) { const ox = Math.cos(yaw) * (left ? -0.1 : 0.1), oz = -Math.sin(yaw) * (left ? -0.1 : 0.1); return this._put(this._feet(), x + ox, y + 0.012, z + oz, yaw + Math.PI, { mirror: left, life: o.life ?? 26, alpha: o.alpha ?? 0.75, fade: 0.25, keep: o.keep }); }
   // 玻璃上的手印(nx,nz = 玻璃朝玩家那面的法線)
   hand(x, y, z, nx, nz, o = {}) { return this._put(this._hands(), x + nx * 0.012, y, z + nz * 0.012, Math.atan2(nx, nz), { rz: (Math.random() - 0.5) * 0.6, s: o.s ?? (0.85 + Math.random() * 0.3), mirror: Math.random() < 0.5, life: o.life ?? 40, alpha: 0.55, fade: 0.6 }); }
   // 牆上的字(w = WRITINGS 的一筆;x,y,z 牆面上的中心;nx,nz 牆的法線)

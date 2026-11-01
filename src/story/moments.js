@@ -3,7 +3,7 @@
 //   M4 廣播叫你的名字(第 6 次休息的停電)   M5 頭七(climax.js + deduce.js 的頭七,這裡只放小美的開頭)
 //   M6 那張工作證(進 207)   M7 數到十(ending.js)
 // 每一個都只播一次(每一局);說話全部經過聲音的鎖(src/story/voice.js),前後不會疊。
-import { seq, wait } from './voice.js';
+import { seq, wait, door207 } from './voice.js';
 import { sfx, ix as ixs } from '../audio.js';
 import * as THREE from 'three';
 const _f = new THREE.Vector3();
@@ -67,7 +67,7 @@ export function installMoments(game, S) {
   // ---------- M3:207 門後傳出小美 1999 年的聲音,收音機裡的小美愣住 ----------
   function m3() {
     if (run.m3) return; run.m3 = true;
-    const w = X.doors?.list?.find((q) => q.lock?.door === 'f2_ward_207');
+    const w = door207(game);
     const pos = w ? { x: w.cx, y: w.y + 1.2, z: w.cz } : null;
     const tape = '……還醒著的夜貓子，收到請回答。';
     hold(18);
@@ -149,7 +149,7 @@ export function installMoments(game, S) {
     }
     run.wasSilent = silent;
     // M6:在 207 裡面,看著床頭 0.8 秒,或進門 6 秒
-    const dw = !run.m6 && X.doors?.list?.find((q) => q.lock?.door === 'f2_ward_207'), pp = game.player.pos;
+    const dw = !run.m6 && door207(game), pp = game.player.pos;
     if (!run.m6 && game.hospital?.zone?.id === 'f2_ward_207' && (!dw || Math.hypot(pp.x - dw.cx, pp.z - dw.cz) > 1.6)) { // 真的走進房間(不是站在門口)
       run.in207 += step;
       const A = game.hospital?.anchors?.w207, q = A?.lamp || A?.bed;

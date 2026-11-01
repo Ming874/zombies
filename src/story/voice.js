@@ -67,6 +67,22 @@ export async function free(game, o = {}) {
   while (V.busy(o) && (game.time || 0) - t0 < (o.maxWait ?? 60)) await wait(game, 0.25);
 }
 
+// 207 走廊那一扇門(207 有兩個門洞:走廊的正門,和通 206 的側門;劇情說的「207 的門」都是走廊那一扇)
+export function door207(game) {
+  const ds = (game.interact?.doors?.list || []).filter((w) => w.lock?.door === 'f2_ward_207');
+  return ds.find((w) => w.za?.id === 'f2_corridor' || w.zb?.id === 'f2_corridor') || ds[0] || null;
+}
+
+// 207 的檯燈燈具(後巷看到的那扇窗跟著它亮;src/map/hospital/lights.js storyLights)
+export const lamp207 = (game) => game.hospital?.lights?.story?.lamp || game.hospital?.anchors?.w207?.lamp?.fixture || null;
+// 那盞燈現在亮著嗎:守燈系統(game.story.lamp,lamp 代理)優先,再加上配電盤上 207 的迴路
+export function lamp207Lit(game) {
+  const L = game.story?.lamp, circuit = game.interact?.flags?.get?.('h.pwr.207') !== false;
+  let on = true;
+  try { if (L?.lit) on = !!L.lit(); } catch { on = true; }
+  return on && circuit;
+}
+
 export function wait(game, secs) {
   return new Promise((res) => { const X = game.interact; if (!X?.after) { setTimeout(res, secs * 1000); return; } X.after(secs, res); });
 }
