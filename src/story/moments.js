@@ -8,8 +8,10 @@ import { sfx, ix as ixs } from '../audio.js';
 import * as THREE from 'three';
 const _f = new THREE.Vector3();
 
+// 第二張是後記憶(NARRATIVE N12;Hirsch):你不記得 2003 年,你記得的是媽媽說的 —— 結局回到同一條後巷、同一扇窗
 const M1 = [
-  '你的阿嬤林秀英是護理長。\n2003 年 SARS 封院時，她死在 207 號房。',
+  '你的阿嬤林秀英是護理長。\n2003 年 SARS 封院，她沒有出來。',
+  '那年你三歲，什麼都不記得。\n媽媽說，那十四天，她每天晚上抱著你，\n在後巷看二樓那扇亮著的窗。',
   '23 年後，七月初一，鬼門開。\n家裡的電話響了：「聖心醫院 207」。',
   '電話裡是阿嬤：\n「阿孫，你來看阿嬤好不好？」',
 ];
@@ -47,8 +49,9 @@ export function installMoments(game, S) {
         await new Promise((r) => setTimeout(r, 2400));
         try { ixs.ringStop?.('m1.ring'); } catch { /* 略 */ }
         for (let i = 0; i < M1.length && !skipped; i++) {
-          if (i === 2) setTimeout(() => { if (!skipped) try { ixs.phoneVoice?.('阿孫，你來看阿嬤好不好？', { voice: 'woman', filter: 'phone' }); } catch { /* 略 */ } }, 1100);
-          cur = M.card({ lines: M1[i].split('\n'), hold: i === 2 ? 2.6 : 2.4, fadeIn: 700, fadeOut: 450, align: 'center' });
+          const last = i === M1.length - 1, lines = M1[i].split('\n');
+          if (last) setTimeout(() => { if (!skipped) try { ixs.phoneVoice?.('阿孫，你來看阿嬤好不好？', { voice: 'woman', filter: 'phone' }); } catch { /* 略 */ } }, 1100);
+          cur = M.card({ lines, hold: last ? 2.6 : lines.length > 2 ? 3.4 : 2.4, fadeIn: 700, fadeOut: 450, align: 'center' });
           await cur;
         }
       } finally { try { ixs.ringStop?.('m1.ring'); } catch { /* 略 */ } removeEventListener('keydown', skip, true); removeEventListener('mousedown', skip, true); }
