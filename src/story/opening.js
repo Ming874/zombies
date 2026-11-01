@@ -27,8 +27,8 @@ const FIRST = [['xl', '……等一下。', 1.6, { ...O1, gap: 0.8 }], ['xl', '�
 const TEACH = [['xl', '收音機在叫，就是他們靠近了。', undefined, O1], ['xl', '打頭！', 1.2, O1]];
 const CHASE = ['跑！', '不要回頭，跑。', '綠燈那邊，跑！'];
 const KS = '對講機 · 金水伯';
-// 第 9 次休息:離你最近的電話響,是 2003 年留在總機裡的一通留言(三樓 3 號的女兒打給爸爸;他在第 9 天走了,hc.43、memdata m.ward3)
-const OLD3 = { id: 'ph.old3', who: '電話 · 留言（2003）', voice: 'woman', ear: 'right', parts: ['（2003 年，封院第 8 天的留言。）', '爸，是我。你有沒有好好吃飯？', '他們說三樓不能探病……', '封院一結束，我第一個來接你。', '……爸？你有聽到嗎？'] };
+// 第 9 次休息:離你最近的電話響,是 2003 年留在總機裡的一通留言(三樓 3 號的女兒打給爸爸,封院第 6 天;他在第 9 天走了,hc.43、memdata m.ward3)
+const OLD3 = { id: 'ph.old3', who: '電話 · 留言（2003）', voice: 'woman', ear: 'right', parts: ['（2003 年，封院第 6 天的留言。）', '爸，是我。你有沒有好好吃飯？', '他們說三樓不能探病……', '封院一結束，我第一個來接你。', '……爸？你有聽到嗎？'] };
 
 export function installOpening(game, S) {
   const X = game.interact, H = () => game.horror, Rd = () => game.story?.radio;
