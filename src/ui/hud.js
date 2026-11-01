@@ -85,6 +85,11 @@ export class Hud {
     this.hpRow = hp; this.hpNum = hp.querySelector('.num'); this.hpFill = hp.querySelector('.fill'); this.hpTrail = hp.querySelector('.trail');
     this.arRow = ar; this.arNum = ar.querySelector('.num'); this.arFill = ar.querySelector('.fill');
     this.stRow = st; this.stFill = st.querySelector('.fill');
+    // 三把火(game.soul;src/horror/soul.js):血條旁三朵小火,熄了變成一縷煙;三把全熄 = 失魂(整排變冷)
+    this.soulEl = mk('hd-soul hd-hide', '<i></i><i></i><i></i>');
+    this.soulEl.title = '三把火';
+    hp.appendChild(this.soulEl);
+    this.soulFl = [...this.soulEl.children];
 
     this.weapon = add(mk('hd hd-weapon', `<div class="hd-wname"></div><div class="hd-ammo"><b class="mag">0</b><span class="res">/ 0</span></div>
       <div class="hd-inv"><span class="g">${ICON.grenade}<b>0</b><kbd class="kc">G</kbd></span><span class="m">${ICON.medkit}<b>0</b><kbd class="kc">H</kbd></span></div>`));
@@ -127,6 +132,19 @@ export class Hud {
       this.hpTrail.style.transform = `scaleX(${r})`;
     });
     this._set('hplow', r < 0.35 && n > 0, (v) => this.hpRow.classList.toggle('low', v));
+  }
+  // 三把火:n = 0..3 還亮著幾把;red = 紅衣的身影跟著你(禁忌)
+  setSoul(n, red = false) {
+    this._set('soulOn', true, () => this.soulEl.classList.remove('hd-hide'));
+    this._set('soul', n, (v) => {
+      this.soulFl.forEach((e, i) => e.classList.toggle('out', i >= v));
+      this.soulEl.classList.toggle('lost', v <= 0);
+    });
+    this._set('soulRed', !!red, (v) => this.soulEl.classList.toggle('red', v));
+  }
+  soulHit(n) { // 剛熄掉的那一朵冒一下煙
+    const e = this.soulFl[Math.max(0, Math.min(2, n))];
+    e?.animate([{ transform: 'translateY(0) scale(1.35)', opacity: 1 }, { transform: 'translateY(-.5em) scale(.8)', opacity: 0.35 }], { duration: 900, easing: 'ease-out' });
   }
   setArmor(a, max) {
     const n = Math.ceil(Math.max(0, a || 0));

@@ -48,11 +48,13 @@ export function installRadio(game, S) {
       const p = game.player, yaw = p.yaw || 0;
       return { pos: { x: p.pos.x - Math.cos(yaw) * 0.35, y: p.pos.y + 1.25, z: p.pos.z + Math.sin(yaw) * 0.35 }, gain: 0.7 };
     },
-    // 地下室:三成的字變成「……」
+    // 地下室:三成的字變成「……」;失魂(三把火都熄了,game.soul):一半的字聽不清,有些字被雜訊蓋成「▒」
     garble(text) {
-      if (!R.weak()) return text;
+      const lost = !!game.soul?.lost?.();
+      if (!R.weak() && !lost) return text;
+      const k = lost ? 0.5 : 0.3;
       let out = '', skip = false;
-      for (const ch of String(text)) { if (/[，。、！？\s]/.test(ch)) { out += ch; skip = false; continue; } if (Math.random() < 0.3) { if (!skip) out += '……'; skip = true; } else { out += ch; skip = false; } }
+      for (const ch of String(text)) { if (/[，。、！？\s]/.test(ch)) { out += ch; skip = false; continue; } if (Math.random() < k) { if (lost && Math.random() < 0.4) { out += '▒'; skip = false; } else { if (!skip) out += '……'; skip = true; } } else { out += ch; skip = false; } }
       return out;
     },
     // 小美要說劇情:指針自己滑回 1207
