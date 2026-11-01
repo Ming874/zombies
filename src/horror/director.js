@@ -26,6 +26,9 @@ export const KINDS = {
   // 外部(伏擊代理、新殭屍)
   ambush: { tier: 'medium', cd: 28, jump: true, ext: true, act: 1, cat: 'host' },
   ceilingDrop: { tier: 'medium', cd: 40, jump: true, ext: true, act: 1, cat: 'host' },
+  // 休息時的「習慣群」醒來(src/zombies/ambush.js):玩家自己的行為造成的(背對、開槍、太大聲),不看恐懼值與層級間隔,
+  // 只看大場面鎖、跳嚇間隔與每次休息的預算(REST_BEATS)
+  habit: { tier: 'medium', cd: 10, jump: true, ext: true, act: 1, cat: 'host', rest: true },
   // ---- small ----
   whisper: { tier: 'small', cd: 14, act: 1, cat: 'voice', w: 1.1 },
   ambient: { tier: 'small', cd: 35, act: 1, cat: 'sound', w: 0.8 },
@@ -122,6 +125,7 @@ export const INTENSITY = {
 };
 export const LEVELS = ['off', 'low', 'normal', 'high'];
 const CALM_START = 60; // 開局多少秒內不放 medium/big 與閃燈
+const REST_BEATS = { off: 0, low: 1, normal: 3, high: 4 }; // 每次休息最多幾個「跟殭屍有關」的節拍(習慣群醒來)
 const LIGHT_KINDS = new Set(['flicker', 'signal', 'lightsDie', 'blackout', 'blackoutChange', 'swingBulb', 'darkFollow', 'corridorOut']);
 // 誘集期間(回合進行中)也可以有的:不是鬼的東西(宿主、伏擊、殭屍靠近的閃燈、天花板裡的爬行)。
 // 其他全部是「鬼」:只在靜默期(回合之間的休息)出現(STORY.md §1.9、§4.2、§12)
@@ -149,6 +153,7 @@ export class Director {
     this.bigJumps = {}; // 幕 → 這一幕放過幾個大跳嚇
     this.calmUntil = 0; // 追逐結束後的喘息(這段時間不放鬼)
     this.chaseUntil = 0;
+    this.restBeats = 0; // 這次休息用掉幾個殭屍節拍
   }
   // 第幾幕:第 1~2 回合 = 1(有人在)、3~5 = 2(看得見的痕跡)、6 以後 = 3(正面遭遇);靜默期拖很久也會往後推
   get act() {
@@ -179,13 +184,13 @@ export class Director {
   reset() {
     this.t = 0; this.dread = 0; this.tension = 0; this.calm = 0; this.bigUntil = 0; this.roundT = 0;
     this.last = {}; this.lastTier = { small: -1e9, medium: -1e9, big: -1e9 }; this.lastJump = -1e9; this.log.length = 0; this.uses = {}; this.recent.length = 0; this.lastAny = -1e9;
-    this.bigJumps = {}; this.calmUntil = 0; this.chaseUntil = 0;
+    this.bigJumps = {}; this.calmUntil = 0; this.chaseUntil = 0; this.restBeats = 0;
   }
   // 每幀(遊戲中、非暫停):張力與恐懼值
   update(dt, game) {
     this.t += dt;
     const p = game.player;
-    if (game.phase !== this.phase) { this.phase = game.phase; this.roundT = 0; } else this.roundT += dt;
+    if (game.phase !== this.phase) { this.phase = game.phase; this.roundT = 0; this.restBeats = 0; } else this.roundT += dt;
     let near = 99, alive = 0;
     for (const z of game.zombies) if (z.alive) { alive++; if (z.dist < near) near = z.dist; }
     const hp = p.hp / (p.maxHp || 100), hurt = Math.max(0, 1 - (game.time - (p.lastHurt ?? -99)) / 3);
@@ -226,7 +231,8 @@ export class Director {
     const w = Math.max(0.2, o.weight ?? 1);
     const deny = () => { this.denied++; return false; };
     if (!game || game.state !== 'playing') return deny();
-    if (!this.allowTier(K.tier, game, kind === 'whisper')) return deny(); // 耳語只看自己的冷卻(進新區域的那句不要被別的小事件擋掉)
+    if (K.rest && (!this.silent || this.restBeats >= (REST_BEATS[this.level] ?? 2))) return deny(); // 休息時的殭屍節拍:有預算
+    if (!this.allowTier(K.tier, game, kind === 'whisper' || !!K.rest)) return deny(); // 耳語只看自己的冷卻(進新區域的那句不要被別的小事件擋掉)
     if (this.t - (this.last[kind] ?? -1e9) < K.cd * I.cd * w) return deny();
     if (K.jump && this.t - this.lastJump < (K.tier === 'big' ? 60 : 18) * I.cd * w) return deny(); // 跳嚇不連發
     if (K.jump && this.t - this.lastTier.big < 40 * I.cd) return deny(); // 大場面之後的喘息
@@ -238,7 +244,7 @@ export class Director {
     if (!K.ext && !o.force && (K.act || 1) > this.act) return deny(); // 還沒到那一幕
     if (this.t < CALM_START && LIGHT_KINDS.has(kind)) return deny(); // 開局 60 秒內燈不閃
     // 恐懼值不夠:外部(伏擊)看得見的驚嚇只要求一半門檻(牠們本身就是戰鬥的一部分)
-    const need = TIER[K.tier].dread * (K.ext ? 0.5 : 1) * Math.min(1.6, w);
+    const need = K.rest ? 0 : TIER[K.tier].dread * (K.ext ? 0.5 : 1) * Math.min(1.6, w);
     if (this.dread < need && !o.force) return deny();
     return true;
   }
@@ -247,6 +253,7 @@ export class Director {
     const K = KINDS[kind] || { tier: 'medium', jump: true };
     if (kind === 'chase') { this.chaseUntil = this.t + (o.dur ?? 30); this.hold(o.dur ?? 30); }
     if (K.bj) this.bigJumps[this.act] = (this.bigJumps[this.act] || 0) + 1;
+    if (K.rest) this.restBeats++;
     const w = Math.max(0.2, o.weight ?? 1);
     this.last[kind] = this.t;
     this.lastTier[K.tier] = this.t;
@@ -272,5 +279,5 @@ export class Director {
     return true;
   }
   get chasing() { return this.t < this.chaseUntil; }
-  stats() { return { level: this.level, act: this.act, t: +this.t.toFixed(1), dread: +this.dread.toFixed(1), tension: +this.tension.toFixed(2), calm: +this.calm.toFixed(1), big: this.bigActive, chase: this.chasing, bigJumps: { ...this.bigJumps }, fired: this.fired, denied: this.denied, log: this.log.slice(-10) }; }
+  stats() { return { level: this.level, act: this.act, t: +this.t.toFixed(1), dread: +this.dread.toFixed(1), tension: +this.tension.toFixed(2), calm: +this.calm.toFixed(1), big: this.bigActive, chase: this.chasing, bigJumps: { ...this.bigJumps }, restBeats: this.restBeats, fired: this.fired, denied: this.denied, log: this.log.slice(-10) }; }
 }
