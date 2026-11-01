@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { stageConfig, warmMaterials } from './warmup.js';
 import { GpuProfiler } from '../gfx/gpuprof.js';
+import { gpuKind } from '../ui/gpuhint.js';
 
 // ===== 畫質管理 → game.quality =====
 // 預設檔 low / medium / high / ultra(首次自動依 GPU 挑選,之後記在 localStorage)。
@@ -64,6 +65,9 @@ export function detectPreset(gl) {
   if (/swiftshader|llvmpipe|software|basic render|microsoft basic/.test(s)) return { preset: 'low', gpu: s };
   if (mobile) return { preset: 'low', gpu: s };
   if (/rtx|gtx 1[06-9]|gtx 16|radeon rx|rx [5-9]\d{2,3}|arc a[57]|apple m[1-9] (pro|max|ultra)|apple m[2-9]/.test(s)) return { preset: 'high', gpu: s };
+  // 內顯(和 CPU 共用記憶體頻寬與功耗):AMD 780M/890M 的字串是 "radeon(tm) 890m graphics",以前落到下面的 /radeon|amd/ 變成高畫質
+  // (實測 890M 高畫質大廳約 30 fps)→ 中畫質,並標記 igpu(自動調整反應快一點、不做超取樣)
+  if (gpuKind(s) === 'integrated') return { preset: 'medium', gpu: s, igpu: true };
   if (/intel|uhd|iris|mali|adreno|apple gpu|vega [3-8]\b|radeon\(tm\) graphics|mx\d{3}/.test(s)) return { preset: 'medium', gpu: s };
   if (/nvidia|geforce|radeon|amd/.test(s)) return { preset: 'high', gpu: s };
   return { preset: (nav.hardwareConcurrency || 4) >= 8 && (nav.deviceMemory || 8) >= 8 ? 'high' : 'medium', gpu: s };
@@ -93,6 +97,7 @@ export class Quality {
     const gl = game.renderer.getContext();
     this.gpu = new GpuProfiler(gl);
     this.detected = detectPreset(gl);
+    this.igpu = !!this.detected.igpu; // 內顯:GPU 瓶頸時降得快、不往上超取樣
     const saved = load();
     this.preset = saved && PRESETS[saved.preset] ? saved.preset : this.detected.preset;
     this.over = (saved && saved.over) || {};
@@ -188,7 +193,7 @@ export class Quality {
   minScale() { return this.get('pixelMin'); }
   maxScale() { return Math.max(this.baseMax(), this.boostCap()); }
   baseMax() { return Math.max(this.minScale(), Math.min(this.get('pixelMax'), Math.max(1, this.dpr) * (this.preset === 'ultra' ? 1.5 : 1))); }
-  boostCap() { return Math.min(2, Math.max(this.baseMax(), Math.max(1, this.dpr) * (this.get('boostMax') || 1))); }
+  boostCap() { return this.igpu ? this.baseMax() : Math.min(2, Math.max(this.baseMax(), Math.max(1, this.dpr) * (this.get('boostMax') || 1))); }
   startScale() { return clamp(Math.min(this.dpr, this.get('pixelMax')), this.get('pixelMin'), this.baseMax()); }
 
   setScale(s, force = false) {
@@ -322,10 +327,12 @@ export class Quality {
   //   GPU 瓶頸 → 往下減(先收回超取樣與效果,再降解析度)。背景編譯中(staging)不動。
   control() {
     const t = now(), budget = 1000 / this.get('targetFps');
-    if (this.staging || this.frame.n < 40 || t - this.lastChange < 900) return;
-    const frame = this.frame.avg(40), cpu = this.cpu.avg(40);
+    // 內顯:往下調的反應時間縮短(換階後 0.5 秒就重新判斷、超載 0.25 秒就降、平均窗 24 幀;差很多時一次降兩階)
+    const gap = this.igpu ? 500 : 900, hold = this.igpu ? 250 : 400, n = this.igpu ? 24 : 40;
+    if (this.staging || this.frame.n < 40 || t - this.lastChange < gap) return;
+    const frame = this.frame.avg(n), cpu = this.cpu.avg(n);
     const hasGpu = this.gpu.ms != null && this.gpuA.n >= 30;
-    const A = hasGpu ? this.gpuA.avg(40) : null, B = hasGpu ? this.gpuB.avg(40) : null, sub = this.sub.avg(40);
+    const A = hasGpu ? this.gpuA.avg(n) : null, B = hasGpu ? this.gpuB.avg(n) : null, sub = this.sub.avg(n);
     const gpuBound = hasGpu ? A + B > frame * 0.86 && A > sub * 1.3 + 1.2 : frame > budget * 1.18 && cpu < frame * 0.62;
     const cpuBound = !gpuBound && frame > budget * 1.05;
     this.bound = gpuBound ? 'gpu' : cpuBound ? 'cpu' : 'ok';
@@ -341,7 +348,7 @@ export class Quality {
     }
     if (gpuBound) {
       if (!this.overT) this.overT = t;
-      if (t - this.overT > 400) { this.overT = 0; this.upBlock = Math.min(60000, this.upBlock * 2); this.step(-1); }
+      if (t - this.overT > hold) { this.overT = 0; this.upBlock = Math.min(60000, this.upBlock * 2); this.step(this.igpu && frame > budget * 1.6 ? -2 : -1); }
       return;
     }
     this.overT = 0;
@@ -361,8 +368,8 @@ export class Quality {
   }
   // 自動調整走一階;回傳是否真的有變(到頂/到底就不動)
   step(d) {
-    const lv = this.level + d;
-    if (lv < -5 || lv > 8) return false;
+    const lv = Math.max(-5, Math.min(8, this.level + d)); // 內顯一次降兩階時到底就停在 -5
+    if (lv === this.level) return false;
     const fx = this.get('ao') > 0 || this.get('ssr') > 0 || this.get('vol') > 0;
     const s = this.levelState(lv).scale;
     const fxChange = fx && ((this.level < 1) !== (lv < 1) || (this.level <= -3) !== (lv <= -3));
