@@ -49,9 +49,9 @@ export const LINES = [
   { id: 'h.w12', canon: '5.8#12', text: '免驚，免驚。阿孫，回神喔。', ghost: 'zheng', who: '林秀英(送走時)', why: '遺照前收驚(按住 E 5 秒)時;收驚的叫法', when: '現在', trig: 'script', ear: 'both' },
 
   // ---------- 第一次進入某區(補充;說話的都是正典裡的人或沒有名字的亡者) ----------
-  { id: 'z.lobby.1', text: '……大家都在這裡等。你也是來接家人的嗎？', ghost: 'lobby', who: '大廳的人', why: '七月初三醫院廣播叫所有人到大廳集合;地上只剩包包與拖鞋', when: '七月初三', trig: 'zone', zone: ['f1_lobby'], prog: [5] },
+  { id: 'z.lobby.1', text: '……大家都在這裡等。\n你也是來接家人的嗎？', ghost: 'lobby', who: '大廳的人', why: '七月初三醫院廣播叫所有人到大廳集合;地上只剩包包與拖鞋', when: '七月初三', trig: 'zone', zone: ['f1_lobby'], prog: [5] },
   { id: 'z.corr1', text: '那個廣播……不要過去。', ghost: 'lobby', who: '大廳的人', why: '1F 主走廊就是那晚大家走去大廳的路;林秀英隔天清晨在這裡寫了「不要相信廣播」', when: '七月初三', trig: 'zone', zone: ['f1_corridor'], hint: 'rule:pa' },
-  { id: 'z.waiting', text: '叫號了嗎……我等好久了。', ghost: 'lobby', who: '候診區的人(亡者)', why: '叫號機停在七月初三的號碼', when: '七月初三', trig: 'zone', zone: ['f1_waiting'] },
+  { id: 'z.waiting', text: '叫到我了嗎……我等好久了。', ghost: 'lobby', who: '候診區的人(亡者)', why: '叫號機停在七月初三的號碼', when: '七月初三', trig: 'zone', zone: ['f1_waiting'] },
   { id: 'z.er', text: '先看我……我排第幾號？', who: '急診的人(亡者)', why: '急診的檢傷卡散落一地;正門焊死後家屬逃進急診', when: '七月初三', trig: 'zone', zone: ['f1_er'] },
   { id: 'z.chapel', text: '……幫我點一根蠟燭，好不好？', who: '禮拜堂的人(亡者)', why: '2003 年的修女的習慣:有人在等,就點一根蠟燭;結局會記得你點了幾根', when: '現在', trig: 'zone', zone: ['f1_chapel'], hint: 'egg:candle' },
   { id: 'z.207.2', text: '這張椅子……阿嬤坐了十四個晚上。', ghost: 'zheng', who: '林秀英', why: '監控畫面裡,207 的床空著的時候燈下還坐著一個人:她死在 207 的陪病椅上', when: '七月十一', trig: 'zone', zone: ['f2_ward_207'], prog: [4] },
@@ -66,7 +66,7 @@ export const LINES = [
   { id: 'z.boiler', text: '紅色的插頭……不要拔。', ghost: 'zheng', who: '林秀英', why: '工務室停電通知:207 的燈和監控室搶同一台發電機,油桶在鍋爐房', when: '七月初二起', trig: 'zone', zone: ['f2_corridor'], hint: 'quest:207light' },
   { id: 'z.3f', text: '三樓……你還是上來了。', who: '三樓的病人(亡者)', why: '2F 東樓梯牆上寫著「三樓不要上去」(大新的保全)', when: '七月初二之後', trig: 'zone', zone: ['f3_corridor'] },
   { id: 'z.cell', text: '三樓的事……他們不讓護理長問。', who: '試驗病房的病人(亡者)', why: '隔離房 1 的牆上刻著日子:三樓的病人用刻痕數日子', when: '2003 封院期間', trig: 'zone', zone: ['psych_cell'] },
-  { id: 'z.cell.song', text: '收音機開著，伊的心就較定。', who: '試驗病房的病人(亡者)', why: '熟悉的人聲會讓宿主暫時安靜', when: '2003 封院期間', trig: 'off', zone: ['psych_cell'], prog: [4], hint: 'rule:voice' },
+  { id: 'z.cell.song', text: '收音機開著，她就比較安心。', who: '試驗病房的病人(亡者)', why: '熟悉的人聲會讓宿主暫時安靜', when: '2003 封院期間', trig: 'off', zone: ['psych_cell'], prog: [4], hint: 'rule:voice' },
   { id: 'z.dorm', text: '阿嬤在這裡睡了六個晚上。\n第七晚，就沒有再上來了。', ghost: 'zheng', who: '林秀英', why: '2003 年的修女在答錄機裡說:「207 的燈,拜託妳。不要讓它熄。」', when: '七月初三', trig: 'zone', zone: ['f3_dorm'] },
   { id: 'z.cemetery', text: '七月了……門開了，我們回來看看。', who: '舊墓園的人(亡者)', why: '農曆七月鬼門開(民俗)', when: '七月', trig: 'zone', zone: ['f1_cemetery'] },
   { id: 'z.laundry', text: '床單洗好了……要拿去哪一床？', who: '洗衣房的人(亡者)', why: '洗衣房的排班表停在七月初三', when: '七月初三', trig: 'zone', zone: ['b1_laundry'] },
@@ -103,21 +103,21 @@ export const LINES = [
   { id: 'pr.curtain', text: '這是我的床。', who: '隔簾後的病人(亡者)', why: '每一床的隔簾都拉著,像還有人住', when: '七月初三之前', trig: 'prop', prop: 'bed_curtain' },
   { id: 'pr.veil', text: '修女說……要等到天亮。', ghost: 'lobby', who: '大廳的人', why: '2003 年的修女把聖像蓋起來:「這座城市現在就是苦難週」', when: '七月', trig: 'prop', prop: ['statue_veiled'] },
   { id: 'pr.coffin', text: '我不在裡面。', who: '不明(亡者)', why: '靈車後車廂的棺木是空的,貼著夜班回收單「回收第 1 次」', when: '現在', trig: 'prop', prop: 'coffin' },
-  { id: 'pr.tv', text: '……請留在室內……鎖好門窗……不要前往醫院……', who: '霧港市災害應變中心的緊急廣播(真,但沒用)', why: '商店電視的跑馬燈也在播同一則', when: '七月初一起', trig: 'prop', prop: ['tv', 'cctv'], filter: 'radio', mode: 'murmur' },
+  { id: 'pr.tv', text: '……請留在室內……鎖好門窗……\n不要前往醫院……', who: '霧港市災害應變中心的緊急廣播(真,但沒用)', why: '商店電視的跑馬燈也在播同一則', when: '七月初一起', trig: 'prop', prop: ['tv', 'cctv'], filter: 'radio', mode: 'murmur' },
 
   // ---------- 接起電話(互動代理呼叫 game.horror.phone;同一區內的內線還通,§11.5) ----------
   { id: 'ph.1', text: '……林秀英護理長，請到一樓大廳。\n林秀英護理長……', who: '院內呼叫的舊錄音', why: 'R2 護理站的舊電話會自己響,放的是 207 家屬的呼叫錄音', when: '2003 年', trig: 'phone', filter: 'phone' },
   { id: 'ph.2', text: '喂？……是你嗎？你怎麼還不回家？', who: '不明(內線;亡者)', why: '你是來找家人的;這通內線像是反過來在找你', when: '現在', trig: 'phone', filter: 'phone' },
-  { id: 'ph.3', text: '……我在你後面那間房間，打給你。', who: '不明(內線;亡者)', why: '同一區內的內線還通', when: '現在', trig: 'phone', filter: 'phone' },
-  { id: 'ph.4', text: '這裡是總機……您撥的分機，已經沒有人了。', who: '總機的自動語音', why: '總機的自動語音還在運作', when: '2026 年', trig: 'phone', filter: 'phone' },
+  { id: 'ph.3', text: '……我就在你後面那間房間。', who: '不明(內線;亡者)', why: '同一區內的內線還通', when: '現在', trig: 'phone', filter: 'phone' },
+  { id: 'ph.4', text: '這裡是總機。\n您撥的分機，已經沒有人了。', who: '總機的自動語音', why: '總機的自動語音還在運作', when: '2026 年', trig: 'phone', filter: 'phone' },
   { id: 'ph.5', text: '……（呼吸聲）……數到十，再掛電話。', who: '不明(內線;亡者)', why: '「霧港夜話」的結尾語', when: '現在', trig: 'phone', filter: 'phone', hint: 'rule:voice' },
-  { id: 'ph.6', text: '這裡是護理站……207 的便當，放門口敲三下。', ghost: 'zheng', who: '林秀英(內線)', why: '她的心願:封鎖之後金水伯來不了,她怕那一床沒有人看(送走她:在探病登記簿上簽名)', when: '七月十一之後', trig: 'phone', filter: 'phone', hint: 'quest:zheng' },
+  { id: 'ph.6', text: '這裡是護理站。\n207 的便當，放門口，敲三下。', ghost: 'zheng', who: '林秀英(內線)', why: '她的心願:封鎖之後金水伯來不了,她怕那一床沒有人看(送走她:在探病登記簿上簽名)', when: '七月十一之後', trig: 'phone', filter: 'phone', hint: 'quest:zheng' },
 
   // ---------- 收音機自己打開 ----------
-  { id: 'rd.1', text: '……AM 1207……還醒著的夜貓子……收到請回答……', who: '霧港夜話的舊錄音(1999)', why: 'AM 1207 的呼號;舊錄音是真的,但過時', when: '1999 年', trig: 'radio', filter: 'radio' },
-  { id: 'rd.2', text: '……霧港市災害應變中心……請留在室內……鎖好門窗……', who: '市府緊急廣播(真,但沒用)', why: '市府知道醫院危險,卻把夜間清除外包給夜班', when: '七月初一起', trig: 'radio', filter: 'radio' },
-  { id: 'rd.3', text: '……（女聲哼著聖詩的旋律，沒有歌詞）……', who: '2003 年的修女錄的聖詩(舊錄音)', why: '她把聖詩錄成醫院廣播的備用帶', when: '2026 年七月之前', trig: 'radio', filter: 'radio', mode: 'murmur' },
-  { id: 'rd.4', text: '……今天晚上，小美在山上，陪大家等月亮……', who: '霧港夜話 1999/10/20 的舊錄音', why: '王志明 10/19 的叩應讓小美上山做現場直播', when: '1999/10/20', trig: 'radio', filter: 'radio', prog: [4] },
+  { id: 'rd.1', text: '……AM 1207……還醒著的夜貓子……\n收到請回答……', who: '霧港夜話的舊錄音(1999)', why: 'AM 1207 的呼號;舊錄音是真的,但過時', when: '1999 年', trig: 'radio', filter: 'radio' },
+  { id: 'rd.2', text: '……霧港市災害應變中心……\n請留在室內……鎖好門窗……', who: '市府緊急廣播(真,但沒用)', why: '市府知道醫院危險,卻把夜間清除外包給夜班', when: '七月初一起', trig: 'radio', filter: 'radio' },
+  { id: 'rd.3', text: '……（一個女聲在哼聖詩，沒有歌詞）……', who: '2003 年的修女錄的聖詩(舊錄音)', why: '她把聖詩錄成醫院廣播的備用帶', when: '2026 年七月之前', trig: 'radio', filter: 'radio', mode: 'murmur' },
+  { id: 'rd.4', text: '……今天晚上，小美在山上，\n陪大家等月亮……', who: '霧港夜話 1999/10/20 的舊錄音', why: '王志明 10/19 的叩應讓小美上山做現場直播', when: '1999/10/20', trig: 'radio', filter: 'radio', prog: [4] },
 
   // ---------- 警告(靜默期裡的伏擊者:耳朵 = 他的方向) ----------
   { id: 'wn.back', text: '……後面。', who: '不明(亡者)', why: '提示:靜默期裡宿主不是零,有東西從背後來', when: '現在', trig: 'off', was: 'warn', ear: 'behind', hint: 'warn' },
@@ -128,14 +128,14 @@ export const LINES = [
   // ---------- 引導(提示;鬼不說謊,所以是最可靠的引導) ----------
   { id: 'gd.shop', text: '……捲門拉起來了。往這邊。', who: '不明(亡者)', why: '休息時補給站開放;耳朵的方向 = 補給站的方向', when: '現在', trig: 'off', was: 'guide', cue: 'shop', phase: 'rest', hint: 'shop' },
   { id: 'gd.shop2', text: '金水的店……在這邊。', ghost: 'zheng', who: '林秀英', why: '金水伯二十三年來每個星期日都來看 207;她認得他', when: '現在', trig: 'off', was: 'guide', cue: 'shop', phase: 'rest', hint: 'shop', prog: [3] },
-  { id: 'gd.fountain', text: '池子裡丟七次……修女留了話。', ghost: 'lobby', who: '大廳的人', why: '噴水池聖母像:丟滿七枚銅板,底座出現2003 年的修女的禱告字條', when: '七月初三', trig: 'zone', zone: ['f1_lobby'], prog: [6], hint: 'egg:fountain' },
-  { id: 'gd.his', text: '病歷電腦……打她住進來的那一天。', ghost: 'zheng', who: '林秀英', why: 'HIS 終端可以輸入號碼;0924 是 207 的入院日期', when: '現在', trig: 'idle', prog: [6], hint: 'egg:his' },
+  { id: 'gd.fountain', text: '池子裡丟七個銅板……修女留了話。', ghost: 'lobby', who: '大廳的人', why: '噴水池聖母像:丟滿七枚銅板,底座出現2003 年的修女的禱告字條', when: '七月初三', trig: 'zone', zone: ['f1_lobby'], prog: [6], hint: 'egg:fountain' },
+  { id: 'gd.his', text: '病歷電腦……輸入她住進來的那一天。', ghost: 'zheng', who: '林秀英', why: 'HIS 終端可以輸入號碼;0924 是 207 的入院日期', when: '現在', trig: 'idle', prog: [6], hint: 'egg:his' },
   { id: 'gd.radio', text: '停車場……有一台車的收音機還開著。', who: '不明(亡者)', why: '停車場一台車的收音機調在 AM 1207(車主是一位家屬)', when: '現在', trig: 'idle', prog: [4], hint: 'egg:carradio' },
   { id: 'gd.fuse', text: '保險絲……太平間也有一支。', who: '不明(亡者)', why: '電梯按鈕旁的鉛筆箭頭「↓ 冷」指向太平間的保險絲(大新的工務留的)', when: '七月初六', trig: 'idle', prog: [3], hint: 'egg:fuse' },
 
   // ---------- 探索時 / 配合事件 ----------
   { id: 'id.1', text: '……你聽到了嗎？有人在叫你的名字。', who: '不明(亡者)', why: '鬼月禁忌:有人叫你的名字,莫回頭(遊戲從不證實是誰)', when: '現在', trig: 'idle' },
-  { id: 'id.2', text: '他們說，家人馬上就醒。', ghost: 'lobby', who: '大廳的人', why: '集合廣播的內容', when: '七月初三', trig: 'idle' },
+  { id: 'id.2', text: '他們說，家人馬上就會醒來。', ghost: 'lobby', who: '大廳的人', why: '集合廣播的內容', when: '七月初三', trig: 'idle' },
   { id: 'id.3', text: '這裡……已經不收活人了。', who: '不明(亡者)', why: '主選單題詞;緊急疏散公告「本院即日起全面停止收治」', when: '七月初三起', trig: 'idle', prog: [5] },
   { id: 'id.4', text: '頭七那天……我有回來。', who: '不明(亡者)', why: '頭七回魂(民俗)', when: '現在', trig: 'off', prog: [3] },
   { id: 'cu.figure', text: '走廊盡頭……有人在等你。', who: '不明(亡者)', why: '配合走廊盡頭的人影', when: '現在', trig: 'cue', cue: 'figure' },
@@ -154,7 +154,7 @@ export const LINES = [
   { id: 'pa.2', text: '請勿驚慌。……請勿使用電梯。', who: '醫院廣播(大新的合成聲,主機故障重播)', why: '集合廣播的後半段', when: '七月初三起每晚', trig: 'pa', filter: 'pa' },
   { id: 'pa.3', text: '……感謝各位的配合。', who: '醫院廣播(大新的合成聲,主機故障重播)', why: '第一波屍潮衝進大廳時廣播說的那一句', when: '七月初三', trig: 'pa', filter: 'pa', prog: [3] },
   { id: 'pa.4', text: '林秀英護理長，請到一樓大廳。\n……林秀英護理長……', who: '院內呼叫的舊錄音(混進廣播主機)', why: 'R2 護理站的舊呼叫錄音', when: '2003 年', trig: 'pa', filter: 'pa' },
-  { id: 'pa.5', text: '喚醒之夜即將開始……請家屬到一樓大廳就座……', who: '醫院廣播(大新接管的院長室)', why: '緊急疏散公告的內容(§5.9)', when: '七月初三', trig: 'pa', filter: 'pa', prog: [4] },
+  { id: 'pa.5', text: '喚醒之夜即將開始……\n請家屬到一樓大廳就座……', who: '醫院廣播(大新接管的院長室)', why: '緊急疏散公告的內容(§5.9)', when: '七月初三', trig: 'pa', filter: 'pa', prog: [4] },
   // ---------- 第二輪:配合新事件的耳語 ----------
   { id: 'cu.pace', text: '巡房了……不要在走廊上逗留。', ghost: 'zheng', who: '林秀英', why: '她還在夜間巡房(病歷板的夾子聲);以前也這樣叫家屬晚上不要在走廊逗留', when: '七月十一之後', trig: 'cue', cue: 'pace', ear: 'behind' },
   { id: 'cu.knock', text: '聽到敲門……不要開。', ghost: 'zheng', who: '林秀英', why: '住院病患須知第五條「夜間聽到敲門聲,請勿開門」是她寫的(封院第 8 天)', when: '2003 封院期間起', trig: 'cue', cue: 'knock', hint: 'rule:door' },
@@ -169,19 +169,19 @@ export const LINES = [
   // ---- 第三輪(src/horror/haunts.js):劇情 v2 核心(STORY_v2 出來前的對齊版)----
   // 2003 年 SARS 封院十四天;護理長林秀英守了 207 十四暝,燈沒有熄過;玩家是她的孫子,她認得你。921(1999/9/21 01:47)那一晚小美在山上現場直播。
   // 用詞：國語為主，每句最多一個白名單台語詞（阿孫、免驚、乖…）；不用暝／莫／細漢／目睭（CLARITY_PLAN §5）。由 STORY3 表指定播放(trig 'story3'),不進隨機池。
-  { id: 's3.swing', text: '那盞燈……阿嬤顧了十四個晚上。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '2003 封院十四天,她守著 207,燈一次都沒熄(「207 的燈」傳說的由來)', when: '2003 封院期間', trig: 'story3', ear: 'right' },
-  { id: 's3.follow', text: '燈，阿嬤幫你開著……往前走，不要回頭。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她認得你;你一回頭,她就把背後的燈都開回來', when: '現在', trig: 'story3', ear: 'behind' },
-  { id: 's3.bed', text: '第七晚，廣播又叫阿嬤下樓……阿嬤沒有去。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題「封院第 7 天,207 號房發生了什麼事」:護理長答應大家第七天', when: '2003 封院第一週', trig: 'story3', ear: 'left' },
+  { id: 's3.swing', text: '那盞燈……阿嬤守了十四個晚上。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '2003 封院十四天,她守著 207,燈一次都沒熄(「207 的燈」傳說的由來)', when: '2003 封院期間', trig: 'story3', ear: 'right' },
+  { id: 's3.follow', text: '燈，阿嬤幫你開著。\n往前走，不要回頭。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她認得你;你一回頭,她就把背後的燈都開回來', when: '現在', trig: 'story3', ear: 'behind' },
+  { id: 's3.bed', text: '第七晚，廣播又叫阿嬤下樓。\n……阿嬤沒有去。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題「封院第 7 天,207 號房發生了什麼事」:護理長答應大家第七天', when: '2003 封院第一週', trig: 'story3', ear: 'left' },
   { id: 's3.flat', text: '又一床……他們給他打了那個藥。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '封院的混亂裡,大新生技在其他病人身上試藥;她是發現的人', when: '2003 封院期間', trig: 'story3' },
   { id: 's3.ball', text: '金水伯拿來的球……你小時候最愛玩。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '你是她的孫子:小時候常來醫院等她下班,金水伯會從店裡拿球給你(關於你是誰)', when: '你小時候', trig: 'story3', ear: 'left' },
   { id: 's3.beam', text: '……這邊。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她站的方向就是 207;鬼＝提示,她一直在帶你過去', when: '現在', trig: 'story3' },
   { id: 's3.tap', text: '阿嬤說過：七月被拍肩膀，不要轉頭。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '鬼月禁忌;她從小這樣叮嚀你(關於你是誰)', when: '你小時候', trig: 'story3' },
   { id: 's3.name.call', text: '{暱稱}……', who: '不明(鬼月:叫你名字的,不要回頭)', why: '禁忌「被叫名字不要回頭」;叫你的不是阿嬤', when: '現在', trig: 'story3', ear: 'behind' },
   { id: 's3.name.ok', text: '乖，沒有回頭就好。\n叫你的那個，不是阿嬤。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她認得你,也知道那個聲音不是她(鬼不說謊)', when: '現在', trig: 'story3', ear: 'left' },
-  { id: 's3.name.bad', text: '有人叫你的名字……不要回頭。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '你回頭了;她把燈開回來', when: '現在', trig: 'story3', ear: 'right' },
+  { id: 's3.name.bad', text: '有人叫你的名字……\n不要回頭，知道嗎？', ghost: 'zheng', who: '林秀英(阿嬤)', why: '你回頭了;她把燈開回來', when: '現在', trig: 'story3', ear: 'right' },
   { id: 's3.radio', text: '……現在時間，凌晨 1 點 47 分。\n這裡是山上的現場，我們——', who: '小美(1999/9/21 的現場直播錄音)', why: '921 那一晚 01:47,小美在大新山研究站的塔上直播;研究站倒塌,直播在這一秒中斷(hc.37)', when: '1999/9/21 01:47', trig: 'story3', filter: 'radio' },
   { id: 's3.dark.know', text: '阿孫……你怎麼也進來了？', ghost: 'zheng', who: '林秀英(阿嬤)', why: '她認得你;官方說她死於 SARS,你從來不信', when: '現在', trig: 'story3', ear: 'left' },
-  { id: 's3.dark.day7', text: '封院第七晚……燈也是這樣熄的。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題:封院第 7 天的晚上,207 那一層停過電', when: '2003 封院第 7 天', trig: 'story3', ear: 'right' },
+  { id: 's3.dark.day7', text: '封院第 7 晚……燈也是這樣熄掉的。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '指向推理題:封院第 7 天的晚上,207 那一層停過電', when: '2003 封院第 7 天', trig: 'story3', ear: 'right' },
   { id: 's3.dark.207', text: '207 的燈不能熄……裡面有人。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '大新把昏迷的小美藏在 207;她守的是裡面那個人', when: '2003 封院期間', trig: 'story3', ear: 'left' },
   { id: 's3.face', text: '不要看窗外……那時候不能開窗。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '封院十四天,窗戶封死;外面的家屬只能隔著玻璃', when: '2003 封院期間', trig: 'story3', ear: 'right' },
   { id: 's3.burst', text: '這間……那時候是隔離病房。', ghost: 'zheng', who: '林秀英(阿嬤)', why: '門自己開了:她讓你進去看(封院時的隔離病房)', when: '2003 封院期間', trig: 'story3' },
@@ -280,7 +280,7 @@ export const CALLS = [
   { id: 'call.sys.207', act: 1, sys: true, who: '院內呼叫的舊錄音', why: 'R2 護理站的舊電話放的是 207 家屬的呼叫錄音', when: '2003 年',
     lines: [{ text: '……林秀英護理長，請到一樓大廳。' }, { text: '林秀英護理長……', gap: 1.2 }, { text: '……一樓大廳……', gap: 1.6 }], end: 'dead', w: 0.7, once: true },
   { id: 'call.zheng.rounds', act: 1, ghost: 'zheng', who: '林秀英(內線)', why: '她還在值夜班;世界規則「他們聽得到」', when: '七月十一之後',
-    lines: [{ text: '這裡是護理站。' }, { text: '……你在{房名}，對不對？', gap: 0.6 }, { text: '晚上不要在走廊走來走去……他們聽得到。', gap: 0.8 }], cues: [{ line: 0, kind: 'clip', at: 0.2 }], end: 'click', w: 1, hint: 'rule:sound' },
+    lines: [{ text: '這裡是護理站。' }, { text: '……你在{房名}，對不對？', gap: 0.6 }, { text: '晚上不要在走廊走來走去。\n……他們聽得到。', gap: 0.8 }], cues: [{ line: 0, kind: 'clip', at: 0.2 }], end: 'click', w: 1, hint: 'rule:sound' },
   { id: 'call.door.closed', act: 2, who: '不明(內線;亡者)', why: '鬼不說謊:那扇門真的是關著的,接著就自己打開', when: '現在', need: { closedDoorBehind: true },
     lines: [{ text: '……你背後那扇{門}。' }, { text: '剛剛是關著的。', gap: 0.8 }, { text: '……現在呢？', gap: 2.6 }], cues: [{ line: 1, kind: 'door', at: 1.2 }], end: 'breath', w: 1.6 },
   { id: 'call.door.open', act: 2, ghost: 'zheng', who: '林秀英(內線)', why: '她替你把背後開著的門關上;門要關好', when: '七月十一之後', need: { openDoorBehind: true },
