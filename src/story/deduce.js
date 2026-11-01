@@ -212,7 +212,7 @@ export function installDeduce(game) {
       if (!run.xl) { run.xl = true; X0.after(3, () => talk(TALK.xiaoling, () => D.addCard('hc.25', { by: 'call' }))); }
     });
     X0.on('voicemail', () => X0.after(9, () => D.addCard('hc.18', { by: 'tape' })));
-    X0.on('reset', () => { run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.knew = false; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); });
+    X0.on('reset', () => { run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.k3done = run.knew = false; run.kRest = 0; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); });
     X0.tick((dt) => { bindNet(); if (game.state === 'playing') update(dt); return true; });
   }
   // ---------- 卡片來源:靈異系統(耳語、頭七) ----------
@@ -238,13 +238,14 @@ export function installDeduce(game) {
     if (game.phase === 'shop' && run.lastPh !== 'shop') {
       run.shops++;
       if (game.story?.busy?.()) { run.lastPh = game.phase; return; } // 王醫師的電話、結局:金水伯這一次先不講
-      // 金水伯的三段對講機每局都播(重玩也是:這一夜他還是會講);第二段要這一局先碰到 hc.07/08/09 任一張
-      if (run.shops >= 2 && !run.k1 && game.objectives?.done?.('h.s.cyc1') !== false) { run.k1 = true; X.after(6, () => kimsui('k.1', TALK.kimsui1, () => { run.k1done = true; D.addCard('hc.21', { by: 'call' }); })); }
-      else if (run.shops >= 2 && run.k1done && !run.k2 && ['hc.07', 'hc.08', 'hc.09'].some(D.got)) { run.k2 = true; X.after(6, () => kimsui('k.2', TALK.kimsui2, () => { run.k2done = true; X.flags.set('h.ks.921', true); S().k2 = true; save(); const nw = D.addWords(['w.xiaoling']); game.ui?.feed?.(`＋〈金水伯：921 那個女孩〉${nw ? ' · 新的詞 1 個' : ''}`, { color: '#e3c98a', ms: 4200 }); })); }
+      // 金水伯的三段對講機每局都播(重玩也是:這一夜他還是會講);一次休息最多一通、上一通沒人接就先不排新的(opening.js 的休息節拍表):
+      //   第 3 次休息 k.1(207 那扇窗)→ 第 5 次 k.3(他認出你)→ 第 8 次以後 k.2(921 那個女孩;要這一局先碰到 hc.07/08/09,王醫師要打來的那一次讓給他)
+      const kFree = !(game.story?.kimsuiQ?.() > 0) && run.kRest !== run.shops, cl = game.story?.climax?.run, hoNext = !!game.objectives?.has?.('h.boss10') && !cl?.hoRang;
+      if (kFree && run.shops >= 3 && !run.k1) { run.k1 = true; run.kRest = run.shops; X.after(6, () => kimsui('k.1', TALK.kimsui1, () => { run.k1done = true; D.addCard('hc.21', { by: 'call' }); })); }
+      else if (kFree && run.shops >= 5 && run.k1done && !run.k3 && game.round >= 5) { run.k3 = true; run.kRest = run.shops; X.after(9, () => kimsui('k.3', TALK.kimsui3, () => { run.k3done = true; S().k3 = true; save(); })); }
+      else if (kFree && run.shops >= 8 && run.k1done && run.k3done && !run.k2 && !hoNext && ['hc.07', 'hc.08', 'hc.09'].some(D.got)) { run.kRest = run.shops; run.k2 = true; X.after(6, () => kimsui('k.2', TALK.kimsui2, () => { run.k2done = true; X.flags.set('h.ks.921', true); S().k2 = true; save(); const nw = D.addWords(['w.xiaoling']); game.ui?.feed?.(`＋〈金水伯：921 那個女孩〉${nw ? ' · 新的詞 1 個' : ''}`, { color: '#e3c98a', ms: 4200 }); })); }
       // 以前聖筊過:這一夜縮短,不跳過(保險絲、門禁卡照找;你記得密碼,目標「查出 207 的密碼」直接完成;電子鎖要自己去輸入或再擲一次)
       if (D.solved() && run.shops === 1 && !run.knew) { run.knew = true; X.flags.set('h.code.known', true); X.after(5, () => game.ui?.feed?.('你記得 207 的密碼：0924。', { color: '#e3c98a', ms: 5200 })); }
-      // 金水伯認出你(他說的永遠是真的;他只是不講自己的心情)
-      if (run.shops >= 3 && run.k1done && !run.k3 && game.round >= 5) { run.k3 = true; X.after(9, () => kimsui('k.3', TALK.kimsui3, () => { S().k3 = true; save(); })); }
     }
     run.lastPh = game.phase;
     // 207 門口(3 m 內、靜默期):「燈莫關。伊驚烏。」(hc.22)
