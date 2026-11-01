@@ -1,7 +1,7 @@
 // 筆記本系統(game.deduce;正典 STORY_v2 §3.8、HOSPITAL_CLUES_v2 §0～§3)。
 //
 //   game.deduce.addCard(id, { by })   收卡:解鎖卡上的詞,HUD 角落閃「＋線索 [J]」(重複收不會重複算)
-//   game.deduce.has(id) / cards() / words()
+//   game.deduce.has(id) / cards() / words()   has = 筆記本裡有(跨局);got(id) = 這一局碰到了(看到、撿到、聽到;目標鏈只看這個)
 //   game.deduce.fill(blank, wordId) / clear(blank) / ready() / score() → { n, m }
 //   game.deduce.throw() → { result: 'sheng' | 'xiao' | 'yin', n, m } | null(還有空格)
 //   game.deduce.solved()
@@ -15,7 +15,7 @@ import { MAP, QUESTION, WORDS, CARD, CARDS, NOTE_CARD, WHISPER, LOOK, TALK, THRO
 import { Book } from './book.js';
 import * as THREE from 'three';
 import { sfx, ghost } from '../audio.js';
-import { secsOf, voiceLock, free, wait, seq, line, radioReady } from './voice.js';
+import { secsOf, voiceLock, free, wait, seq, line, radioReady, door207 as door207Of } from './voice.js';
 
 const KEY = 'hz.deduce.v1';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } };
@@ -30,12 +30,13 @@ export function installDeduce(game) {
   const emit = (ev, d) => { for (const fn of subs.get(ev) || []) { try { fn(d); } catch (e) { console.warn('[deduce]', ev, e); } } };
   const ix = () => game.interact;
   const H = () => game.horror;
-  const run = { shops: 0, k1: false, k2: false, w02: false, tq: null, tqLate: false, tqAt: 0, look: new Map(), memT: 0, opened207: false, xl: false };
+  const run = { shops: 0, k1: false, k2: false, w02: false, tq: null, tqLate: false, tqAt: 0, look: new Map(), memT: 0, opened207: false, xl: false, got: new Set() };
 
   const D = {
     q: QUESTION, map: MAP,
     on(ev, fn) { if (!subs.has(ev)) subs.set(ev, new Set()); subs.get(ev).add(fn); return () => subs.get(ev).delete(fn); },
     has(id) { return S().cards.includes(id); },
+    got(id) { return run.got.has(id); }, // 這一局碰到的(重玩時,上一局的卡要這一局再碰一次才算)
     cards() { return S().cards.map((id) => CARD[id]).filter(Boolean); },
     words() { return S().words.filter((w) => WORDS[w]); },
     isFresh(id) { return S().fresh.includes(id); },
@@ -45,6 +46,7 @@ export function installDeduce(game) {
       const c = CARD[id];
       if (!c) return false;
       const s = S();
+      if (!run.got.has(id)) { run.got.add(id); emit('got', { id, by: o.by || null }); }
       if (s.cards.includes(id)) return false;
       s.cards.push(id);
       s.fresh.push(id);
@@ -176,7 +178,7 @@ export function installDeduce(game) {
   }
 
   // ---------- 207 的門自己打開(聖筊;替全隊) ----------
-  const door207 = () => ix()?.doors?.list?.find((w) => w.lock?.door === 'f2_ward_207') || null;
+  const door207 = () => door207Of(game);
   // 聖筊 = 大新的電子鎖解開(h.207.elock);門內的舊旋鈕要等頭七阿嬤回來轉開,兩道都開了門才會推開(src/story/climax.js)
   function unlock207(send) {
     const X = ix();
@@ -210,7 +212,7 @@ export function installDeduce(game) {
       if (!run.xl) { run.xl = true; X0.after(3, () => talk(TALK.xiaoling, () => D.addCard('hc.25', { by: 'call' }))); }
     });
     X0.on('voicemail', () => X0.after(9, () => D.addCard('hc.18', { by: 'tape' })));
-    X0.on('reset', () => { run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; });
+    X0.on('reset', () => { run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.k3done = run.knew = false; run.kRest = 0; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); });
     X0.tick((dt) => { bindNet(); if (game.state === 'playing') update(dt); return true; });
   }
   // ---------- 卡片來源:靈異系統(耳語、頭七) ----------
@@ -220,19 +222,8 @@ export function installDeduce(game) {
     H0.on('story', (e) => { if (e?.id === 's3.touqi') touqi(); });
   }
 
-  // 頭七(HOSPITAL_CLUES_v2 §3):她轉身(玩家看著她) → 「阿孫……你哪會遮大漢矣？」 →「阿嬤無著 SARS……」(hc.19);
-  // 錯過(不在 2F、或靠太近她就消失):之後任何一次靜默,站在遺照前 5 秒補播第二句並收卡
-  function touqi() {
-    const h = H(), why = h?.touqiWhy || 'time';
-    const on2F = /^f2_/.test(game.hospital?.zone?.id || '');
-    try { sfx.folk('ama', game.player.pos); } catch { /* 還沒烘焙好 */ }
-    if (why === 'look' && on2F) {
-      X0?.after?.(6.5, () => h?.whisper?.('h.w.tc1', { ear: 'both', priority: 9, force: true, lockOk: true })); // 一次一句,中間留 6 秒
-      X0?.after?.(13, () => h?.whisper?.('h.w.tc2', { ear: 'both', priority: 9, force: true, lockOk: true })); // 她唯一的謊(每一局都說;M5)
-      X0?.after?.(16.4, () => h?.whisper?.('h.w.tc3', { ear: 'both', priority: 9, force: true, lockOk: true }));
-      X0?.after?.(19.6, () => h?.whisper?.('h.w.tc4', { ear: 'both', priority: 9, force: true, lockOk: true }));
-    } else if (!D.has('hc.19')) { run.tqLate = true; ix()?.flags?.set?.('h.touqi.late', true); }
-  }
+  // 頭七(HOSPITAL_CLUES_v2 §3):三句由 src/story/climax.js 播(一定播完,不管有沒有看她、在不在二樓);hc.19 在「阿嬤沒有得 SARS」那一句收(WHISPER)
+  function touqi() { try { sfx.folk('ama', game.player.pos); } catch { /* 還沒烘焙好 */ } }
 
   // ---------- 每幀(互動系統的 tick;只在遊戲中) ----------
   let acc = 0;
@@ -247,16 +238,19 @@ export function installDeduce(game) {
     if (game.phase === 'shop' && run.lastPh !== 'shop') {
       run.shops++;
       if (game.story?.busy?.()) { run.lastPh = game.phase; return; } // 王醫師的電話、結局:金水伯這一次先不講
-      if (run.shops >= 2 && !D.has('hc.21') && !run.k1 && game.objectives?.done?.('h.s.cyc1') !== false) { run.k1 = true; X.after(6, () => kimsui('k.1', TALK.kimsui1, () => D.addCard('hc.21', { by: 'call' }))); }
-      else if (run.shops >= 2 && D.has('hc.21') && !run.k2 && ['hc.07', 'hc.08', 'hc.09'].some(D.has) && !S().k2) { run.k2 = true; X.after(6, () => kimsui('k.2', TALK.kimsui2, () => { S().k2 = true; save(); D.addWords(['w.xiaoling']); game.ui?.feed?.('＋線索〈金水伯：那一扇窗〉 · 新的詞 1 個', { color: '#e3c98a', ms: 4200 }); })); }
-      if (D.solved() && !run.opened207 && run.shops === 1) X.after(4, () => unlock207(true)); // 以前聖筊過:第一次靜默 207 的電子鎖自己解開
-      // 金水伯認出你(他說的永遠是真的;他只是不講自己的心情)
-      if (run.shops >= 3 && D.has('hc.21') && !S().k3 && !run.k3 && game.round >= 5) { run.k3 = true; X.after(9, () => kimsui('k.3', TALK.kimsui3, () => { S().k3 = true; save(); })); }
+      // 金水伯的三段對講機每局都播(重玩也是:這一夜他還是會講);一次休息最多一通、上一通沒人接就先不排新的(opening.js 的休息節拍表):
+      //   第 3 次休息 k.1(207 那扇窗)→ 第 5 次 k.3(他認出你)→ 第 8 次以後 k.2(921 那個女孩;要這一局先碰到 hc.07/08/09,王醫師要打來的那一次讓給他)
+      const kFree = !(game.story?.kimsuiQ?.() > 0) && run.kRest !== run.shops, cl = game.story?.climax?.run, hoNext = !!game.objectives?.has?.('h.boss10') && !cl?.hoRang;
+      if (kFree && run.shops >= 3 && !run.k1) { run.k1 = true; run.kRest = run.shops; X.after(6, () => kimsui('k.1', TALK.kimsui1, () => { run.k1done = true; D.addCard('hc.21', { by: 'call' }); })); }
+      else if (kFree && run.shops >= 5 && run.k1done && !run.k3 && game.round >= 5) { run.k3 = true; run.kRest = run.shops; X.after(9, () => kimsui('k.3', TALK.kimsui3, () => { run.k3done = true; S().k3 = true; save(); })); }
+      else if (kFree && run.shops >= 8 && run.k1done && run.k3done && !run.k2 && !hoNext && ['hc.07', 'hc.08', 'hc.09'].some(D.got)) { run.kRest = run.shops; run.k2 = true; X.after(6, () => kimsui('k.2', TALK.kimsui2, () => { run.k2done = true; X.flags.set('h.ks.921', true); S().k2 = true; save(); const nw = D.addWords(['w.xiaoling']); game.ui?.feed?.(`＋〈金水伯：921 那個女孩〉${nw ? ' · 新的詞 1 個' : ''}`, { color: '#e3c98a', ms: 4200 }); })); }
+      // 以前聖筊過:這一夜縮短,不跳過(保險絲、門禁卡照找;你記得密碼,目標「查出 207 的密碼」直接完成;電子鎖要自己去輸入或再擲一次)
+      if (D.solved() && run.shops === 1 && !run.knew) { run.knew = true; X.flags.set('h.code.known', true); X.after(5, () => game.ui?.feed?.('你記得 207 的密碼：0924。', { color: '#e3c98a', ms: 5200 })); }
     }
     run.lastPh = game.phase;
     // 207 門口(3 m 內、靜默期):「燈莫關。伊驚烏。」(hc.22)
     const w = door207();
-    if (w && silent && !run.w02 && Math.abs(p.pos.y - w.y) < 2 && Math.hypot(p.pos.x - w.cx, p.pos.z - w.cz) < 3 && !h?.whispers?.busy) {
+    if (w && silent && !run.w02 && Math.abs(p.pos.y - w.y) < 2 && Math.hypot(p.pos.x - w.cx, p.pos.z - w.cz) < 3 && !h?.whispers?.busy && !h?.memories?.state?.cur && !game.story?.busy?.()) {
       if (h?.whisper?.('h.w02', { ear: 'right', priority: 7 })) run.w02 = true;
     }
     // 環境線索:準心停在上面 0.8 秒、3 m 內
@@ -264,7 +258,7 @@ export function installDeduce(game) {
     if (cam && !game.paused) {
       cam.getWorldDirection(_v3);
       for (const L of LOOK) {
-        if (D.has(L.card)) continue;
+        if (run.got.has(L.card)) continue;
         const q = L.at === 'door207' ? (w ? { x: w.cx, y: w.y + 1.4, z: w.cz } : null) : X.get(L.id) ? X.where(X.get(L.id)) : null;
         if (!q) continue;
         const dx = q.x - cam.position.x, dy = q.y - cam.position.y, dz = q.z - cam.position.z, d = Math.hypot(dx, dy, dz) || 1;
@@ -274,13 +268,6 @@ export function installDeduce(game) {
         run.look.set(L.card, t);
         if (t >= 0.8) D.addCard(L.card, { by: 'look' });
       }
-    }
-    // 頭七的補播:靜默期站在遺照前 5 秒
-    const m = X.get('h.ix.memorial');
-    if (run.tqLate && m && silent) {
-      const q = X.where(m);
-      run.memT = Math.abs(p.pos.y - q.y) < 2 && Math.hypot(p.pos.x - q.x, p.pos.z - q.z) < 2.4 ? run.memT + step : 0;
-      if (run.memT >= 5 && !h?.whispers?.busy && h?.whisper?.('h.w.tc2', { ear: 'both', priority: 9, force: true, lockOk: true })) { run.tqLate = false; run.memT = 0; X.after(3.4, () => h?.whisper?.('h.w.tc3', { ear: 'both', priority: 9, force: true, lockOk: true })); X.after(6.6, () => h?.whisper?.('h.w.tc4', { ear: 'both', priority: 9, force: true, lockOk: true })); }
     }
     // 多人:受傷就收起筆記本(世界沒停)
     if (book.isOpen && game.net && p.lastHurt !== book.hurt) book.close(false);

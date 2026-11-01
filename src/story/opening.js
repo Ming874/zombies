@@ -4,8 +4,10 @@
 //   → 第一隻靠近:「我聽到我自己的聲音」→ 第一次尖叫:「收音機在叫，就是他們靠近了。」
 // - 第一次休息(單人 +15 秒):小美(休息時間、對講機在響)→ 店門口的對講機(金水伯,接了才說;interact/lines.js ph.shop01)
 //   → 收音機自己安靜 →〈望春風〉→ 阿嬤「阿孫……你來了。」→ 一顆球(M2)
-// - 第二次休息:小美說她「聽到」的(收音機突然沒聲音、她聽不到那個人;開著他們也聽得到)+「關掉再打開」= 收到;對講機第二通(207 的窗)
-// - 第三次休息:阿嬤「阿孫，樓梯慢慢走。」(把你當小孩)
+// 休息的節拍(NARRATIVE N4、REDESIGN R4:一次休息一個劇情節拍;山谷要安靜):
+//   1 到了(小美 → 對講機 → 阿嬤「你來了」→ 球)  2 小美說她「聽到」的規則(+「關掉再打開」= 收到)  3 金水伯:207 那扇窗(deduce.js k.1)
+//   4 阿嬤「樓梯慢慢走」  5 金水伯認出你(k.3)  6 廣播叫你的名字(moments.js M4)  7 〈第七暝〉與頭七(climax.js)
+//   8 王醫師的電話(保全倒下之後)或金水伯:921 那個女孩(k.2)  9 三樓的家屬(memdata m.ward3 的電話版:對講機轉接的舊留言)
 // - 金水伯只從店門口的對講機說話:game.story.kimsui(id, parts, cb) 讓對講機響,接了才講;沒接就下一次休息再響
 // - 追逐時小美一局最多 3 句(game.story.chaseLine;用完回傳 '',只剩收音機的尖叫)
 import { seq } from './voice.js';
@@ -25,6 +27,8 @@ const FIRST = [['xl', '……等一下。', 1.6, { ...O1, gap: 0.8 }], ['xl', '�
 const TEACH = [['xl', '收音機在叫，就是他們靠近了。', undefined, O1], ['xl', '打頭！', 1.2, O1]];
 const CHASE = ['跑！', '不要回頭，跑。', '綠燈那邊，跑！'];
 const KS = '對講機 · 金水伯';
+// 第 9 次休息:離你最近的電話響,是 2003 年留在總機裡的一通留言(三樓 3 號的女兒打給爸爸;他在第 9 天走了,hc.43、memdata m.ward3)
+const OLD3 = { id: 'ph.old3', who: '電話 · 留言（2003）', voice: 'woman', ear: 'right', parts: ['（2003 年，封院第 8 天的留言。）', '爸，是我。你有沒有好好吃飯？', '他們說三樓不能探病……', '封院一結束，我第一個來接你。', '……爸？你有聽到嗎？'] };
 
 export function installOpening(game, S) {
   const X = game.interact, H = () => game.horror, Rd = () => game.story?.radio;
@@ -79,6 +83,7 @@ export function installOpening(game, S) {
   }
   X.on('call', (P, ln) => { if (ln?.id === 'ph.shop01') { S.flag?.('h.ks.call'); X.after((P.talk?.endAt === Infinity ? 0 : 0) + (P.talk?.dur || 20) + 2.5, () => run.amaAfterCall?.()); } const k = kq[0]; if (k && ln && ln.id === k.line.id) { kq.shift(); X.after((P.talk?.dur || 6) + 0.6, () => { try { k.cb?.(); } catch (e) { console.warn('[story] kimsui', e); } }); } });
 
+  S.kimsuiQ = () => kq.length; // 還在等人接的對講機(金水伯一次休息只打一通)
   X.on('reset', () => { run.pa?.stop?.(); run = fresh(); kq.length = 0; });
   let acc = 0;
   X.tick((dt) => {
@@ -109,6 +114,13 @@ export function installOpening(game, S) {
     return true;
   });
 
+  function ringOld() { // 2003 年的「其他人」:一通沒有人接過的留言
+    if (run.old3 || S.busy?.() || game.phase === 'fighting' || game.state !== 'playing' || game.story?.ending?.active) return;
+    const q = game.player.pos;
+    let best = null, bd = Infinity;
+    for (const P of X.phones || []) { if (P.state !== 'idle' || P.e?.id === 'h.ix.phone.store') continue; const d = Math.hypot(P.pos.x - q.x, P.pos.z - q.z) + Math.abs(P.pos.y - q.y) * 6; if (d < bd) { bd = d; best = P; } }
+    if (best?.startRing?.(OLD3, 28)) { run.old3 = true; if (!game.net && game.phase === 'shop') game.restT = Math.max(game.restT, 34); }
+  }
   function release() { // 第一波開始出怪
     if (run.released) return;
     run.released = true;
@@ -116,20 +128,20 @@ export function installOpening(game, S) {
   }
   function onSilence() {
     run.quiet++;
-    if (run.quiet === 2) { // 第二次休息:規則 4 由小美說出來(她說的是她「聽到」的)+ 收音機開著會被聽到 + 關掉再打開 = 收到
+    if (run.quiet === 2) { // 第二次休息:規則由小美說出來(她說的是她「聽到」的)+ 收音機開著會被聽到 + 關掉再打開 = 收到(207 的方向由目標「找到 207」的兩句帶)
       X.after(3, () => {
         if (game.phase === 'fighting') return;
         seq(game, [
-          ['xl', '上次燈熄的時候，', 1.8], ['xl', '收音機突然整個沒聲音。', 2.6], ['xl', '然後有人在叫你，對不對？', 2.6, { gap: 1.2 }],
+          ['xl', '上次燈熄的時候，收音機突然沒聲音，', 3.4], ['xl', '然後有人在叫你，對不對？', 2.6, { gap: 1.2 }],
           ['xl', '我聽不到她。……我只聽得到他們。', 3.4, { gap: 1.4 }],
-          ['xl', '我跟你講，收音機開小聲一點。', 3.0], ['xl', '他們也聽得到。', 2.0, { gap: 2.4 }],
-          ['xl', '你還在嗎？', 1.6], ['xl', '在的話，把收音機關掉再打開。', 3.0],
+          ['xl', '收音機開小聲一點。他們也聽得到。', 3.2, { gap: 2.2 }],
+          ['xl', '你還在的話，把收音機關掉再打開。', 3.2],
           () => { run.ack = game.time; },
         ]);
       });
-      X.after(16, () => S.kimsui?.('ph.shop02', ['207 在二樓北邊。', '從後巷看，第七個窗。', '……2003 年，阿伯每天晚上看那扇窗。'], () => S.flag?.('h.ks.207')));
     }
-    if (run.quiet === 3) X.after(14, () => { if (game.phase !== 'fighting' && game.state === 'playing') seq(game, [['ama', '阿孫，樓梯慢慢走。', undefined, { ear: 'left' }]]); }); // 把你當小孩(頭七回收)
+    if (run.quiet === 9) X.after(10, () => ringOld());
+    if (run.quiet === 4) X.after(12, () => { if (game.phase !== 'fighting' && game.state === 'playing' && !S.busy?.()) seq(game, [['ama', '阿孫，樓梯慢慢走。', undefined, { ear: 'left' }]]); }); // 把你當小孩(頭七回收)
     if (run.quiet !== 1 || run.firstBreak) return;
     run.firstBreak = true;
     run.pa?.stop?.();

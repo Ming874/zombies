@@ -15,7 +15,7 @@ const NOTES = [
   ['how', (c) => c.done('h.s.how207'), '207 的鎖由三樓監控室控制，可是三樓沒有電。'],
   ['fuse', (c) => c.has('h.area.morgue'), '地下室要找 3 支保險絲：洗衣房、鍋爐房、太平間（冰櫃照 3→1→5 拉）。'],
   ['power', (c) => c.has('h.gen.on'), '三樓有電了。監控室要刷門禁卡，還要輸入密碼。'],
-  ['code', (c) => c.done('h.s.code') || c.has('know.code0924'), '密碼是 207 的病人住進來那天：1999 年 9 月 24 日。'],
+  ['code', (c) => c.done('h.s.code') || c.has('h.code.known'), '密碼是 207 的病人住進來那天：1999 年 9 月 24 日。'],
   ['badge', (c) => c.step() === 'h.s.badge', '門禁卡在大新的夜班組長身上，第 5 波他會出現。'],
   ['card', (c) => c.inv('card.security'), '拿到門禁卡了。'],
   ['gift', (c) => c.has('h.radio.ama'), '阿嬤把她在護理站聽的收音機留給你了。'],

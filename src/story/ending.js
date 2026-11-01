@@ -12,7 +12,7 @@
 // 合作的代理(都是「偵測到才用」):game.motion(veil / letterbox / dawn / cards / credits)、world.hospital.anchors(alleyView、w207)、
 // world.hospital.setDawn(t)、anchors.truck.mesh。沒有它們:自己的黑幕、自己算的鐵網位置、DOM 的晨光。
 import './ending.css';
-import { line as say, wait, fillNick } from './voice.js';
+import { line as say, wait, fillNick, lamp207, lamp207Lit } from './voice.js';
 import { CARD } from './clues.js';
 import { sfx, ghost } from '../audio.js';
 import { settings } from '../ui/settings.js';
@@ -24,7 +24,7 @@ const ONE = {
   dark: '燈熄了。不是她關的。',
   normal: '每天晚上都亮著。二十三年了。',
 };
-const PAGE = ['5/12　封院第 14 天。燒退一點。左手腫。', '207 今天眼睛有動。我跟她說：燈我會顧，等你自己醒來，自己關。', '如果我走了，告訴淑芬：我不是 SARS。是針。'];
+const PAGE = ['封院第 14 天。燒退一點。左手腫。', '207 今天眼睛有動。我跟她說：燈我會顧，等你自己醒來，自己關。', '如果我走了，告訴淑芬：我不是 SARS。是針。'];
 const LAST = '告訴阿孫：阿嬤沒有不要回家。';
 const NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
@@ -45,11 +45,11 @@ export function installEnding(game, S) {
 
   function skipMotion() { const mp = run?.mp; try { mp?.skipAll ? mp.skipAll() : mp?.skip?.(); } catch { /* 略 */ } }
   function decide() {
-    const d = D(), solved = !!d?.solved?.(), page = !!d?.has?.('hc.30');
-    const lit = X.flags.get('h.pwr.207') !== false; // 配電盤上的 207 迴路(開局有電;玩家可以自己關掉)
+    const d = D(), solved = !!d?.solved?.(), page = !!d?.got?.('hc.30');
+    const lit = lamp207Lit(game); // 守燈系統的燈(game.story.lamp)+ 配電盤上的 207 迴路(開局有電;玩家可以自己關掉)
     const diff = (() => { try { return new URLSearchParams(location.search).get('diff') || settings.get?.('difficulty') || 'normal'; } catch { return 'normal'; } })();
     if (!lit) return 'dark';
-    if (solved && (diff === 'hard' || diff === 'nightmare') && d?.has?.('hc.32')) return 'secret';
+    if (solved && (diff === 'hard' || diff === 'nightmare') && d?.got?.('hc.32')) return 'secret';
     if (solved && page) return 'good';
     return 'normal';
   }
@@ -135,7 +135,7 @@ export function installEnding(game, S) {
     return { x: best.x, y, z: best.z, yaw: Math.atan2(-dx, -dz), pitch: Math.asin(dy / dd), win: { x: wx, y: wy, z: wz } };
   }
   function place(P) { if (!P) return false; const p = game.player; try { p.place(P.x, P.y, P.z, P.yaw); p.pitch = P.pitch ?? 0.2; return true; } catch { return false; } }
-  const lampFixtures = () => { const A = W()?.anchors?.w207; if (A?.lamp?.fixture) return [A.lamp.fixture]; return (W()?.lights?.fixtures || game.hospital?.lights?.fixtures || []).filter((f) => f.zone?.id === 'f2_ward_207' || f.zone === 'f2_ward_207'); };
+  const lampFixtures = () => { const f = lamp207(game); return f ? [f] : []; }; // 只有檯燈(207 天花板的燈是壞的,不要碰)
   function dawn(t) {
     run.dawn = t;
     try { W()?.setDawn?.(t); } catch { /* 略 */ }
@@ -198,7 +198,7 @@ export function installEnding(game, S) {
       await talk('ks', '2003 年，我們每天晚上都站在這裡。');
       await talk('ks', '你阿母抱著你，你一直指那扇窗。', { gap: 2 });
       // 三、紙條
-      if (d?.has?.('hc.09')) {
+      if (d?.got?.('hc.09')) {
         run.beat = 'note';
         const gave = await ask('把紙條交給金水伯', 14);
         run.ch.note = gave;
@@ -213,7 +213,7 @@ export function installEnding(game, S) {
         }
       }
       // 四、那一頁
-      if (d?.has?.('hc.30')) {
+      if (d?.got?.('hc.30')) {
         run.beat = 'page';
         const n = [10, () => say(game, 'ks', '那張紙，你不看一下？', { sub })];
         run.ch.page = await ask('打開那一頁', 20, n);
@@ -273,7 +273,7 @@ export function installEnding(game, S) {
           await talk('xl', '我自己去關。', { gap: 2.6 });
         } else await talk('xl', '……今天，數完了。', { gap: 2.2 });
       }
-      if (!d?.has?.('hc.30') && has('h.ho.heard')) { await talk('ho', '……謝謝你。', { gap: 1.4 }); sub('n', '電話掛了。', 2); await w(3); }
+      if (!d?.got?.('hc.30') && has('h.ho.heard')) { await talk('ho', '……謝謝你。', { gap: 1.4 }); sub('n', '電話掛了。', 2); await w(3); }
       // 八、207 的清晨(好/秘密)
       const A = W()?.anchors?.w207;
       if ((v === 'good' || v === 'secret') && solo && A?.view && !run.skip) {
@@ -310,7 +310,7 @@ export function installEnding(game, S) {
     if (game.state !== 'playing') { run.done = true; return false; }
     run.beat = 'alley';
     await talk('ks', '……每天晚上都亮著。二十三年了。', { gap: 1.2 });
-    if (d?.has?.('hc.30')) {
+    if (d?.got?.('hc.30')) {
       run.beat = 'page';
       await readPage(0.6);
       await talk('xl', '……她一直在跟我說話。', { gap: 1.2 });
@@ -341,12 +341,12 @@ export function installEnding(game, S) {
   }
 
   function photo(v) {
-    const d = D(), mine = !!d?.has?.('hc.32');
+    const d = D(), mine = !!d?.got?.('hc.32');
     const box = document.createElement('div');
     box.className = 'st-photo';
     box.innerHTML = mine
       ? '<div class="stamp">2000 · 聖心醫院 新生兒室</div><div class="hand">床母娘娘，<br>保佑我的孫子。</div><div class="sig">秀英</div>'
-      : '<div class="stamp">霧港日報 · 92 年 5 月 8 日</div><div class="hand">不要怕<br>阿嬤在這裡</div><div class="sig">（剪下來的報紙，背面寫著：阿孫）</div>';
+      : '<div class="stamp">霧港日報 · 2003 · 聖心封院第 10 天</div><div class="hand">不要怕<br>阿嬤在這裡</div><div class="sig">（剪下來的報紙，背面寫著：阿孫）</div>';
     void v;
     return box;
   }
@@ -392,7 +392,7 @@ export function installEnding(game, S) {
     q('.st-sub').innerHTML = '';
     q('.st-skip').style.display = '';
     dawn(0); bars(false);
-    for (const f of lampFixtures()) { if ('gate' in f) f.gate = 1; else f.ov = 1; }
+    if (lamp207Lit(game)) for (const f of lampFixtures()) { if ('gate' in f) f.gate = 1; else f.ov = 1; } // 熄燈結局之後窗還是黑的
     try { const t = W()?.anchors?.truck?.mesh; if (t) t.visible = false; } catch { /* 略 */ }
     const Dr = H()?.director; if (Dr) { Dr.bigUntil = Dr.t; Dr.calmUntil = Dr.t + 20; }
     document.body.classList.remove('st-ending');

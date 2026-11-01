@@ -3,7 +3,7 @@
 //   M4 廣播叫你的名字(第 6 次休息的停電)   M5 頭七(climax.js + deduce.js 的頭七,這裡只放小美的開頭)
 //   M6 那張工作證(進 207)   M7 數到十(ending.js)
 // 每一個都只播一次(每一局);說話全部經過聲音的鎖(src/story/voice.js),前後不會疊。
-import { seq, wait } from './voice.js';
+import { seq, wait, door207 } from './voice.js';
 import { sfx, ix as ixs } from '../audio.js';
 import * as THREE from 'three';
 const _f = new THREE.Vector3();
@@ -13,6 +13,8 @@ const M1 = [
   '23 年後，七月初一，鬼門開。\n家裡的電話響了：「聖心醫院 207」。',
   '電話裡是阿嬤：\n「阿孫，你來看阿嬤好不好？」',
 ];
+
+const NOTICE = ['本作人物、醫院、地點與機構皆為虛構。', '（內容涉及疫病、死亡與醫院場景）'];
 
 export function installMoments(game, S) {
   const X = game.interact, H = () => game.horror, D = () => game.deduce, O = () => game.objectives;
@@ -37,6 +39,10 @@ export function installMoments(game, S) {
       const skip = (e) => { if (e.type === 'keydown' && (e.repeat || !/^(Space|Enter|NumpadEnter|Escape)$/.test(e.code))) return; skipped = true; cur?.skip?.(); };
       addEventListener('keydown', skip, true); addEventListener('mousedown', skip, true);
       try {
+        // 虛構聲明(HISTORY §8 第 11 條、H4):一張短短的卡,在電話響之前
+        cur = M.card({ lines: NOTICE, hold: 2.2, fadeIn: 500, fadeOut: 400, align: 'center' });
+        await cur;
+        if (skipped) return;
         try { ixs.ringStart?.('m1.ring', null, 'bell'); } catch { /* 略 */ }
         await new Promise((r) => setTimeout(r, 2400));
         try { ixs.ringStop?.('m1.ring'); } catch { /* 略 */ }
@@ -67,7 +73,7 @@ export function installMoments(game, S) {
   // ---------- M3:207 門後傳出小美 1999 年的聲音,收音機裡的小美愣住 ----------
   function m3() {
     if (run.m3) return; run.m3 = true;
-    const w = X.doors?.list?.find((q) => q.lock?.door === 'f2_ward_207');
+    const w = door207(game);
     const pos = w ? { x: w.cx, y: w.y + 1.2, z: w.cz } : null;
     const tape = '……還醒著的夜貓子，收到請回答。';
     hold(18);
@@ -149,7 +155,7 @@ export function installMoments(game, S) {
     }
     run.wasSilent = silent;
     // M6:在 207 裡面,看著床頭 0.8 秒,或進門 6 秒
-    const dw = !run.m6 && X.doors?.list?.find((q) => q.lock?.door === 'f2_ward_207'), pp = game.player.pos;
+    const dw = !run.m6 && door207(game), pp = game.player.pos;
     if (!run.m6 && game.hospital?.zone?.id === 'f2_ward_207' && (!dw || Math.hypot(pp.x - dw.cx, pp.z - dw.cz) > 1.6)) { // 真的走進房間(不是站在門口)
       run.in207 += step;
       const A = game.hospital?.anchors?.w207, q = A?.lamp || A?.bed;

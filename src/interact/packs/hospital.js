@@ -87,25 +87,25 @@ const items = [
   { id: 'h.ix.keypad', kind: 'keypad', zone: 'f3_monitor', mount: 'wall', near: null, code: '0924', title: '3F 監控室 · 207 的電子鎖', sub: '提示：207 那位病人住院那天（月日，4 位數）', onSolve: { flag: 'h.207.elock' }, wrong: '密碼不對。', power: 'h.pwr.monitor',
     why: '207 的電子鎖由監控室控制；授權碼是「她來的那一天」：1999/9/24。鍵盤只解開電子鎖(h.207.elock);門內的旋鈕要等頭七(src/story/climax.js)。' },
   { id: 'h.ix.cctv', kind: 'cctv', zone: 'f3_monitor', mount: 'surface', near: null, power: 'h.pwr.monitor',
-    why: '監控室主控台的錄影機，卡著 2003/5/5 CAM-07 的帶子（hc.05）。' },
+    why: '監控室主控台的錄影機，卡著封院第 7 天 CAM-07 的帶子（hc.05）。' },
   { id: 'h.ix.lock.207', kind: 'lock', zone: 'f2_ward_207', mount: 'wall', near: 'door', door: 'f2_ward_207', item: null, flag: 'h.207.unlock', text: '207 · 鎖住了（董事長下令，不准打開）', unlockText: '門外的電子鎖、門內的旋鈕，都開了。',
-    why: '大新 2024 年在 207 門邊加裝的電子鎖（封存）；門玻璃內側是阿嬤 2003/5/5 用口紅反寫的「莫開門」（hc.15）。' },
+    why: '大新 2024 年在 207 門邊加裝的電子鎖（封存）；門玻璃內側是阿嬤封院第 7 天用口紅反寫的「莫開門」（hc.15）。' },
 
   // ================================================================== 2F 護理站(林秀英)
   { id: 'h.ix.memorial', kind: 'memorial', zone: 'f2_corridor', mount: 'surface', near: 'f2_ward_207',
     why: '「問的地方」：阿嬤的遺照、乾掉的白色康乃馨、一副筊杯（2004 年金水伯放的）；王醫師下令不准動。看＝hc.13，筆記本填好之後按住 E 擲筊。' },
   { id: 'h.look.keys', kind: 'note', zone: 'f2_corridor', mount: 'wall', near: 'f2_ward_207', note: 'h.c16', style: 'poster',
-    why: '護理站內牆的鑰匙板：207 的鉤子空著，「5/5 護理長收」（hc.16）。' },
+    why: '護理站內牆的鑰匙板：207 的鉤子空著，「第 7 天護理長收」（hc.16）。' },
   { id: 'h.look.panel2f', kind: 'note', zone: 'f2_corridor', mount: 'wall', near: 'f2_ward_207', note: 'h.c27', style: 'clipboard',
     why: '2F 北側配電箱門上的工務紙條（hc.27）。' },
   { id: 'h.ix.pillow', kind: 'note', zone: 'f2_ward_207', mount: 'surface', near: null, note: 'H10', style: 'paper',
     why: '207 床上的枕頭裡，值班日記的最後一頁（hc.30；頭七的腳印指向它）。' },
   { id: 'h.ix.nursecall', kind: 'nursecall', zone: 'f2_corridor', mount: 'wall', near: 'f2_ward_207', room: '207',
-    why: '護理站的呼叫面板；207 的叫人鈴一直被按住（留白：2003/5/13 清晨她按著叫人鈴走的）。' },
+    why: '護理站的呼叫面板；207 的叫人鈴一直被按住（留白：封院第 15 天清晨她按著叫人鈴走的）。' },
   { id: 'h.ix.phone.nurse', kind: 'phone', zone: 'f2_corridor', mount: 'surface', near: 'f2_ward_207', style: 'nurse', ext: '2F 護理站', calls: ['ph.n01', 'ph.n02', 'ph.n03', 'ph.n04'], ring: 'tension', special: null,
     why: '2F 護理站的電話；阿嬤（內線）與 2003 年的醫院廣播錄音。' },
   { id: 'h.ix.answering', kind: 'answering', zone: 'f2_corridor', mount: 'surface', near: 'f2_ward_207', message: 'ph.vm01',
-    why: '護理站的答錄機，紅燈還在閃：2003/5/7 21:14 女兒的留言（hc.18）。' },
+    why: '護理站的答錄機，紅燈還在閃：封院第 9 天 21:14 女兒的留言（hc.18）。' },
   { id: 'h.ix.whiteboard', kind: 'note', zone: 'f2_corridor', mount: 'wall', near: 'f2_ward_207', note: 'h.s06', style: 'whiteboard',
     why: '2F 護理站白板，停在 2003 年封院第 7 天：「晚上廣播叫人，不要下樓」。' },
   { id: 'h.ix.handover4', kind: 'note', zone: 'f2_corridor', mount: 'surface', near: 'f2_ward_207', note: 'h.s23', style: 'clipboard',
@@ -119,7 +119,7 @@ const items = [
   { id: 'h.ix.radio.nurse', kind: 'handradio', zone: 'f2_corridor', mount: 'surface', near: 'f2_ward_207', nearId: 'h.ix.tape1998', dx: 0.34, variant: 'ama', name: '阿嬤的收音機',
     why: '阿嬤在護理站聽〈霧港夜話〉的那台；側面膠帶「霧港夜話（重播）　207 聽著心跳會加快　——林」。地下室燒壞手提收音機之後才拿得到（REDESIGN §2.4.8）。' },
   { id: 'h.ix.notice.ward', kind: 'note', zone: 'f2_ward_206', mount: 'wall', near: 'door', note: 'h.s24', style: 'poster',
-    why: '病房門內的住院須知；第五條「夜間聽到敲門聲，請勿開門」是阿嬤 2003/5/6 加的。' },
+    why: '病房門內的住院須知；第五條「夜間聽到敲門聲，請勿開門」是阿嬤封院第 8 天加的。' },
   { id: 'h.ix.switch203', kind: 'switch', zone: 'f2_ward_203', mount: 'wall', near: 'door', target: 'f2_ward_203',
     why: '203 的燈開關；牆上的「別開燈」是 203 病人的女兒寫的，開燈會讓她父親躁動。' },
 
@@ -153,7 +153,7 @@ const items = [
 
   // ================================================================== 急診
   { id: 'h.ix.ernote', kind: 'note', zone: 'f1_er', mount: 'surface', near: null, note: 'h.s25', style: 'clipboard',
-    why: '2003/5/7 阿嬤自行通報的疑似病例通報單（hc.17）。' },
+    why: '封院第 9 天阿嬤自行通報的疑似病例通報單（hc.17）。' },
   { id: 'h.ix.ercart', kind: 'medcab', zone: 'f1_er', mount: 'auto', near: null, loot: 'random', label: '急救車',
     why: '急診的急救車。' },
 
