@@ -728,7 +728,7 @@ export class Shop {
     this.levelId = world.layout?.levels?.[S.level]?.id || '';
     // 店面所在區域名稱(提示文字用)與店名字樣:都從地圖資料來,地圖可用 layout.shopBrand 覆寫
     this.zoneName = (world.zoneAt ? world.zoneAt(S.x, (S.y || 0) + 0.2, S.z) : null)?.name || '';
-    this.brand = { sign: '金水商行（臨時補給點）', en: 'KIM-SUI STORE · SUPPLY POINT', term: '金水商行 · 收銀機', ...(world.layout?.shopBrand || {}) };
+    this.brand = { sign: '金水商行（臨時補給點）', en: '院內福利社 · 歡迎光臨', term: '金水商行 · 收銀機', ...(world.layout?.shopBrand || {}) };
     this.group = new THREE.Group();
     this.group.position.set(S.x, this.y, S.z);
     this.group.rotation.y = this.F.rot;
@@ -846,8 +846,8 @@ export class Shop {
       map: signTex((x, w, h) => {
         x.fillStyle = '#122a24'; x.fillRect(0, 0, w, h);
         x.fillStyle = '#d8ccb0'; x.font = `700 ${h * 0.44}px ${FONT}`; x.textBaseline = 'middle'; x.textAlign = 'center';
-        x.fillText('彈藥 · 醫療 · 防具 · 武器', w / 2, h * 0.44);
-        x.font = `600 ${h * 0.17}px ${FONT}`; x.fillStyle = '#8fb3a6'; x.fillText('AMMO · MEDICAL · ARMOR · WEAPONS', w / 2, h * 0.82);
+        x.fillText('飲料 · 泡麵 · 日用品', w / 2, h * 0.44);
+        x.font = `600 ${h * 0.17}px ${FONT}`; x.fillStyle = '#8fb3a6'; x.fillText('菸酒 · 電話卡 · 冰塊 · 文具', w / 2, h * 0.82);
         noise(x, w, h, 12);
       }, 1024, 160), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.5,
     });
@@ -862,8 +862,8 @@ export class Shop {
       m.position.set((x0 + x1) / 2, fasciaY + fh / 2, 0.565);
       this.group.add(m);
     }
-    // 霓虹招牌「金水商行 OPEN」
-    this.neonMat = new THREE.MeshBasicMaterial({ map: neonTex([['金水商行', '#ff9a3c', 150, 0.4, 900], ['OPEN', '#ff3b30', 74, 0.84, 900]]), transparent: true, depthWrite: false, toneMapped: false });
+    // 霓虹招牌「金水商行 營業中」
+    this.neonMat = new THREE.MeshBasicMaterial({ map: neonTex([['金水商行', '#ff9a3c', 150, 0.4, 900], ['營業中', '#ff3b30', 74, 0.84, 900]]), transparent: true, depthWrite: false, toneMapped: false });
     const neonW = Math.min(2.6, 2 * CW + 0.4), neonH = Math.min(fh - 0.1, neonW / 4 * 1.05);
     B.add(M.dark, put(box(neonW * 0.86, neonH * 0.92, 0.02), 0, fasciaY + fh / 2, 0.565));
     const neon = new THREE.Mesh(new THREE.PlaneGeometry(neonW, neonW / 4), this.neonMat);
@@ -995,12 +995,12 @@ export class Shop {
     for (const s of [-1, 1]) B.add(M.alu, put(box(0.04, 1.8, 0.05), pcx + s * (pw / 2 + 0.03), 1.72, wz + 0.04));
     B.add(M.alu, put(box(pw + 0.1, 0.04, 0.05), pcx, 2.62, wz + 0.04));
     B.add(M.alu, put(box(pw + 0.1, 0.04, 0.05), pcx, 0.83, wz + 0.04));
-    // 「槍枝 GUNS」小燈箱
+    // 「防身器材」小燈箱
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.26), new THREE.MeshBasicMaterial({
       map: signTex((x, w, h) => {
         x.fillStyle = '#0d0f0e'; x.fillRect(0, 0, w, h);
         x.fillStyle = '#f0e6d0'; x.font = `900 ${h * 0.62}px ${FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText('槍枝 GUNS', w / 2, h / 2 + 2);
+        x.fillText('防身器材', w / 2, h / 2 + 2);
       }, 512, 102), color: new THREE.Color(1.1, 1.05, 0.95),
     }));
     sign.position.set(pcx, Math.min(ceil - 0.3, 2.86), wz + 0.03);
@@ -1202,9 +1202,9 @@ export class Shop {
     this.tvAt = { x: tx, y: Math.min(R.ceil - 0.7, 2.45), z: tz, ry: -tvSide * 0.9 };
     this.group.add(this.tvScreen);
     this._placeTVScreen();
-    // ---- 前窗內側的 OPEN 霓虹(朝走廊) ----
+    // ---- 前窗內側的「營業中」霓虹(朝走廊) ----
     if (!R.frontOpen && front > 2) {
-      this.neon2Mat = new THREE.MeshBasicMaterial({ map: neonTex([['OPEN', '#ff3b30', 150, 0.5, 900]], 512, 256), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+      this.neon2Mat = new THREE.MeshBasicMaterial({ map: neonTex([['營業中', '#ff3b30', 136, 0.5, 900]], 512, 256), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
       const n2 = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.45), this.neon2Mat);
       n2.position.set(-Math.min(3.2, fl - 1.6), 1.9, front - 0.12); // 面向走廊(從店內看是反的,跟真的霓虹一樣)
       this.group.add(n2);
@@ -1251,8 +1251,8 @@ export class Shop {
         const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, '#0a4c7a'); g.addColorStop(1, '#0c6aa0');
         c.fillStyle = g; c.fillRect(0, 0, w, h);
         c.fillStyle = '#e6f4ff'; c.font = `900 ${h * 0.62}px ${FONT}`; c.textBaseline = 'middle';
-        c.fillText('冷飲 COLD DRINKS', 24, h / 2 + 2);
-        c.fillStyle = '#9fd4ff'; c.font = `700 ${h * 0.34}px ${FONT}`; c.textAlign = 'right'; c.fillText('ICE · 冰', w - 24, h / 2);
+        c.fillText('冷飲 · 汽水 · 果汁', 24, h / 2 + 2);
+        c.fillStyle = '#9fd4ff'; c.font = `700 ${h * 0.34}px ${FONT}`; c.textAlign = 'right'; c.fillText('冰', w - 24, h / 2);
       }, 1024, 72), color: new THREE.Color(1.15, 1.15, 1.15),
     }));
     hdr.position.set(x + face * (D / 2 + 0.003), H - 0.12, cz);

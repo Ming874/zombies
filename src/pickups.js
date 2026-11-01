@@ -895,87 +895,117 @@ function screenTex(kind, ready) {
   return toTex(c);
 }
 
-function stencilPlate(lines, color, w = 512, h = 160) {
-  const [c, x] = cv(w, h);
+// [draws] 補給櫃整座烘成「一個 mesh」:頂點色 + 一張貼圖(上 60% 是牌子字樣,其他零件取下方白色區)
+// 舊版是 40 個沒合併的 mesh(彈藥箱樣板複本)、4.5 萬頂點,而且不經過 PVS,隔著樓板也照畫
+const _col = new THREE.Color();
+const PLATE_V0 = 0.4, WHITE_V = 0.03;
+function supplyTex(kind) {
+  const W = 512, H = 256, PH = Math.round(H * (1 - PLATE_V0));
+  const [c, x] = cv(W, H);
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+  const ammo = kind === 'ammo';
+  x.fillStyle = ammo ? '#2d3324' : '#f1eee6'; x.fillRect(0, 0, W, PH);
+  x.strokeStyle = ammo ? '#c9b25a' : '#b3121a'; x.lineWidth = 6; x.strokeRect(8, 8, W - 16, PH - 16);
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  for (const [t, size, y] of lines) { x.font = `900 ${size}px "Microsoft JhengHei", Impact, sans-serif`; x.fillStyle = color; x.fillText(t, w / 2, y * h); }
-  x.globalCompositeOperation = 'destination-out';
-  for (let i = 0; i < 700; i++) { x.globalAlpha = rr(0.2, 0.8); x.fillRect(rnd() * w, rnd() * h, rr(1, 3), rr(1, 3)); }
+  x.fillStyle = ammo ? '#d6c15a' : '#b3121a';
+  x.font = `900 ${ammo ? 70 : 74}px "Microsoft JhengHei", sans-serif`;
+  x.fillText(ammo ? '保全器材櫃' : '急救醫療櫃', W / 2, PH * 0.4);
+  x.font = '700 30px "Microsoft JhengHei", sans-serif';
+  x.fillStyle = ammo ? '#b8b39a' : '#5a5a56';
+  x.fillText(ammo ? '彈藥補給 · 每一波每人一次' : '醫療補給 · 每一波每人一次', W / 2, PH * 0.78);
+  for (let i = 0; i < 500; i++) { x.globalAlpha = rr(0.1, 0.5); x.fillStyle = ammo ? '#151810' : '#9a968c'; x.fillRect(rnd() * W, rnd() * PH, rr(1, 3), rr(1, 3)); }
+  x.globalAlpha = 1;
   return toTex(c);
 }
+// 零件上色:hex 頂點色,貼圖座標指到白色區;plate=true 的零件(牌子)保留 uv,壓到上方字樣區
+function tint(g, hex, plate = false) {
+  const n = g.attributes.position.count, col = new Float32Array(n * 3), uv = g.attributes.uv.array;
+  _col.set(hex);
+  for (let i = 0; i < n; i++) {
+    col[i * 3] = _col.r; col[i * 3 + 1] = _col.g; col[i * 3 + 2] = _col.b;
+    if (plate) uv[i * 2 + 1] = PLATE_V0 + uv[i * 2 + 1] * (1 - PLATE_V0);
+    else { uv[i * 2] = 0.5; uv[i * 2 + 1] = WHITE_V; }
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
 
-let SM = null; // 補給點共用材質
+let SM = null; // 補給點共用材質(兩種櫃子同一個 shader:頂點色 + 貼圖)
 function supplyMats() {
   if (SM) return SM;
   shared();
   const std = (o) => new THREE.MeshStandardMaterial(o);
   SM = {
-    dark: std({ color: 0x2a2d2b, roughness: 0.6, metalness: 0.5 }),
-    white: std({ color: 0xdedbd2, roughness: 0.42, metalness: 0.15 }),
-    glass: std({ color: 0xcfe3e8, roughness: 0.05, transparent: true, opacity: 0.2, depthWrite: false }),
-    inside: std({ color: 0x1a1d1c, roughness: 0.9 }),
-    ammoPlate: std({ map: stencilPlate([['彈藥 AMMO', 92, 0.42], ['每一波每人一次', 34, 0.82]], '#d6c15a'), transparent: true, depthWrite: false, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }),
-    medPlate: std({ map: stencilPlate([['醫療 MEDICAL', 84, 0.42], ['每一波每人一次', 34, 0.82]], '#b3121a'), transparent: true, depthWrite: false, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2 }),
+    ammoBody: std({ map: supplyTex('ammo'), vertexColors: true, roughness: 0.62, metalness: 0.4 }),
+    medBody: std({ map: supplyTex('health'), vertexColors: true, roughness: 0.5, metalness: 0.2 }),
   };
   return SM;
 }
 
-// 彈藥補給櫃:鋼製棧板 + 開放式軍綠鐵櫃,層架上放彈藥箱,頂上狀態燈
-function buildAmmoStation() {
-  const M = supplyMats(), g = new THREE.Group();
-  const W = 0.96, H = 1.28, D = 0.52, olive = [], dark = [], steel = [];
-  dark.push(at(new THREE.BoxGeometry(W + 0.06, 0.1, D + 0.06), 0, 0.05));
-  for (const x of [-0.42, 0, 0.42]) dark.push(at(new THREE.BoxGeometry(0.08, 0.04, D + 0.06), x, 0.12));
-  for (const s of [-1, 1]) olive.push(at(rbox(0.035, H, D, 0.008, 1), s * (W / 2 - 0.0175), 0.14 + H / 2));
-  olive.push(at(rbox(W, 0.035, D, 0.008, 1), 0, 0.14 + H - 0.0175));
-  olive.push(at(new THREE.BoxGeometry(W - 0.04, H - 0.04, 0.02), 0, 0.14 + H / 2, -D / 2 + 0.01));
-  for (const h of [0.16, 0.56, 0.95]) {
-    olive.push(at(new THREE.BoxGeometry(W - 0.06, 0.025, D - 0.04), 0, 0.14 + h));
-    steel.push(at(new THREE.BoxGeometry(W - 0.06, 0.03, 0.012), 0, 0.14 + h + 0.01, D / 2 - 0.03));
-  }
-  for (const s of [-1, 1]) steel.push(at(cyl(0.012, 0.18, 8), s * 0.3, 0.14 + H + 0.03, 0, 0, 0, Math.PI / 2)); // 提把
-  g.add(mesh(olive, R.mat.olive), mesh(dark, M.dark, false), mesh(steel, R.mat.steel, false));
-  // 層架上的彈藥箱
-  const put = (k, x, y, ry, s = 1) => { const o = R.tmpl[k].group.clone(); o.position.set(x, y + R.tmpl[k].half * s, 0.02); o.rotation.y = ry; o.scale.setScalar(s); g.add(o); };
-  put('bigammo', 0, 0.14 + 0.175, 0.04, 0.9);
-  put('ammo', -0.22, 0.14 + 0.575, 0.08); put('ammo', 0.2, 0.14 + 0.575, -0.06);
-  put('ammo', -0.18, 0.14 + 0.965, -0.1); put('med', 0.24, 0.14 + 0.965, 0.1, 0.55);
-  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.19), M.ammoPlate);
-  plate.position.set(0, 0.14 + H - 0.12, D / 2 + 0.002);
-  g.add(plate);
-  return { g, W, D, H: H + 0.14, lampY: H + 0.2, screenAt: [W / 2 - 0.19, H - 0.08, D / 2 + 0.004] };
+// 鐵皮彈藥箱(層架上的內容物):軍綠箱身、黃色識別帶、提把
+function canAt(parts, x, y, z, ry, s = 1) {
+  const L = 0.28 * s, Hh = 0.17 * s, Wd = 0.15 * s;
+  parts.push(tint(at(new THREE.BoxGeometry(L, Hh, Wd), x, y + Hh / 2, z, 0, ry), 0x4a5233));
+  parts.push(tint(at(new THREE.BoxGeometry(L + 0.004, 0.022 * s, Wd + 0.004), x, y + Hh * 0.72, z, 0, ry), 0xa88a2a));
+  parts.push(tint(at(new THREE.BoxGeometry(0.11 * s, 0.014, 0.022), x, y + Hh + 0.012, z, 0, ry), 0x2a2c2e));
 }
 
-// 醫療櫃:鋼架上的白色鐵櫃,玻璃門內是急救箱,門板下半部紅十字
+// 彈藥補給櫃:棧板上的開放式灰綠鐵櫃(保全室的器材櫃),層架上放彈藥箱與紙箱,頂上狀態燈
+function buildAmmoStation() {
+  const M = supplyMats(), g = new THREE.Group();
+  const W = 0.96, H = 1.28, D = 0.52, Y = 0.14, P = [];
+  const steel = 0x6a716b, dark = 0x2a2d2b;
+  P.push(tint(at(new THREE.BoxGeometry(W + 0.06, 0.1, D + 0.06), 0, 0.05), dark));
+  for (const x of [-0.42, 0, 0.42]) P.push(tint(at(new THREE.BoxGeometry(0.08, 0.04, D + 0.06), x, 0.12), dark));
+  for (const s of [-1, 1]) P.push(tint(at(new THREE.BoxGeometry(0.035, H, D), s * (W / 2 - 0.0175), Y + H / 2), steel));
+  P.push(tint(at(new THREE.BoxGeometry(W, 0.035, D), 0, Y + H - 0.0175), steel));
+  P.push(tint(at(new THREE.BoxGeometry(W - 0.04, H - 0.04, 0.02), 0, Y + H / 2, -D / 2 + 0.01), 0x4d534e));
+  for (const h of [0.16, 0.56, 0.95]) {
+    P.push(tint(at(new THREE.BoxGeometry(W - 0.06, 0.025, D - 0.04), 0, Y + h), steel));
+    P.push(tint(at(new THREE.BoxGeometry(W - 0.06, 0.03, 0.012), 0, Y + h + 0.01, D / 2 - 0.03), 0x3e403c));
+  }
+  // 內容物:下層木箱、中層兩個彈藥箱、上層彈藥箱 + 紙箱
+  const s0 = Y + 0.16 + 0.0125, s1 = Y + 0.56 + 0.0125, s2 = Y + 0.95 + 0.0125;
+  P.push(tint(at(new THREE.BoxGeometry(0.62, 0.3, 0.36), 0, s0 + 0.15, 0.02, 0, 0.04), 0x5b4a33));
+  P.push(tint(at(new THREE.BoxGeometry(0.63, 0.03, 0.37), 0, s0 + 0.24, 0.02, 0, 0.04), 0x3a2f22));
+  canAt(P, -0.22, s1, 0.02, 0.08); canAt(P, 0.2, s1, 0.02, -0.06);
+  canAt(P, -0.18, s2, 0.02, -0.1);
+  P.push(tint(at(new THREE.BoxGeometry(0.26, 0.2, 0.3), 0.24, s2 + 0.1, 0.02, 0, 0.1), 0x9a7a52)); // 紙箱
+  P.push(tint(at(new THREE.BoxGeometry(0.262, 0.004, 0.06), 0.24, s2 + 0.2, 0.02, 0, 0.1), 0xc9b98a)); // 封箱膠帶
+  for (const s of [-1, 1]) P.push(tint(at(cyl(0.012, 0.18, 8), s * 0.3, Y + H + 0.03, 0, 0, 0, Math.PI / 2), 0x3e403c)); // 提把
+  P.push(tint(at(cyl(0.05, 0.03, 12), W / 2 - 0.12, H + 0.2 - 0.075, 0), dark)); // 狀態燈座
+  P.push(tint(at(new THREE.PlaneGeometry(0.5, 0.18), -0.19, Y + H - 0.12, D / 2 + 0.003), 0xffffff, true)); // 牌子
+  g.add(mesh(P, M.ammoBody));
+  return { g, W, D, H: H + Y, lampY: H + 0.2, screenAt: [W / 2 - 0.19, H - 0.08, D / 2 + 0.004] };
+}
+
+// 醫療櫃:鋼架上的白色鐵櫃,窗內是急救箱,門板下半部紅十字(整座一個 mesh)
 function buildHealthStation() {
   const M = supplyMats(), g = new THREE.Group();
-  const W = 0.78, H = 1.0, D = 0.34, Y0 = 0.66, white = [], dark = [], steel = [], red = [];
-  for (const x of [-1, 1]) for (const z of [-1, 1]) dark.push(at(new THREE.BoxGeometry(0.04, Y0, 0.04), x * (W / 2 - 0.04), Y0 / 2, z * (D / 2 - 0.04)));
-  dark.push(at(new THREE.BoxGeometry(W - 0.04, 0.03, D - 0.04), 0, 0.12));
-  dark.push(at(new THREE.BoxGeometry(W, 0.03, D), 0, Y0 - 0.015));
-  white.push(at(rbox(W, H, D, 0.015, 2), 0, Y0 + H / 2));
-  white.push(at(rbox(W - 0.03, H - 0.03, 0.025, 0.008, 1), 0, Y0 + H / 2, D / 2 + 0.012)); // 門板
-  steel.push(at(cyl(0.01, 0.16, 8), W / 2 - 0.07, Y0 + H * 0.55, D / 2 + 0.04)); // 把手
-  for (const yy of [0.62, 0.48]) steel.push(at(new THREE.BoxGeometry(0.03, 0.02, 0.03), W / 2 - 0.07, Y0 + H * yy, D / 2 + 0.03));
-  red.push(at(new THREE.BoxGeometry(0.2, 0.065, 0.006), 0, Y0 + 0.24, D / 2 + 0.027)); // 紅十字(門板下半)
-  red.push(at(new THREE.BoxGeometry(0.065, 0.2, 0.006), 0, Y0 + 0.24, D / 2 + 0.027));
-  g.add(mesh(white, M.white), mesh(dark, M.dark, false), mesh(steel, R.mat.steel, false), mesh(red, R.mat.red, false));
-  // 玻璃窗與內容物
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.16, H * 0.42), M.inside);
-  win.position.set(0, Y0 + H * 0.7, D / 2 + 0.025);
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.16, H * 0.42), M.glass);
-  glass.position.set(0, Y0 + H * 0.7, D / 2 + 0.03);
-  glass.renderOrder = 2;
-  g.add(win, glass);
+  const W = 0.78, H = 1.0, D = 0.34, Y0 = 0.66, P = [];
+  const white = 0xdedbd2, dark = 0x2a2d2b, steel = 0x3e403c, red = 0xb3121a;
+  for (const x of [-1, 1]) for (const z of [-1, 1]) P.push(tint(at(new THREE.BoxGeometry(0.04, Y0, 0.04), x * (W / 2 - 0.04), Y0 / 2, z * (D / 2 - 0.04)), dark));
+  P.push(tint(at(new THREE.BoxGeometry(W - 0.04, 0.03, D - 0.04), 0, 0.12), dark));
+  P.push(tint(at(new THREE.BoxGeometry(W, 0.03, D), 0, Y0 - 0.015), dark));
+  P.push(tint(at(rbox(W, H, D, 0.015, 2), 0, Y0 + H / 2), white));
+  P.push(tint(at(rbox(W - 0.03, H - 0.03, 0.025, 0.008, 1), 0, Y0 + H / 2, D / 2 + 0.012), white)); // 門板
+  P.push(tint(at(cyl(0.01, 0.16, 8), W / 2 - 0.07, Y0 + H * 0.55, D / 2 + 0.04), steel)); // 把手
+  for (const yy of [0.62, 0.48]) P.push(tint(at(new THREE.BoxGeometry(0.03, 0.02, 0.03), W / 2 - 0.07, Y0 + H * yy, D / 2 + 0.03), steel));
+  P.push(tint(at(new THREE.BoxGeometry(0.2, 0.065, 0.006), 0, Y0 + 0.24, D / 2 + 0.027), red)); // 紅十字(門板下半)
+  P.push(tint(at(new THREE.BoxGeometry(0.065, 0.2, 0.006), 0, Y0 + 0.24, D / 2 + 0.027), red));
+  // 窗(暗色內襯 + 鋁框)與窗內的急救箱
+  const wy = Y0 + H * 0.7, ww = W - 0.16, wh = H * 0.42;
+  P.push(tint(at(new THREE.PlaneGeometry(ww, wh), 0, wy, D / 2 + 0.026), 0x1a1d1c));
+  for (const s of [-1, 1]) P.push(tint(at(new THREE.BoxGeometry(ww + 0.02, 0.012, 0.01), 0, wy + s * wh / 2, D / 2 + 0.03), 0x9aa09a));
+  for (const s of [-1, 1]) P.push(tint(at(new THREE.BoxGeometry(0.012, wh, 0.01), s * ww / 2, wy, D / 2 + 0.03), 0x9aa09a));
   for (const x of [-0.15, 0.15]) {
-    const o = R.tmpl.med.group.clone();
-    o.scale.setScalar(0.42);
-    o.position.set(x, Y0 + H * 0.52 + R.tmpl.med.half * 0.42, D / 2 + 0.005);
-    g.add(o);
+    P.push(tint(at(new THREE.BoxGeometry(0.17, 0.12, 0.012), x, wy - 0.06, D / 2 + 0.032), 0xc8231c));
+    P.push(tint(at(new THREE.BoxGeometry(0.05, 0.014, 0.004), x, wy - 0.06, D / 2 + 0.04), 0xf2efe8));
+    P.push(tint(at(new THREE.BoxGeometry(0.014, 0.05, 0.004), x, wy - 0.06, D / 2 + 0.04), 0xf2efe8));
   }
-  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.17), M.medPlate);
-  plate.position.set(0, Y0 + 0.08, D / 2 + 0.027);
-  g.add(plate);
+  P.push(tint(at(cyl(0.05, 0.03, 12), W / 2 - 0.12, Y0 + H + 0.05 - 0.075, 0), dark)); // 狀態燈座
+  P.push(tint(at(new THREE.PlaneGeometry(0.56, 0.17), 0, Y0 + 0.08, D / 2 + 0.027), 0xffffff, true)); // 牌子
+  g.add(mesh(P, M.medBody));
   return { g, W, D, H: Y0 + H, lampY: Y0 + H + 0.05, screenAt: [0, Y0 + 0.46, D / 2 + 0.028], screenW: 0.3 };
 }
 
@@ -990,7 +1020,7 @@ export class Supplies {
 
   add(s) {
     shared();
-    const M = supplyMats();
+    supplyMats();
     const y = s.y || 0, w = this.world;
     const B = s.kind === 'health' ? buildHealthStation() : buildAmmoStation();
     // 朝向:附近有牆就背靠牆;否則面向最空曠的方向
@@ -1008,13 +1038,11 @@ export class Supplies {
     const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 2, 0.6), toneMapped: false });
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), lampMat);
     lamp.position.set(B.W / 2 - 0.12, B.lampY - 0.06, 0);
-    const base = new THREE.Mesh(cyl(0.05, 0.03, 12), M.dark);
-    base.position.set(B.W / 2 - 0.12, B.lampY - 0.075, 0);
     const sw = B.screenW || 0.28;
     const scrMat = new THREE.MeshBasicMaterial({ map: screenTex(s.kind, true), toneMapped: false });
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(sw, sw / 2), scrMat);
     scr.position.set(...B.screenAt);
-    root.add(lamp, base, scr);
+    root.add(lamp, scr);
     // 地面光圈(與掉落物同款,不用動態光源)
     const ring = new THREE.Mesh(R.geo.ring, R.proto.ring.clone());
     ring.material.color.set(SUP[s.kind === 'health' ? 'health' : 'ammo'].color);

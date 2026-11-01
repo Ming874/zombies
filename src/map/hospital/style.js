@@ -66,7 +66,7 @@ export const REVEAL_B1 = W('concrete_wall', { tint: [0.95, 0.95, 0.92], wear: 0.
 export const revealFor = (lvId) => (lvId === 'B1' ? REVEAL_B1 : REVEAL);
 
 const FLOOR_BY_THEME = {
-  corridor: { '1F': 'tile_ward', '2F': 'lino_sheet_b', '3F': 'lino_sheet_c', B1: 'epoxy' },
+  corridor: { '1F': 'terrazzo', '2F': 'lino_sheet_b', '3F': 'lino_sheet_c', B1: 'epoxy' },
   ward: 'lino_sheet', icu: 'lino_sheet_c', xray: 'vct', ct: 'lino_sheet_b', pharmacy: 'vct', security: 'carpet_blue', monitor: 'rubber',
   archive: 'vct', nursery: 'lino_sheet_d', peds_ward: 'lino_pattern', cafeteria: 'checker', laundry: 'anti_skid', er: 'lino_sheet_c',
   chapel: 'wood_parquet', rehab: 'wood_gym', director: 'wood_floor', dorm: 'wood_old', playroom: 'carpet_kids', office: 'carpet',

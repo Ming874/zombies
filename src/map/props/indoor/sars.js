@@ -44,7 +44,7 @@ export function sarsSheet(kind) {
       c.fillStyle = '#e8e8e4'; c.fillRect(w / 2 - 12, 120, 24, 86); c.strokeStyle = '#333'; c.lineWidth = 2; c.strokeRect(w / 2 - 12, 120, 24, 86);
       c.fillStyle = '#c8261e'; c.beginPath(); c.arc(w / 2, 214, 16, 0, 7); c.fill(); c.fillRect(w / 2 - 5, 150, 10, 60);
       for (let i = 0; i < 6; i++) { c.fillStyle = '#333'; c.fillRect(w / 2 + 12, 128 + i * 12, 8, 2); }
-      text(c, '額溫 37.5℃ 以上', w / 2, 244, { size: 15, color: '#a8231c' });
+      text(c, '耳溫 38℃ 以上', w / 2, 244, { size: 15, color: '#a8231c' }); // 2003 年用耳溫槍,耳溫 >38℃ 才算發燒
       text(c, '請勿進入,立即通報', w / 2, 260, { size: 12, color: '#333', weight: 'normal' });
     } else if (kind === 'mask') {
       c.fillStyle = '#2e7a5a'; c.fillRect(0, 0, w, 46);
@@ -102,8 +102,9 @@ export function sarsSheet(kind) {
         const y = 42 + i * 18;
         c.fillStyle = 'rgba(40,40,40,0.5)'; c.fillRect(10, y + 7, w - 20, 1);
         text(c, `${8 + (i >> 1)}:${i & 1 ? '30' : '00'}`, 30, y, { size: 11, color: '#333', weight: 'normal' });
-        if (v[i]) text(c, v[i], 110, y, { size: 13, color: v[i] >= '37.5' ? '#a8231c' : '#1c2a6a', weight: 'normal', font: hand });
-        if (v[i] >= '37.5') { c.strokeStyle = '#a8231c'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(110, y, 22, 9, 0, 0, 7); c.stroke(); }
+        const hot = v[i] && parseFloat(v[i]) >= 38; // 耳溫 38℃
+        if (v[i]) text(c, v[i], 110, y, { size: 13, color: hot ? '#a8231c' : '#1c2a6a', weight: 'normal', font: hand });
+        if (hot) { c.strokeStyle = '#a8231c'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(110, y, 22, 9, 0, 0, 7); c.stroke(); }
       }
     }
     grime(c, w, h, 1.3);
@@ -153,7 +154,7 @@ const aframeRect = () => labRect('sars:aframe', 160, 224, (c, w, h) => {
   c.fillStyle = '#f0ece0'; c.fillRect(0, 0, w, h);
   c.fillStyle = '#1f5a8a'; c.fillRect(0, 0, w, 64);
   text(c, '量體溫站', w / 2, 28, { size: 30, color: '#fff' });
-  text(c, 'Temperature Check', w / 2, 52, { size: 12, color: '#d8e8f0', weight: 'normal' });
+  text(c, '耳溫槍 · 請先套耳溫套', w / 2, 52, { size: 12, color: '#d8e8f0', weight: 'normal' });
   text(c, '請排隊', w / 2, 100, { size: 24 });
   text(c, '保持一公尺距離', w / 2, 134, { size: 16, color: '#333' });
   text(c, '未戴口罩', w / 2, 176, { size: 16, color: '#a8231c' });
@@ -181,12 +182,17 @@ const glove = () => tpl('sars:glove', (b) => {
   b.meta.cap = 512;
 });
 const shoeCover = () => tpl('sars:shoecov', (b) => { b.sph('pl_ltblue', 0.08, 0, 0.0, 0, { sx: 0.7, sy: 0.25, sz: 1.4, tl: Math.PI / 2, ws: 8, hs: 3 }); b.meta.cap = 512; });
+// 耳溫槍(2003 年的量體溫工具;額溫槍是 COVID 年代的):側躺在桌上,白色握把、前端錐形探頭、背面小液晶,旁邊一盒耳溫套
 function thermoGun(b, x, y, z, ry) {
-  b.push(x, y, z, 0, ry, HALF * 0.98);
-  b.box('pl_white', 0.15, 0.045, 0.04, 0.0, 0.0, 0, { r: 0.012 });
-  b.box('pl_gray', 0.035, 0.09, 0.03, -0.035, -0.055, 0, { r: 0.008, rz: 0.25 });
-  b.box('glass_dark', 0.035, 0.024, 0.002, -0.05, 0.012, 0.021);
-  b.cyl('pl_gray', 0.012, 0.02, 0.083, 0, 0, { axis: 'x', seg: 8 });
+  b.push(x, y, z, 0, ry, 0);
+  b.box('pl_white', 0.125, 0.034, 0.046, 0, 0.017, 0, { r: 0.014 });
+  b.box('pl_white', 0.05, 0.03, 0.04, 0.05, 0.016, 0, { r: 0.012, ry: 0.25 });
+  b.cyl('pl_gray', 0.0125, 0.026, 0.087, 0.017, 0.01, { axis: 'x', seg: 10, r2: 0.006 }); // 探頭
+  b.cyl('pl_white', 0.004, 0.006, 0.1025, 0.017, 0.012, { axis: 'x', seg: 8 });
+  b.box('glass_dark', 0.03, 0.002, 0.02, -0.03, 0.0345, 0.004); // 液晶
+  b.box('pl_gray', 0.014, 0.004, 0.014, 0.01, 0.0345, 0.004, { r: 0.002 }); // 按鍵
+  b.box('cardboard', 0.085, 0.05, 0.06, -0.02, 0.025, -0.1, { r: 0.002 }); // 耳溫套盒
+  b.plane(L(boxPrint()), 0.083, 0.048, -0.02, 0.025, -0.0695);
   b.pop();
 }
 function sanitizer(b, x, y, z) {
@@ -203,7 +209,7 @@ function maskBox(b, x, y, z, ry = 0, open = false) {
   if (open) { b.box('cardboard', 0.12, 0.004, 0.06, 0.02, 0.092, -0.02, { rx: -0.6 }); b.box('pl_ltblue', 0.15, 0.02, 0.08, 0, 0.085, 0.004, { rz: 0.1 }); }
   b.pop();
 }
-// 量體溫站:折疊桌 + 額溫槍 + 夾板登記表 + 口罩盒 + 乾洗手 + 桌牌
+// 量體溫站:折疊桌 + 耳溫槍 + 夾板登記表 + 口罩盒 + 乾洗手 + 桌牌
 const thermoStation = () => tpl('sars:station', (b) => {
   const W = 1.2, D = 0.6, H = 0.74;
   b.box('pl_cream', W, 0.03, D, 0, H - 0.015, 0, { r: 0.006 });
@@ -212,7 +218,7 @@ const thermoStation = () => tpl('sars:station', (b) => {
     for (const sz of [-1, 1]) b.rod('steel', 0.013, [sx * (W / 2 - 0.08), 0, sz * (D / 2 - 0.06)], [sx * (W / 2 - 0.08), H - 0.05, sz * (D / 2 - 0.06)], { seg: 6 });
     b.rod('steel', 0.009, [sx * (W / 2 - 0.08), 0.18, -(D / 2 - 0.06)], [sx * (W / 2 - 0.08), 0.18, D / 2 - 0.06], { seg: 5 });
   }
-  thermoGun(b, -0.3, H + 0.03, 0.05, 0.4);
+  thermoGun(b, -0.3, H, 0.1, 0.4);
   b.box('cardboard', 0.23, 0.006, 0.32, 0.05, H + 0.003, 0.02, { ry: -0.15 }); // 夾板
   b.plane(L(sarsSheet('templog')), 0.21, 0.29, 0.05, H + 0.0075, 0.02, { rx: -HALF, rz: 0.15 });
   b.box('steel', 0.08, 0.012, 0.025, 0.05, H + 0.012, -0.12, { ry: -0.15 });

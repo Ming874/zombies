@@ -468,13 +468,13 @@ function planks(R, o) { // 長條木地板,4m 見方
 function carpet(R, o) {
   const s = sheet(512, 512, o.base);
   const { x, w, h } = s;
-  if (o.kids) { // 兒童遊戲地墊(褪色的彩色圖樣 + 字母)
+  if (o.kids) { // 兒童遊戲地墊(褪色的彩色圖樣 + 注音符號)
     const cols = ['#b05050', '#4f7fae', '#d2aa48', '#5b9a64', '#8a62a0'];
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
       x.fillStyle = cols[(i + j * 2) % cols.length]; x.globalAlpha = 0.55;
       x.fillRect(i * 128 + 6, j * 128 + 6, 116, 116); x.globalAlpha = 1;
-      x.fillStyle = 'rgba(240,235,220,0.5)'; x.font = 'bold 72px Arial'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.fillText('ABCDEFGHIJKLMNOP'[j * 4 + i], i * 128 + 64, j * 128 + 68);
+      x.fillStyle = 'rgba(240,235,220,0.5)'; x.font = 'bold 76px "Microsoft JhengHei", "PingFang TC", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔ'[j * 4 + i], i * 128 + 64, j * 128 + 68); // 注音地墊(2003 年的幼兒地墊是注音,不是 ABC)
     }
   } else { // 辦公室方塊地毯 50cm,絨毛方向交錯
     for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { x.fillStyle = (i + j) % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'; x.fillRect(i * 128, j * 128, 128, 128); }
