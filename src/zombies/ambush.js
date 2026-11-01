@@ -562,7 +562,7 @@ class Ambush {
       const miss = along > 0 && along < 45 ? Math.sqrt(Math.max(0, ox * ox + oy * oy + oz * oz - along * along)) : 99;
       if ((near || miss < 1.5) && W.hasLineOfSight(sh.o.x, sh.o.y, sh.o.z, cx, cy, cz)) { this._wakeCorpse(z, true, g.player); return; }
     }
-    if (this._heard(z.pos, a.R + 3)) { this._wakeCorpse(z, false, g.player); if (!a.dormant) return; } // 附近有大聲的聲音(槍聲、甩門、衝刺落地)
+    if (this._heard(z.pos, a.R)) { this._wakeCorpse(z, false, g.player); if (!a.dormant) return; } // 附近有大聲的聲音(槍聲、甩門、重落地、爆炸)
     let best = null, bd = 1e9;
     for (const p of pl) {
       if (Math.abs(p.pos.y - z.pos.y) > 1.8) continue;
@@ -588,13 +588,16 @@ class Ambush {
     this.blockT = this.g.time + 8;
     return true;
   }
-  // 噪音(game.noise,flow 的環形緩衝;還沒有就略過):裝死的在 r 內聽到最近 maxAge 秒的聲音
-  _heard(pos, r, maxAge = 1.2) {
+  // 噪音(game.noise,flow 的環形緩衝:槍聲、重落地、甩門/撞門、爆炸):near() 給「聽得到的裡面最響的一個」(距離 ≤ r + 噪音半徑)。
+  // 噪音半徑是「傳多遠」(手槍 26 m、巴雷特 70 m),裝死的只被夠近的吵醒:休息中 R + 半徑 × 0.45、打鬥中 × 0.25(打鬥一直有槍聲)
+  _heard(pos, R, maxAge = 1.2) {
     const N = this.g.noise;
     if (!N || typeof N.near !== 'function') return false;
-    let q = null;
-    try { q = N.near(pos, r, maxAge); } catch { return false; }
-    return !!q && (q.length === undefined || q.length > 0);
+    let e = null;
+    try { e = N.near(pos, R, maxAge); } catch { return false; }
+    if (!e || !Number.isFinite(e.x)) return false;
+    const k = this.g.phase === 'fighting' ? 0.25 : 0.45;
+    return Math.hypot(e.x - pos.x, e.z - pos.z) <= R + (e.r || 0) * k;
   }
 
   // 挑位置:路徑距離 8~34m、同層優先、玩家前進方向、暗處;前幾名裡第一個沒人看得到的
