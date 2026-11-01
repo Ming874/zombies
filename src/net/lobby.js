@@ -4,6 +4,8 @@ import { NetSession } from './session.js';
 import { survivorVariant, survivorReady } from '../zombies/model.js';
 import { loadSurvivors } from '../zombies/realistic.js';
 import { resume as resumeAudio, sfx } from '../audio.js';
+import { installSave, loadTeam, restoreCoop, coopLabel } from '../sys/save.js';
+import { account } from '../sys/account.js';
 
 // 主選單的多人入口:暱稱、建立房間(合作生存 / 對戰死鬥與選項)、輸入代碼加入、公開房間列表、
 // 房間等待畫面(玩家列表、準備、房主開始/踢人/改設定、聊天、邀請連結),並在開始時建立 NetSession。
@@ -22,6 +24,7 @@ export function initNet(game) {
   const lobby = new Lobby(game);
   lobby.mountEntry();
   window.__net = lobby;
+  try { installSave(game); } catch (e) { console.warn('[save] install', e); } // [w5] 存檔點(單人自動存、主選單「繼續」;合作的隊伍存檔也在這裡)
   return lobby;
 }
 
@@ -43,7 +46,7 @@ class Lobby {
   nick() {
     let n = '';
     try { n = localStorage.getItem(NICK) || ''; } catch { /* 忽略 */ }
-    return n || `阿孫${String(Math.floor(Math.random() * 900) + 100)}`;
+    return n || Array.from(account.user?.name || '').slice(0, 16).join('') || `阿孫${String(Math.floor(Math.random() * 900) + 100)}`; // [w5] 登入了:預設用帳號的名字
   }
   saveNick(n) { try { localStorage.setItem(NICK, n); } catch { /* 忽略 */ } }
 
@@ -133,7 +136,9 @@ class Lobby {
       this.view = 'room';
       this.chatLog = [];
       this.sys(`你加入了房間 ${m.room.code}`);
+      this.teamSave = null;
       if (m.room.state === 'playing' && !this.session) { this.startMatch({ room: m.room, match: m.room.match, seed: m.room.matchSeed || 0, mapId: m.room.mapId, late: true }); return; }
+      this.prefetchTeam();
       this.render();
       this.prebuild();
       history.replaceState(null, '', `${location.pathname}?room=${m.room.code}`);
@@ -153,7 +158,9 @@ class Lobby {
       this.refreshRoom();
     });
     c.on('host', (m) => { if (this.room) { this.room.host = m.id; this.refreshRoom(); } });
-    c.on('room', (m) => { if (this.room) { this.room = m.room; this.refreshRoom(); } });
+    c.on('room', (m) => { if (this.room) { this.room = m.room; this.refreshRoom(); this.prefetchTeam(); } });
+    // [w5] 隊伍存檔:房間裡每個人都登入 → ok;有上次的存檔 → save { t, meta }(大廳提示「繼續你們上次的進度」)
+    c.on('team', (m) => { if (!this.room) return; this.room.team = m.team; this.refreshRoom(); this.prefetchTeam(); });
     c.on('pings', (m) => { if (!this.room) return; for (const [id, rtt] of m.r) { const p = this.room.players.find((q) => q.id === id); if (p) p.rtt = rtt; } this.refreshRoom(); });
     c.on('chat', (m) => { this.chatLog.push({ name: m.name, text: m.text }); if (this.chatLog.length > 60) this.chatLog.shift(); this.renderChat(); });
     c.on('start', (m) => this.startMatch(m));
@@ -208,8 +215,34 @@ class Lobby {
     sfx.uiClick?.();
   }
   start() {
+    const sv = this.room?.mode === 'coop' && this.room.team?.save, go = () => { this.gesture = performance.now(); this.client.send('start', { data: {} }); };
+    if (sv && this.g.ui.menu?.confirm) { // [w5] 有隊伍存檔:重新開始會在第一次休息時覆蓋,先問
+      this.g.ui.menu.confirm({ title: '從第一夜重新開始？', text: `你們上次的進度（${coopLabel(sv.meta || {})}）會在這一夜的第一次休息時被覆蓋。`, ok: '重新開始', cancel: '取消' }, go);
+      return;
+    }
+    go();
+  }
+  // [w5] 「繼續你們上次的進度」(房主):先拿到存檔,再開始(伺服器確認隊伍存檔真的存在才會帶 resume)
+  async resumeStart() {
+    const r = this.room, btn = this.box.querySelector('#mp-resume');
+    if (!r?.team?.save) return;
     this.gesture = performance.now();
-    this.client.send('start', { data: {} });
+    if (btn) { btn.disabled = true; btn.textContent = '讀取存檔中…'; }
+    try {
+      const res = this.teamSave?.t === r.team.save.t ? this.teamSave : await loadTeam(r.code);
+      if (!res) throw new Error('沒有存檔');
+      this.teamSave = res;
+      this.gesture = performance.now();
+      this.client.send('start', { data: { resume: res.t } });
+    } catch (e) { this.msg(`讀不到上次的進度（${e.message}）`); if (btn) { btn.disabled = false; btn.textContent = '繼續你們上次的進度'; } }
+  }
+  // 大廳裡先把隊伍存檔與自己的裝備抓下來(開始時就不用等)
+  prefetchTeam() {
+    const r = this.room, sv = r?.team?.save;
+    if (!sv || r.mode !== 'coop' || !account.user) { if (!sv) this.teamSave = null; return; }
+    if (this.teamSave?.t === sv.t || this._tf === sv.t) return;
+    this._tf = sv.t;
+    loadTeam(r.code).then((res) => { if (res && this.room === r) this.teamSave = res; }).catch(() => {}).finally(() => { if (this._tf === sv.t) this._tf = null; });
   }
   again() {
     this.gesture = performance.now();
@@ -251,9 +284,17 @@ class Lobby {
     document.getElementById('menu')?.classList.remove('on');
     const g = this.g;
     // 多地圖(之後):m.mapId / m.seed 在這裡就已經到了,可以先 loadMap(mapId, seed) 再建 NetSession
-    const s = new NetSession(g, this.client, this, { room: m.room, you: this.you, match: m.match, seed: m.seed, mapId: m.mapId ?? m.room.mapId ?? null, late: !!m.late });
+    // [w5] 從隊伍存檔繼續:房主在 coop.begin() 照共用狀態進休息;隊友在這裡寫自己的裝備(回合由房主的 'sync' 帶)
+    const want = m.data?.resume && m.room.mode === 'coop' && !m.late ? m.data.resume : null;
+    const ready = want && this.teamSave?.t === want ? this.teamSave : null;
+    const s = new NetSession(g, this.client, this, { room: m.room, you: this.you, match: m.match, seed: m.seed, mapId: m.mapId ?? m.room.mapId ?? null, late: !!m.late, resume: ready });
     this.session = s;
     s.start();
+    if (want && !s.isHost) {
+      const own = (res) => { if (this.session === s && res) { restoreCoop(g, res, false); s.hud.center('從存檔點繼續', 2200); } };
+      if (ready) own(ready);
+      else loadTeam(m.room.code).then(own).catch((e) => console.warn('[save] 讀不到隊伍存檔', e)); // 還沒抓到:晚一點寫(封院天數可能差一天)
+    }
     s.hud.chatLine('', `房間 ${m.room.code} · ${MODE_NAME[m.room.mode]} · Tab 計分板 · Enter 聊天`, false, true);
     // 有使用者手勢(房主按開始)就直接鎖定滑鼠;其他人顯示「點擊進入」
     let locked = false;
@@ -362,6 +403,7 @@ class Lobby {
         <div>
           ${host ? `<h3>模式</h3><div class="modes"><button class="mode ${r.mode === 'coop' ? 'sel' : ''}" data-m="coop"><b>合作生存</b><span>2~4 人 · 一起撐過屍潮</span></button><button class="mode ${r.mode === 'pvp' ? 'sel' : ''}" data-m="pvp"><b>對戰死鬥</b><span>2~8 人 · 各自為戰</span></button></div>` : ''}
           <h3>設定</h3><div class="opts">${settings}<label><input type="checkbox" id="mp-s-pub" ${r.pub ? 'checked' : ''} ${host ? '' : 'disabled'} /> 公開房間</label></div>
+          <div class="resume" id="mp-resumebox"></div>
           <h3>玩家</h3><div class="players"></div>
         </div>
         <div><h3>聊天</h3><div class="chatbox"><div class="log"></div><input type="text" maxlength="160" placeholder="聊天（Enter 送出）" /></div></div>
@@ -376,6 +418,7 @@ class Lobby {
     q('#mp-leave').onclick = () => this.leaveRoom();
     if (q('#mp-ready')) q('#mp-ready').onclick = () => this.ready();
     if (host) q('#mp-start').onclick = () => this.start();
+    q('#mp-resumebox').addEventListener('click', (e) => { if (e.target.closest('#mp-resume')) { sfx.uiClick?.(); this.resumeStart(); } });
     q('#mp-rejoin').onclick = () => this.startMatch({ room: this.room, match: this.room.match, seed: this.room.matchSeed || 0, mapId: this.room.mapId, late: true });
     const send = (patch) => this.client.send('settings', patch);
     for (const b of this.box.querySelectorAll('.mode')) b.onclick = () => send({ mode: b.dataset.m });
@@ -402,7 +445,7 @@ class Lobby {
       const p = r.players.find((q) => q.id === i);
       if (!p) { html += `<div class="pl empty"><span class="dot" style="background:${SLOT_COLORS[i]}"></span><span class="nm">空位</span></div>`; continue; }
       html += `<div class="pl"><span class="dot" style="background:${SLOT_COLORS[i]}"></span><span class="nm">${esc(p.name)}${p.id === this.you ? '（你）' : ''}</span>
-        ${p.id === r.host ? '<span class="tag host">房主</span>' : ''}${p.conn === false ? '<span class="tag off">斷線</span>' : p.ready ? '<span class="tag ready">已準備</span>' : ''}
+        ${p.id === r.host ? '<span class="tag host">房主</span>' : ''}${p.conn === false ? '<span class="tag off">斷線</span>' : p.ready ? '<span class="tag ready">已準備</span>' : ''}${r.mode === 'coop' && account.enabled && !p.auth ? '<span class="tag off">未登入</span>' : ''}
         <span class="ping">${p.rtt ? `${p.rtt}ms` : ''}</span>${host && p.id !== this.you ? `<button class="grey kick" data-id="${p.id}">踢出</button>` : ''}</div>`;
     }
     box.innerHTML = html;
@@ -420,8 +463,24 @@ class Lobby {
       sb.disabled = (r.mode === 'pvp' && others.length < 1) || r.state === 'playing';
       sb.textContent = allReady ? '開始遊戲' : '開始遊戲（有人未準備）';
     }
+    this.renderResume();
     const rj = this.box.querySelector('#mp-rejoin');
     if (rj) rj.style.display = r.state === 'playing' && !this.session ? '' : 'none';
+  }
+
+  // [w5] 合作的隊伍存檔:同樣的人再組隊 → 「繼續你們上次的進度」(房主按);有人沒登入 → 提示全員登入才會存
+  renderResume() {
+    const box = this.box.querySelector('#mp-resumebox'), r = this.room;
+    if (!box || !r) return;
+    const host = r.host === this.you, t = r.team || {}, sv = t.save;
+    let html = '';
+    if (r.mode === 'coop' && r.state !== 'playing') {
+      if (sv) html = `<div class="rs-t">上次的進度：<b>${esc(coopLabel(sv.meta || {}))}</b></div>${host ? '<button class="big" id="mp-resume">繼續你們上次的進度</button><small>或按「開始遊戲」從第一夜重新開始</small>' : '<small>房主可以選擇繼續你們上次的進度</small>'}`;
+      else if (account.enabled && r.players.length >= 2 && !t.ok) html = `<small>每個人都登入 Google，才會記錄你們的進度（${r.players.filter((p) => p.auth).length}/${r.players.length} 已登入）</small>`;
+      else if (t.ok) html = '<small>每一次休息都會記錄你們的進度，下次同樣的人組隊可以接著玩</small>';
+    }
+    if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
+    box.classList.toggle('on', !!html);
   }
 
   renderChat() {

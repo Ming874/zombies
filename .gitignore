@@ -3,3 +3,6 @@ dist
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# 帳號、session、存檔(server/store.js;正式環境請把 DATA_DIR 掛在 Volume)
+data/

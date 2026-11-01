@@ -14,6 +14,10 @@ import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { ISOLATION, json, plain } from './http.js';
+import { handleAuth, googleEnabled, accountOf } from './auth.js';
+import { handleSaves } from './saves.js';
+import { flushAll, DATA_DIR, teamKey, teamInfo } from './store.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(process.env.DIST_DIR || path.join(HERE, '..', 'dist'));
@@ -104,14 +108,7 @@ const MIME = {
 };
 // 文字、glTF 幾何(.bin/.glb)、wasm、未壓縮字型與圖示;已壓縮的圖片/音訊/影片/woff 不再壓
 const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.map', '.txt', '.md', '.xml', '.csv', '.svg', '.gltf', '.glb', '.bin', '.obj', '.wasm', '.webmanifest', '.hdr', '.exr', '.ttf', '.otf', '.ico', '.wav']);
-// 跨來源隔離(SharedArrayBuffer 需要):所有回應都帶;靜態資源另外標示只供同源使用
-const ISOLATION = {
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'require-corp',
-  'Cross-Origin-Resource-Policy': 'same-origin',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-};
+// 跨來源隔離標頭(ISOLATION)在 server/http.js:所有回應都帶;靜態資源另外標示只供同源使用
 // 快取策略:Vite 產生的 /assets/*(檔名含雜湊)永久快取;入口檔(index.html、Service Worker、manifest)每次重新驗證;
 // 其他未加雜湊的資源(貼圖、模型、圖示、授權說明)快取 1 天,過期後一週內先用舊的、背景重新驗證(內容雜湊 ETag → 304)
 const CC_IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -200,15 +197,6 @@ function watchDist() {
   } catch { /* 平台不支援遞迴監看 */ }
 }
 
-function plain(res, code, text, extra = {}) {
-  res.writeHead(code, { ...ISOLATION, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...extra });
-  res.end(text);
-}
-function json(res, code, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(code, { ...ISOLATION, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-  res.end(body);
-}
 // If-None-Match 是否符合(忽略 W/ 與 -br/-gz 字尾)
 function etagMatch(header, tag) {
   if (!header) return false;
@@ -279,10 +267,11 @@ const ipCreates = new Map(); // ip → [時間戳]
 let nextConn = 1;
 
 class Conn {
-  constructor(ws, ip) {
+  constructor(ws, ip, acct = null) {
     this.id = nextConn++;
     this.ws = ws;
     this.ip = ip;
+    this.acct = acct; // 登入的帳號 { id, name }(WebSocket 升級請求的 cookie hz_sid;沒登入 = null)
     this.name = '';
     this.hello = false;
     this.born = now();
@@ -334,13 +323,23 @@ class Room {
   members() { return this.slots.filter(Boolean); }
   live() { return this.slots.filter((c) => c && !c.gone); }
   freeSlot() { for (let i = 0; i < this.max; i++) if (!this.slots[i]) return i; return -1; }
-  player(c) { return { id: c.slot, name: c.name, ready: c.ready, conn: !c.gone, rtt: c.rtt }; }
+  player(c) { return { id: c.slot, name: c.name, ready: c.ready, conn: !c.gone, rtt: c.rtt, auth: !!c.acct }; }
   info() {
     return {
       code: this.code, mode: this.mode, name: this.name, pub: this.pub, max: this.max, host: this.host, state: this.state,
       match: this.match, settings: this.settings, mapId: this.mapId, seed: this.seed, matchSeed: this.matchSeed, players: this.members().map((c) => this.player(c)),
+      team: this.teamPublic(),
     };
   }
+  // 合作的隊伍存檔:房間裡每個人都登入(2~4 人)→ key = 'coop:' + 帳號 id 排序(只在伺服器;用戶端只看到 ok 與存檔摘要)
+  team() {
+    if (this.mode !== 'coop') return { ok: false, key: null };
+    const m = this.members(), ids = m.map((c) => c.acct?.id);
+    const key = m.length >= 2 && m.length <= 4 && ids.every(Boolean) ? teamKey(ids) : null;
+    return { ok: !!key, key };
+  }
+  teamPublic() { const t = this.team(); return { ok: t.ok, save: t.ok ? teamInfo(t.key) : null }; }
+  castTeam() { this.cast({ t: 'team', team: this.teamPublic() }); }
   brief() {
     const host = this.slots[this.host];
     return { code: this.code, mode: this.mode, name: this.name || `${host?.name || '?'} 的房間`, n: this.members().length, max: this.max, state: this.state, settings: this.settings, mapId: this.mapId };
@@ -376,6 +375,7 @@ function join(c, room) {
   if (room.live().length === 1 && !room.slots[room.host]) room.host = slot;
   c.send({ t: 'joined', room: room.info(), you: slot, token: c.token });
   room.cast({ t: 'peer', p: room.player(c), join: true }, c);
+  room.castTeam();
 }
 
 function leave(c, why = 'leave') {
@@ -390,6 +390,7 @@ function leave(c, why = 'leave') {
   if (!room.members().length) { rooms.delete(room.code); log(`[room] ${room.code} 關閉`); return; }
   room.cast({ t: 'left', id: slot, why });
   if (room.host === slot) migrate(room);
+  room.castTeam();
 }
 
 // 房主轉移:挑最早加入、仍在線的玩家;沒有人在線就等(斷線者重連後會接手,逾時則房間關閉)
@@ -511,6 +512,7 @@ function onText(c, msg) {
       room.started = now();
       for (const m of room.members()) m.ready = false;
       const data = msg.data && typeof msg.data === 'object' ? msg.data : {};
+      if ('resume' in data) { const ts = room.teamPublic().save; if (ts && room.mode === 'coop') data.resume = ts.t; else delete data.resume; } // 「繼續你們上次的進度」:隊伍存檔要真的存在
       // 地圖與種子在建場景之前就送到每個人(mapId 可由房主在開始時指定)
       if ('mapId' in msg) room.mapId = mapIdOf(msg.mapId);
       room.matchSeed = room.seed ?? crypto.randomInt(1 << 30);
@@ -590,8 +592,8 @@ function onBinary(c, buf) {
   }
 }
 
-function onConnect(ws, ip) {
-  const c = new Conn(ws, ip);
+function onConnect(ws, ip, acct) {
+  const c = new Conn(ws, ip, acct);
   conns.add(c);
   ipConns.set(ip, (ipConns.get(ip) || 0) + 1);
   stat.peakConns = Math.max(stat.peakConns, conns.size);
@@ -645,6 +647,13 @@ setInterval(() => {
   for (const [ip, h] of ipCreates) { const k = h.filter((x) => t - x < 60000); if (k.length) ipCreates.set(ip, k); else ipCreates.delete(ip); }
 }, 60000).unref();
 
+// 存檔 API 用:房間代碼 → 成員的帳號、隊伍 key、房主的帳號
+function roomOf(code) {
+  const r = rooms.get(code);
+  if (!r) return null;
+  return { members: r.members().map((c) => c.acct?.id).filter(Boolean), team: r.team(), hostAcct: r.slots[r.host]?.acct?.id || null };
+}
+
 // =====================================================================
 // HTTP 伺服器
 // =====================================================================
@@ -652,6 +661,13 @@ const server = http.createServer((req, res) => {
   try {
     const q = req.url.indexOf('?');
     const p = q < 0 ? req.url : req.url.slice(0, q);
+    if (p.length > 1024) return plain(res, 414, 'URI Too Long');
+    if (p.startsWith('/auth/') || p === '/api/me' || p.startsWith('/api/avatar/')) { // 登入(server/auth.js)
+      if (handleAuth(req, res, p, new URLSearchParams(q < 0 ? '' : req.url.slice(q + 1)))) return;
+    }
+    if (p === '/api/save' || p.startsWith('/api/save/') || p.startsWith('/api/team/')) { // 存檔(server/saves.js)
+      if (handleSaves(req, res, p, roomOf, (code) => rooms.get(code)?.castTeam())) return;
+    }
     if (p === '/healthz') return json(res, 200, { ok: true, uptime: Math.round((now() - stat.started) / 1000), files: files.size, conns: conns.size, rooms: rooms.size });
     if (p === '/api/rooms') return json(res, 200, { rooms: publicRooms() });
     if (p === '/api/stats') {
@@ -662,7 +678,6 @@ const server = http.createServer((req, res) => {
       });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return plain(res, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
-    if (p.length > 1024) return plain(res, 414, 'URI Too Long');
     serveStatic(req, res, p);
   } catch (e) {
     log('[http] 錯誤', e);
@@ -684,12 +699,15 @@ server.on('upgrade', (req, socket, head) => {
     return socket.destroy();
   }
   socket.setNoDelay(true);
-  wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, ip));
+  const a = accountOf(req); // 升級請求帶著 cookie:這條連線是哪個帳號
+  const acct = a ? { id: a.id, name: a.name } : null;
+  wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, ip, acct));
 });
 
 reindex().then(() => {
   server.listen(PORT, HOST, () => {
     log(`[server] http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  ws:/ws  dist=${DIST}${files.size ? '' : '(沒有建置檔,僅提供 WebSocket)'}  [${PROD ? 'production' : 'development'}]`);
+    log(`[server] 資料 ${DATA_DIR} · Google 登入${googleEnabled() ? '已設定' : '未設定(GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)'}${process.env.AUTH_DEV === '1' ? ' · 假登入 /auth/dev 已開啟(AUTH_DEV=1,只供測試)' : ''}`);
     watchDist();
   });
 });
@@ -698,7 +716,9 @@ function shutdown(sig) {
   log(`[server] 收到 ${sig},關閉中…`);
   for (const c of conns) { try { c.send({ t: 'error', code: 'restart', msg: '伺服器重新啟動中,請稍後重新連線' }); c.ws?.close(1001, 'restart'); } catch { /* 忽略 */ } }
   server.close();
+  flushAll(); // 帳號、session、存檔:節流中的變更立刻寫完
   setTimeout(() => process.exit(0), 800).unref();
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('exit', () => flushAll());
 process.on('SIGINT', () => shutdown('SIGINT'));

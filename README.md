@@ -84,7 +84,7 @@ npm start            # 正式環境:node server/index.js 同時提供 dist/ 靜�
 ```
 
 - 正式伺服器會送出跨來源隔離標頭(COOP / COEP),讓物理 Worker 可以使用 SharedArrayBuffer;開發伺服器(vite.config.js)也一樣。
-- 健康檢查:`/healthz`;公開房間列表:`/api/rooms`。
+- 健康檢查:`/healthz`;公開房間列表:`/api/rooms`。登入與存檔見下面的〈登入與存檔點〉。
 - 網址參數(除錯用):`?physics=off|main|worker`、`?blockout`(灰盒場景)、`?room=代碼`(直接加入房間)。
 
 ### 效能:遊戲中偶爾整個畫面停 1~3 秒
@@ -107,6 +107,28 @@ HUD、字幕、提示等網頁元素刻意不用 CSS `filter` / `backdrop-filter
 - **對戰死鬥**(2–8 人):各自為戰,先到擊殺上限或時間到結束,可選擇加入零星殭屍騷擾。
 - 由房主的瀏覽器模擬殭屍與回合,伺服器只負責房間與轉發;房主離線時自動轉移。
 
+## 登入與存檔點
+
+- **Google 登入**:主選單右上角「用 Google 登入」。走伺服器端的 OAuth 2.0 授權碼流程(整頁重新導向 + PKCE;頁面開了 COOP/COEP,不能用 Google 的按鈕或彈出視窗)。登入後頭像和名字顯示在主選單。
+- **存檔點(單人)**:每一波打完、進入休息時自動存一份。主選單多一個「繼續(第 N 波之後・封院第 N 天)」,進去就停在那一次休息(商店開著),下一波是 N+1。按「新的一夜」會先問要不要覆蓋存檔點。沒有登入時存在這台電腦的瀏覽器(localStorage)。
+- **雙人(合作)進度**:房間裡每個人都登入時,房主每次休息把共用的回合狀態存成隊伍存檔(key = 兩人的帳號 id 排序),每個人的裝備存在自己的帳號下。同樣的人再組隊,大廳會提示「繼續你們上次的進度」,房主按下去就照存檔恢復。
+- 存了什麼:波數、難度、分數與金幣、武器/彈藥/改裝、護甲、手榴彈、醫療包、生命、目標進度與劇情旗標、道具、門鎖、筆記本這一局拿到的卡、207 的油量、封院天數、魂火。抽屜開關、地上的屍體、這一波的殭屍不存。
+
+### 伺服器設定(環境變數)
+
+| 變數 | 說明 |
+|---|---|
+| `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` | Google Cloud Console 的 OAuth 用戶端(網頁應用程式)。沒設定時不顯示登入按鈕,`/api/me` 回 `{ enabled: false }`,遊戲照常可玩(存檔只在瀏覽器) |
+| `PUBLIC_URL` | 選填。網站的正式網址(例 `https://zombies.zeabur.app`);不設定時依請求的 Host 與 `x-forwarded-proto` 組出重新導向 URI |
+| `DATA_DIR` | 帳號、session、存檔的 JSON 檔放哪裡(預設 `<repo>/data`,已加進 .gitignore) |
+| `AUTH_DEV` | 只給測試用:設成 `1` 才開放 `/auth/dev?name=xxx` 假登入。**正式環境不要設** |
+
+Google Cloud Console:建立「OAuth 用戶端 ID」→ 應用程式類型選「網頁應用程式」→「已授權的重新導向 URI」填 `https://<你的網域>/auth/google/callback`(本機開發另外加 `http://localhost:5173/auth/google/callback` 或 `http://localhost:8787/auth/google/callback`)。
+
+**Zeabur 一定要掛 Volume**:容器每次重新部署都是新的檔案系統。在服務的「Volumes」加一個掛載路徑(例如 `/data`),再把環境變數 `DATA_DIR` 設成同一個路徑;沒有掛的話,每次部署帳號與存檔都會消失。
+
+存檔 API(都要登入):`GET/PUT/DELETE /api/save/<slot>`(每份 128 KB、每個帳號 10 份)、`GET/PUT /api/team/<房間代碼>`(隊伍存檔,房主寫)、`GET/PUT /api/team/<房間代碼>/gear`(自己的裝備)。寫檔先寫暫存檔再改名(不會寫壞),同一個檔案 1 秒內的變更合併成一次寫入。測試:`node --test server/test/auth.test.mjs server/test/saves.test.mjs`(假的 token 端點,不連 Google)。
+
 ## 專案結構
 
 ```
@@ -124,6 +146,7 @@ src/physics/           Rapier 物理(布娃娃、動態道具)
 src/net/               多人連線(大廳、同步、合作/對戰)
 src/sys/               Worker 池、畫質管理、效能面板
 server/index.js        靜態檔 + WebSocket 房間伺服器
+server/auth.js         Google 登入(OAuth)、session;server/store.js 帳號與存檔的 JSON 檔;server/saves.js 存檔 API
 public/                貼圖、模型、圖示、Service Worker、授權署名
 ```
 

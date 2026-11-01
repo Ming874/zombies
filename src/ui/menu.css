@@ -154,3 +154,29 @@
 .mn-diff { flex-wrap: wrap; } .mn-diff .mn-mini { font-size: 13px; letter-spacing: 2px; padding: 6px 10px; }
 .mn-diff .mn-mini.on { color: #fff; border-color: rgba(224, 71, 58, .85); background: rgba(224, 71, 58, .16); }
 .mn-diffsub { margin: 6px 0 0 22px; font-size: 13px; color: rgba(227, 220, 203, .55); min-height: 1.2em; }
+/* [w5] 帳號列(Google 登入)、存檔點「繼續」、確認框 */
+.mn-acct { position: absolute; right: max(4vw, 24px); top: 88px; z-index: 2; display: none; align-items: center; justify-content: flex-end; gap: 10px; font-size: 13px; color: var(--mn-muted);
+  letter-spacing: 1px; flex-wrap: wrap; max-width: min(420px, 40vw); text-align: right; }
+.mn-acct.on { display: flex; }
+#menu.mo-reveal .mn-acct { animation: mo-fade 1s var(--mo-out) 1.3s backwards; }
+.mn-acct > small { flex-basis: 100%; }
+.mn-acct small { font-size: 12px; color: var(--mn-muted); letter-spacing: 1px; }
+.mn-google { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; letter-spacing: 2px; padding: 7px 12px; }
+.mn-google svg { width: 16px; height: 16px; flex: none; }
+.mn-av { position: relative; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; flex: none; background: #3a2a22; border: 1px solid rgba(255, 255, 255, .22);
+  display: inline-flex; align-items: center; justify-content: center; }
+.mn-av b { font: 700 14px "Microsoft JhengHei", sans-serif; color: #e8d9b8; }
+.mn-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mn-who { display: flex; flex-direction: column; line-height: 1.25; text-align: left; }
+.mn-who b { color: var(--mn-text); font-size: 14px; letter-spacing: 2px; font-weight: 700; }
+.mn-link { font: 700 12px "Microsoft JhengHei", sans-serif; letter-spacing: 2px; color: var(--mn-muted); background: none; border: 1px solid rgba(255, 255, 255, .14); padding: 4px 10px; cursor: pointer; margin-left: 4px; }
+.mn-link:hover, .mn-link:focus-visible { color: #fff; border-color: rgba(255, 255, 255, .4); outline: none; }
+.mn-link:disabled, .mn-google:disabled { opacity: .55; cursor: default; }
+.mn-flash { flex-basis: 100%; font-size: 12.5px; color: #e8a090; letter-spacing: 1px; }
+#mnConfirm { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, .72); color: var(--mn-text);
+  font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif; }
+#mnConfirm.on { display: flex; }
+.mn-confirm { max-width: min(520px, 92vw); }
+.mn-confirm h2 { margin: 0 0 10px; font-size: 26px; letter-spacing: 8px; }
+.mn-confirm p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.7; color: #cfc8b8; letter-spacing: 1px; }
+#deadCont small { display: block; font-size: 11px; letter-spacing: 3px; color: rgba(243, 234, 214, .7); font-weight: 400; margin-top: 2px; }

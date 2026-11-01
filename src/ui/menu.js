@@ -2,6 +2,7 @@ import './menu.css';
 import { settings } from './settings.js';
 import { loadBest, DIFF, DIFF_ORDER } from '../game/waves.js';
 import { sfx } from '../audio.js';
+import { account } from '../sys/account.js';
 
 // 主選單(標題畫面)、暫停選單、死亡結算、設定/操作說明/製作與授權面板。
 // 沿用 index.html 的 #menu / #pause / #dead 容器與 #startBtn / #resumeBtn / #restartBtn(input.js 會綁定),內容改由這裡建立。
@@ -10,6 +11,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const HEART = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M16 27.5S4.5 20 4.5 12.3C4.5 8.6 7.3 6 10.6 6c2.3 0 4.3 1.3 5.4 3.2C17.1 7.3 19.1 6 21.4 6c3.3 0 6.1 2.6 6.1 6.3C27.5 20 16 27.5 16 27.5z"/><path fill="currentColor" d="M15 1.5h2v4h3v2h-3v5h-2v-5h-3v-2h3z"/><path fill="none" stroke="currentColor" stroke-width="1.2" opacity=".7" d="M11 13.5c1.5 2.5 3 3.5 5 3.5s3.5-1 5-3.5"/></svg>';
 const pct = (v) => `${Math.round(v * 100)}%`;
+// Google 的「G」標誌(登入按鈕;四色)
+const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.3.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.2-13.5-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>';
 // 結算的擊殺分類:全部 11 種(追獵者不會被打死,不列)
 const TYPE_ORDER = ['walker', 'runner', 'crawler', 'bloater', 'screamer', 'stalker', 'surgeon', 'burned', 'straitjacket', 'hazmat', 'brute'];
 const TYPE_NAMES = { walker: '活屍', runner: '快跑的', crawler: '爬的', bloater: '會爆的', brute: '巨屍', screamer: '尖叫的', stalker: '潛行的', surgeon: '手術者', burned: '焦屍', hazmat: '清理隊員', straitjacket: '束縛病患' };
@@ -90,6 +93,7 @@ export class Menu {
       <div class="mn-bootmark">等天光<small>暖機中</small></div>
       <div class="mn-nosig" aria-hidden="true">CH 03<small>無訊號</small></div>
       <div class="mn-osd" aria-hidden="true"><span class="rec"><i></i>REC</span><span class="clk">2003/05/12 (一) 23:59:13</span><span class="cam">CAM 03 · 1F 大廳</span></div>
+      <div class="mn-acct" id="menuAcct"></div>
       <div class="mn-wrap">
         <div class="mn-over">${HEART}BEFORE DAYBREAK · SACRED HEART HOSPITAL</div>
         <h1 class="mn-title"><span>等</span><span>天</span><span>光</span></h1>
@@ -113,7 +117,7 @@ export class Menu {
       </div>
       <div class="mn-stage" id="menuStage"></div>
       <div class="mn-side"><div class="mn-sideh">操作</div>${keyGrid(KEYS, 'compact')}</div>
-      <div class="mn-foot">建議戴上耳機並全螢幕遊玩 · 所有設定與最佳紀錄只存在這台電腦的瀏覽器<br />等天光 Before Daybreak · 一款網頁 3D 恐怖射擊遊戲</div>`;
+      <div class="mn-foot">建議戴上耳機並全螢幕遊玩 · 設定與最佳紀錄存在這台電腦的瀏覽器；登入後，存檔點存在你的帳號<br />等天光 Before Daybreak · 一款網頁 3D 恐怖射擊遊戲</div>`;
     m.addEventListener('click', (e) => {
       const b = e.target.closest('[data-p]');
       if (b) { sfx.uiClick(); this.openPanel(b.dataset.p); return; }
@@ -126,6 +130,7 @@ export class Menu {
     this.stage = $('menuStage'); // 空的演出區(主選單右側中央),之後的抽地圖動畫可以放這裡
     this.showBest();
     this._diffRow(); // [w4] 難度(存在 settings.difficulty)
+    this._account(); // [w5] Google 登入(src/sys/account.js)
     // 回到主選單時更新最佳紀錄
     new MutationObserver(() => { if (m.classList.contains('on')) this.showBest(); }).observe(m, { attributes: true, attributeFilter: ['class'] });
   }
@@ -170,6 +175,92 @@ export class Menu {
     paint();
   }
 
+  // [w5] 帳號列:登入後顯示頭像和名字;伺服器沒有設定 Google 登入時整列隱藏
+  _account() {
+    const el = $('menuAcct');
+    if (!el) return;
+    const paint = () => {
+      const u = account.user;
+      el.classList.toggle('on', !!u || account.enabled);
+      if (u) {
+        const ini = esc(Array.from(u.name || '?')[0] || '?');
+        el.innerHTML = `<span class="mn-av"><b>${ini}</b>${u.pic ? `<img src="${esc(u.pic)}" alt="" referrerpolicy="no-referrer" />` : ''}</span><span class="mn-who"><b>${esc(u.name)}</b><small>${u.dev ? '測試帳號 · ' : ''}存檔點存在你的帳號</small></span><button class="mn-link" data-a="out">登出</button>`;
+        el.querySelector('img')?.addEventListener('error', (e) => e.target.remove());
+      } else if (account.enabled) {
+        el.innerHTML = `<button class="mn-mini mn-google" data-a="in">${GOOGLE_G}用 Google 登入</button><small>記錄進度，下次從存檔點繼續（也支援雙人）</small>`;
+      } else el.innerHTML = '';
+      if (this._flash) { const f = document.createElement('div'); f.className = 'mn-flash'; f.textContent = this._flash; el.appendChild(f); }
+    };
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-a]');
+      if (!b) return;
+      sfx.uiClick();
+      if (b.dataset.a === 'in') { b.disabled = true; b.lastChild.textContent = '前往 Google…'; account.login(); }
+      else if (b.dataset.a === 'out') { b.disabled = true; account.logout(); }
+    });
+    const f = account.flash;
+    if (f) { this._flash = f === 'cancel' ? '已取消登入' : '登入失敗，請再試一次'; setTimeout(() => { this._flash = null; paint(); }, 8000); }
+    account.on(paint);
+    paint();
+    account.refresh();
+  }
+
+  // [w5] 存檔點(src/sys/save.js):info = { sub } 有存檔 → 主選單多一個「繼續」(放在最上面)、「單人」改成「新的一夜」;
+  //      死亡畫面多一個「從存檔點繼續」。按下去呼叫 this.onContinue('menu' | 'dead')
+  setSave(info) {
+    const start = $('startBtn'), restart = $('restartBtn'), dc = $('deadCont');
+    let b = $('continueBtn');
+    if (!info) {
+      b?.remove();
+      start?.classList.add('primary');
+      if (start?.firstChild && !start.classList.contains('loading')) start.firstChild.textContent = '單人';
+      if (dc) dc.hidden = true;
+      if (restart) { restart.textContent = '再試一次'; restart.classList.add('primary'); }
+      return;
+    }
+    if (!b && start) {
+      b = document.createElement('button');
+      b.id = 'continueBtn';
+      b.className = 'mn-btn primary';
+      b.addEventListener('click', () => { sfx.uiClick(); this.onContinue?.('menu'); });
+      start.before(b);
+    }
+    if (b) b.innerHTML = `繼續<small>${esc(info.sub || '')}</small>`;
+    start?.classList.remove('primary');
+    if (start?.firstChild && !start.classList.contains('loading')) start.firstChild.textContent = '新的一夜';
+    if (dc) { dc.hidden = false; dc.querySelector('small').textContent = info.sub || ''; }
+    if (restart) { restart.textContent = '新的一夜'; restart.classList.remove('primary'); }
+  }
+
+  // [w5] 確認框(開始新的一夜要覆蓋存檔點時):按「確定」在點擊當下呼叫 onOk(滑鼠鎖定需要使用者手勢)
+  confirm({ title = '確定嗎？', text = '', ok = '確定', cancel = '取消' } = {}, onOk) {
+    let el = $('mnConfirm');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mnConfirm';
+      document.body.appendChild(el);
+      el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
+    }
+    el.innerHTML = `<div class="mn-card mn-confirm" role="dialog" aria-modal="true"><h2></h2><p></p><div class="mn-btns"><button class="mn-btn primary" data-a="ok"></button><button class="mn-btn" data-a="no"></button></div></div>`;
+    el.querySelector('h2').textContent = title;
+    el.querySelector('p').textContent = text;
+    el.querySelector('[data-a="ok"]').textContent = ok;
+    el.querySelector('[data-a="no"]').textContent = cancel;
+    const key = (e) => { if (e.code === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } };
+    const close = () => { el.classList.remove('on'); removeEventListener('keydown', key, true); };
+    el.querySelector('.mn-card').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const b = e.target.closest('[data-a]');
+      if (!b) return;
+      sfx.uiClick();
+      close();
+      if (b.dataset.a === 'ok') onOk?.();
+    });
+    addEventListener('keydown', key, true);
+    el.classList.add('on');
+    el.querySelector('[data-a="no"]').focus();
+  }
+
   showBest() {
     const b = loadBest(), el = $('menuBest');
     if (!el) return;
@@ -212,11 +303,13 @@ export class Menu {
         <h1>你倒下了</h1>
         <div id="deadinfo"></div>
         <div class="mn-btns">
+          <button class="mn-btn primary" id="deadCont" hidden>從存檔點繼續<small></small></button>
           <button class="mn-btn primary" id="restartBtn">再試一次</button>
           <button class="mn-btn" data-act="quit">回到主選單</button>
         </div>
       </div>`;
     d.querySelector('[data-act="quit"]').addEventListener('click', () => { sfx.uiClick(); this.game?.quitToMenu(); });
+    $('deadCont').addEventListener('click', (e) => { e.stopPropagation(); sfx.uiClick(); this.onContinue?.('dead'); });
   }
 
   showDeath(s) {

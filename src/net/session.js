@@ -91,6 +91,7 @@ export class NetSession {
     this.seed = start.seed || 1;
     this.mapId = start.mapId || null; // 房間指定的地圖(多地圖;目前只有一張)
     this.late = !!start.late;
+    this.resume = start.resume || null; // [w5] 從隊伍存檔繼續(src/sys/save.js loadTeam;房主在 coop.begin() 照它進休息)
     this.settings = start.room.settings || {};
     this.remotes = new Map();
     this.hooks = [];
