@@ -173,3 +173,10 @@
 .mn-link:hover, .mn-link:focus-visible { color: #fff; border-color: rgba(255, 255, 255, .4); outline: none; }
 .mn-link:disabled, .mn-google:disabled { opacity: .55; cursor: default; }
 .mn-flash { flex-basis: 100%; font-size: 12.5px; color: #e8a090; letter-spacing: 1px; }
+#mnConfirm { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, .72); color: var(--mn-text);
+  font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif; }
+#mnConfirm.on { display: flex; }
+.mn-confirm { max-width: min(520px, 92vw); }
+.mn-confirm h2 { margin: 0 0 10px; font-size: 26px; letter-spacing: 8px; }
+.mn-confirm p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.7; color: #cfc8b8; letter-spacing: 1px; }
+#deadCont small { display: block; font-size: 11px; letter-spacing: 3px; color: rgba(243, 234, 214, .7); font-weight: 400; margin-top: 2px; }

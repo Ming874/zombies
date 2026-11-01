@@ -4,6 +4,7 @@ import { NetSession } from './session.js';
 import { survivorVariant, survivorReady } from '../zombies/model.js';
 import { loadSurvivors } from '../zombies/realistic.js';
 import { resume as resumeAudio, sfx } from '../audio.js';
+import { installSave } from '../sys/save.js';
 
 // 主選單的多人入口:暱稱、建立房間(合作生存 / 對戰死鬥與選項)、輸入代碼加入、公開房間列表、
 // 房間等待畫面(玩家列表、準備、房主開始/踢人/改設定、聊天、邀請連結),並在開始時建立 NetSession。
@@ -22,6 +23,7 @@ export function initNet(game) {
   const lobby = new Lobby(game);
   lobby.mountEntry();
   window.__net = lobby;
+  try { installSave(game); } catch (e) { console.warn('[save] install', e); } // [w5] 存檔點(單人自動存、主選單「繼續」;合作的隊伍存檔也在這裡)
   return lobby;
 }
 

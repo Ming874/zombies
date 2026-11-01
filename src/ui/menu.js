@@ -205,6 +205,62 @@ export class Menu {
     account.refresh();
   }
 
+  // [w5] 存檔點(src/sys/save.js):info = { sub } 有存檔 → 主選單多一個「繼續」(放在最上面)、「單人」改成「新的一夜」;
+  //      死亡畫面多一個「從存檔點繼續」。按下去呼叫 this.onContinue('menu' | 'dead')
+  setSave(info) {
+    const start = $('startBtn'), restart = $('restartBtn'), dc = $('deadCont');
+    let b = $('continueBtn');
+    if (!info) {
+      b?.remove();
+      start?.classList.add('primary');
+      if (start?.firstChild && !start.classList.contains('loading')) start.firstChild.textContent = '單人';
+      if (dc) dc.hidden = true;
+      if (restart) { restart.textContent = '再試一次'; restart.classList.add('primary'); }
+      return;
+    }
+    if (!b && start) {
+      b = document.createElement('button');
+      b.id = 'continueBtn';
+      b.className = 'mn-btn primary';
+      b.addEventListener('click', () => { sfx.uiClick(); this.onContinue?.('menu'); });
+      start.before(b);
+    }
+    if (b) b.innerHTML = `繼續<small>${esc(info.sub || '')}</small>`;
+    start?.classList.remove('primary');
+    if (start?.firstChild && !start.classList.contains('loading')) start.firstChild.textContent = '新的一夜';
+    if (dc) { dc.hidden = false; dc.querySelector('small').textContent = info.sub || ''; }
+    if (restart) { restart.textContent = '新的一夜'; restart.classList.remove('primary'); }
+  }
+
+  // [w5] 確認框(開始新的一夜要覆蓋存檔點時):按「確定」在點擊當下呼叫 onOk(滑鼠鎖定需要使用者手勢)
+  confirm({ title = '確定嗎？', text = '', ok = '確定', cancel = '取消' } = {}, onOk) {
+    let el = $('mnConfirm');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mnConfirm';
+      document.body.appendChild(el);
+      el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
+    }
+    el.innerHTML = `<div class="mn-card mn-confirm" role="dialog" aria-modal="true"><h2></h2><p></p><div class="mn-btns"><button class="mn-btn primary" data-a="ok"></button><button class="mn-btn" data-a="no"></button></div></div>`;
+    el.querySelector('h2').textContent = title;
+    el.querySelector('p').textContent = text;
+    el.querySelector('[data-a="ok"]').textContent = ok;
+    el.querySelector('[data-a="no"]').textContent = cancel;
+    const key = (e) => { if (e.code === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } };
+    const close = () => { el.classList.remove('on'); removeEventListener('keydown', key, true); };
+    el.querySelector('.mn-card').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const b = e.target.closest('[data-a]');
+      if (!b) return;
+      sfx.uiClick();
+      close();
+      if (b.dataset.a === 'ok') onOk?.();
+    });
+    addEventListener('keydown', key, true);
+    el.classList.add('on');
+    el.querySelector('[data-a="no"]').focus();
+  }
+
   showBest() {
     const b = loadBest(), el = $('menuBest');
     if (!el) return;
@@ -247,11 +303,13 @@ export class Menu {
         <h1>你倒下了</h1>
         <div id="deadinfo"></div>
         <div class="mn-btns">
+          <button class="mn-btn primary" id="deadCont" hidden>從存檔點繼續<small></small></button>
           <button class="mn-btn primary" id="restartBtn">再試一次</button>
           <button class="mn-btn" data-act="quit">回到主選單</button>
         </div>
       </div>`;
     d.querySelector('[data-act="quit"]').addEventListener('click', () => { sfx.uiClick(); this.game?.quitToMenu(); });
+    $('deadCont').addEventListener('click', (e) => { e.stopPropagation(); sfx.uiClick(); this.onContinue?.('dead'); });
   }
 
   showDeath(s) {
