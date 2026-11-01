@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { alphaGuard } from './gbuf.js';
 import './pcss.js'; // 柔和半影的 ShaderChunk 修改(要在任何 shader 編譯之前)
-import './lightcull.js'; // 光源範圍外的像素跳過 RE_Direct(ShaderChunk 修改,同上)
 import * as S from './shaders.js';
 import { WET } from '../map/weather/wet.js';
 import { Occluder } from './occlude.js';
