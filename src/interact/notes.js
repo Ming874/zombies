@@ -7,7 +7,7 @@
 //
 // 欄位：
 //   id        'H01' 或 'h.s01'
-//   kind      'note' 紙本 | 'letter' 信 | 'log' 紀錄 | 'chart' 病歷 | 'photo' 照片 | 'tape' 錄音 | 'report' 通報單
+//   kind      閱讀畫面的類別（src/interact/ui.js KIND）：note 紙條 | letter 信 | log 紀錄 | logbook 登記簿 | chart 病歷 | photo 照片 | polaroid 拍立得 | tape 錄音帶 | report 通報單 | poster 告示 | whiteboard 白板 | drawing 蠟筆畫 | video 錄影帶
 //   title     閱讀畫面的標題
 //   author    誰寫的或誰錄的（沒有名字的人寫職稱；五人卡司以外不出現具名角色）
 //   date      文件上看得到的日期寫法（2003 年封院期間的表單與手寫都用「封院第 N 天」；不用真實的月日,HISTORY §8）
@@ -303,7 +303,7 @@ export const NOTES = [
   },
   {
     id: 'h.s03',
-    kind: 'note',
+    kind: 'whiteboard',
     title: '冰櫃使用登記',
     author: '大新清理隊',
     date: '七月初三',
@@ -326,7 +326,7 @@ export const NOTES = [
   },
   {
     id: 'h.s12',
-    kind: 'note',
+    kind: 'poster',
     title: '停電通知',
     author: '大新 維修組',
     date: '七月初二',
@@ -352,7 +352,7 @@ export const NOTES = [
   // ==================================================================== 推理：207 的門與 2003 年的那一夜（2F 護理站）
   {
     id: 'h.s04',
-    kind: 'log',
+    kind: 'logbook',
     title: '207 進出登記・2003',
     author: '2F 護理站',
     date: '封院第 7 天',
@@ -389,7 +389,7 @@ export const NOTES = [
   },
   {
     id: 'h.s06',
-    kind: 'note',
+    kind: 'whiteboard',
     title: '2F 護理站白板・2003',
     author: '林秀英',
     date: '封院第 7 天',
@@ -476,7 +476,7 @@ export const NOTES = [
   },
   {
     id: 'h.s24',
-    kind: 'note',
+    kind: 'poster',
     title: '住院病患須知',
     author: '2F 護理站',
     date: '封院期間修訂',
@@ -554,7 +554,7 @@ export const NOTES = [
   },
   {
     id: 'h.s13',
-    kind: 'note',
+    kind: 'poster',
     title: '看守 207 的保全排班表',
     author: '大新保全',
     date: '2024',
@@ -599,7 +599,7 @@ export const NOTES = [
   },
   {
     id: 'h.s21',
-    kind: 'log',
+    kind: 'logbook',
     title: '醫院廣播紀錄簿・2003',
     author: '廣播機房',
     date: '封院第 5～7 天',
@@ -687,7 +687,7 @@ export const NOTES = [
   },
   {
     id: 'h.s17',
-    kind: 'note',
+    kind: 'drawing',
     title: '蠟筆畫・護理長阿嬤講故事',
     author: '小兒病房的孩子（沒有署名）',
     date: '2003',
@@ -705,7 +705,7 @@ export const NOTES = [
   },
   {
     id: 'h.s18',
-    kind: 'photo',
+    kind: 'polaroid',
     title: '拍立得・頂樓水塔',
     author: '（沒有署名）',
     date: '封院第 3 天',
