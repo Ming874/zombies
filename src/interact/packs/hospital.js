@@ -25,7 +25,7 @@ const items = [
   // outer:連通往屋頂的外門也鎖(不然從逃生梯上屋頂就能走進三樓走廊)
   { id: 'h.lock.3f', kind: 'lock', zone: 'f3_corridor', door: 'f3_corridor', outer: true, item: null, flag: 'h.area.3f', text: '三樓 · 門鎖沒有電（先修好 B1 的配電盤）', unlockText: '',
     why: '大新的三樓門禁接在配電盤上；七月初一招魂燈第一次點亮時跳電，門全鎖著。' },
-  { id: 'h.lock.morgue', kind: 'lock', zone: 'b1_morgue', door: 'b1_morgue', item: null, flag: 'h.area.morgue', text: '太平間 · 被大新清理隊鎖住了（先去二樓查 207 的門）', unlockText: '',
+  { id: 'h.lock.morgue', kind: 'lock', zone: 'b1_morgue', door: 'b1_morgue', item: null, flag: 'h.area.morgue', text: '太平間 · 大新清理隊上了鎖（先去二樓查 207 的門怎麼開）', unlockText: '',
     why: '大新清理隊鎖了太平間（裡面有甦醒失敗的人）；工務的保險絲備品在 5 號冰櫃。' },
   // ================================================================== 目標鏈:H 檔案
   { id: 'h.ix.h01', kind: 'note', zone: 'f1_lobby', mount: 'floor', near: null, note: 'H01', style: 'paper',
@@ -82,13 +82,13 @@ const items = [
     why: 'B1 的配電盤。七月初一子時招魂燈第一次點亮的電湧燒斷了三支主保險絲；裝回去會很吵（觸發式誘集）。容量只夠兩條迴路時，要開監控室就得先關掉 207 的迴路，或先完成運油支線。' },
   { id: 'h.ix.oil', kind: 'pickup', zone: 'b1_boiler', mount: 'floor', near: 'corner', item: 'oil',
     why: '鍋爐房的柴油桶；北側後勤巷那台 207 專用發電機（2003 年解封後王醫師叫工務裝的）燒的就是這個（支線「207 的燈」）。' },
-  { id: 'h.ix.lock.monitor', kind: 'lock', zone: 'f3_monitor', mount: 'wall', near: 'door', door: 'f3_monitor', item: 'card.security', flag: null, text: '監控室 · 要刷門禁卡（第 5 波的夜班組長身上有）',
+  { id: 'h.ix.lock.monitor', kind: 'lock', zone: 'f3_monitor', mount: 'wall', near: 'door', door: 'f3_monitor', item: 'card.security', flag: null, text: '監控室 · 要刷門禁卡（卡在第 5 波的夜班組長身上）',
     why: '大新保全管的監控室，要門禁卡；門禁卡在第 5 波首領「大新照護員　夜班組長」身上。' },
-  { id: 'h.ix.keypad', kind: 'keypad', zone: 'f3_monitor', mount: 'wall', near: null, code: '0924', title: '3F 監控室 · 207 的電子鎖', sub: '提示：207 那位病人住院那天（月日，4 位數）', onSolve: { flag: 'h.207.elock' }, wrong: '密碼不對。', power: 'h.pwr.monitor',
+  { id: 'h.ix.keypad', kind: 'keypad', zone: 'f3_monitor', mount: 'wall', near: null, code: '0924', title: '3F 監控室 · 207 的電子鎖', sub: '提示：207 的病人住進來的那一天（月日，4 位數）', onSolve: { flag: 'h.207.elock' }, wrong: '密碼不對。', power: 'h.pwr.monitor',
     why: '207 的電子鎖由監控室控制；授權碼是「她來的那一天」：1999/9/24。鍵盤只解開電子鎖(h.207.elock);門內的旋鈕要等頭七(src/story/climax.js)。' },
   { id: 'h.ix.cctv', kind: 'cctv', zone: 'f3_monitor', mount: 'surface', near: null, power: 'h.pwr.monitor',
     why: '監控室主控台的錄影機，卡著封院第 7 天 CAM-07 的帶子（hc.05）。' },
-  { id: 'h.ix.lock.207', kind: 'lock', zone: 'f2_ward_207', mount: 'wall', near: 'door', door: 'f2_ward_207', item: null, flag: 'h.207.unlock', text: '207 · 鎖住了（董事長下令，不准打開）', unlockText: '門外的電子鎖、門內的旋鈕，都開了。',
+  { id: 'h.ix.lock.207', kind: 'lock', zone: 'f2_ward_207', mount: 'wall', near: 'door', door: 'f2_ward_207', item: null, flag: 'h.207.unlock', text: '207 · 鎖住了（董事長下令，不准打開）', unlockText: '門外的電子鎖、門裡的旋鈕，都開了。',
     why: '大新 2024 年在 207 門邊加裝的電子鎖（封存）；門玻璃內側是阿嬤封院第 7 天用口紅反寫的「莫開門」（hc.15）。' },
 
   // ================================================================== 2F 護理站(林秀英)
