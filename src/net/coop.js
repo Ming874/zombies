@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { sfx } from '../audio.js';
 import { F, NONE } from './protocol.js';
+import { restoreCoop } from '../sys/save.js';
 
 // 合作生存:房主跑回合/出怪,廣播回合開始('rs')與結束('re');其他人照著切換階段。
 // 回合間是商店階段(phase 'shop',商店捲門拉起):每人用自己的金幣在實體商店購買;按 N 準備 / 取消,
@@ -180,7 +181,13 @@ export class CoopMode {
   begin() {
     const s = this.s, g = this.g;
     if (s.isHost) {
-      g.startRound(1);
+      // [w5] 從隊伍存檔繼續:停在第 N 波之後的休息(商店開著),用中途加入的 'sync' 把回合帶給大家;下一波 N+1
+      if (s.resume && restoreCoop(g, s.resume, true)) {
+        this.timer = REST_MP;
+        s.send('sync', { n: g.round, c: 0, total: 0, q: '', phase: 'shop', t: REST_MP, v: [], coins: 0 });
+        s.hud.center('從存檔點繼續', 2200);
+        g.__restored = { t: s.resume.t, round: g.round }; // 測試用
+      } else g.startRound(1);
     } else {
       // 等房主的 'rs' / 'sync'(不屬於任何回合階段,本機不會自己出怪或倒數)
       g.phase = 'wait';

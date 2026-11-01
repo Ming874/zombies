@@ -72,3 +72,9 @@
 #mp-lobby .chatbox input { width: 100%; box-sizing: border-box; border: none !important; border-top: 1px solid #2a2926 !important; font-size: 14px !important; }
 @media (max-width: 760px) { #mp-lobby .cols { grid-template-columns: 1fr; } #mp-lobby .modes { grid-template-columns: 1fr; } #mp-lobby .list .r { grid-template-columns: 90px 1fr 70px; } #mp-lobby .list .r span:nth-child(4), #mp-lobby .list .r span:nth-child(5) { display: none; } }
 @media (max-height: 640px) { #mp-lobby .box { padding: 14px 20px 12px; } #mp-lobby h3 { margin-top: 10px; } #mp-lobby .roomcode { font-size: 30px; } }
+/* [w5] 合作的隊伍存檔:「繼續你們上次的進度」 */
+#mp-lobby .resume { display: none; margin: 14px 0 0; padding: 10px 14px; border: 1px solid #3c3a36; background: rgba(217, 180, 90, .06); flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+#mp-lobby .resume.on { display: flex; }
+#mp-lobby .resume .rs-t { flex-basis: 100%; font-size: 14px; color: var(--mpl-text); letter-spacing: 1px; }
+#mp-lobby .resume .rs-t b { color: var(--mpl-gold); font-weight: 700; }
+#mp-lobby .resume small { font-size: 12.5px; color: var(--mpl-muted); letter-spacing: 1px; }
