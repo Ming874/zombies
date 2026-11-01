@@ -18,10 +18,11 @@ export const PRESETS = {
   // 陰影類型一律 pcf(低畫質只是關掉陰影):類型是所有 program 的參數,換預設檔時不要連類型也換
   low: { label: '低', shadows: false, shadowType: 'pcf', shadowScale: 0.5, shadowLights: 0, bloom: false, msaa: 0, pixelMin: 0.6, pixelMax: 0.85, lights: 4, particles: 100, fog: 'low', decals: 0.4, anisotropy: 2, drawDistance: 70, flashFar: 12, ao: 0, ssr: 0, vol: 0, taa: false, pcss: false, boostMax: 1 },
   medium: { label: '中', shadows: true, shadowType: 'pcf', shadowScale: 0.5, shadowLights: 1, bloom: true, msaa: 2, pixelMin: 0.6, pixelMax: 1.0, lights: 6, particles: 160, fog: 'medium', decals: 0.7, anisotropy: 4, drawDistance: 90, flashFar: 14, ao: 1, ssr: 1, vol: 1, taa: false, pcss: false, boostMax: 1.1 },
-  high: { label: '高', shadows: true, shadowType: 'pcf', shadowScale: 1, shadowLights: 2, bloom: true, msaa: 4, pixelMin: 0.7, pixelMax: 1.25, lights: 8, particles: 240, fog: 'high', decals: 1, anisotropy: 8, drawDistance: 120, flashFar: 18, ao: 2, ssr: 2, vol: 2, taa: true, pcss: false, boostMax: 1.25 },
-  ultra: { label: '極致', shadows: true, shadowType: 'pcf', shadowScale: 2, shadowLights: 4, bloom: true, msaa: 4, pixelMin: 0.85, pixelMax: 1.5, lights: 12, particles: 400, fog: 'high', decals: 1, anisotropy: 16, drawDistance: 150, flashFar: 28, ao: 3, ssr: 3, vol: 3, taa: true, pcss: true, boostMax: 1.5 },
+  high: { label: '高', shadows: true, shadowType: 'pcf', shadowScale: 1, shadowLights: 2, bloom: true, msaa: 4, pixelMin: 0.7, pixelMax: 1.25, lights: 8, particles: 240, fog: 'high', decals: 1, anisotropy: 8, drawDistance: 120, flashFar: 18, ao: 2, ssr: 2, vol: 2, taa: true, taaMsaa: false, pcss: false, boostMax: 1.25 },
+  ultra: { label: '極致', shadows: true, shadowType: 'pcf', shadowScale: 2, shadowLights: 4, bloom: true, msaa: 4, pixelMin: 0.85, pixelMax: 1.5, lights: 12, particles: 400, fog: 'high', decals: 1, anisotropy: 16, drawDistance: 150, flashFar: 28, ao: 3, ssr: 3, vol: 3, taa: true, taaMsaa: true, pcss: true, boostMax: 1.5 },
 };
 // [gpu] ao/ssr/vol:0 關、1~3 等級(src/gfx/pipeline.js LEVELS);taa:時間反鋸齒;pcss:手電筒/月光的柔和半影;
+//   taaMsaa:TAA 開著時場景還要不要 MSAA(只有極致;高畫質靠 TAA 抗鋸齒,場景緩衝不多重取樣 → 內顯省約 2 ms;手持武器仍是 msaa 倍);
 //   boostMax:CPU 是瓶頸、GPU 有餘裕時渲染倍率最多拉到 dpr × boostMax(超取樣)。全部只改 uniform / RT 尺寸,不重編 shader
 const COMMON = { dynamicRes: true, targetFps: 60 };
 // 會改變 shader program 參數的設定:先在背景依新設定編好全部材質,編完才真正套用(見 syncProgramKeys)
@@ -252,7 +253,7 @@ export class Quality {
       const n = this.get('msaa');
       for (const rt of [g.composer.renderTarget1, g.composer.renderTarget2]) if (rt && rt.samples !== n) { rt.samples = n; rt.dispose(); }
     }
-    if (g.gfx && (first || ['ao', 'ssr', 'vol', 'taa', 'msaa', 'pcss'].some(has))) this.applyGfx();
+    if (g.gfx && (first || ['ao', 'ssr', 'vol', 'taa', 'msaa', 'taaMsaa', 'pcss'].some(has))) this.applyGfx();
     if (has('anisotropy')) {
       const a = Math.min(this.get('anisotropy'), r.capabilities.getMaxAnisotropy());
       const seen = new Set(), todo = [];
@@ -307,7 +308,7 @@ export class Quality {
     const g = this.game;
     if (!g.gfx) return;
     const boost = this.level >= 1 ? 1 : this.level <= -3 ? -1 : 0;
-    g.gfx.configure({ ao: this.get('ao') | 0, ssr: this.get('ssr') | 0, vol: this.get('vol') | 0, taa: !!this.get('taa'), msaa: this.get('msaa') | 0, boost });
+    g.gfx.configure({ ao: this.get('ao') | 0, ssr: this.get('ssr') | 0, vol: this.get('vol') | 0, taa: !!this.get('taa'), msaa: this.get('msaa') | 0, taaMsaa: !!this.get('taaMsaa'), boost });
     // composer 緩衝:GfxPass 有效果時手持武器在它的多重取樣輸出裡畫 → 之後的全螢幕 pass 不需要 MSAA
     const n = g.gfx.any ? 0 : this.get('msaa') | 0;
     if (g.composer) for (const rt of [g.composer.renderTarget1, g.composer.renderTarget2]) if (rt && rt.samples !== n) { rt.samples = n; rt.dispose(); }

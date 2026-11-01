@@ -68,7 +68,7 @@ export class GfxPass extends Pass {
     this.hzName = 'scene';
     this.game = game;
     this.guard = alphaGuard(game.renderer.getContext());
-    this.cfg = { ao: 2, ssr: 2, vol: 2, taa: true, msaa: 4, boost: 0, aoStrength: 1, ssrStrength: 1.3, volStrength: 1, sharp: 0.18, flashK: 0.12, moonK: 0.3, lampK: 0.45 };
+    this.cfg = { ao: 2, ssr: 2, vol: 2, taa: true, msaa: 4, taaMsaa: false, boost: 0, aoStrength: 1, ssrStrength: 1.3, volStrength: 1, sharp: 0.18, flashK: 0.12, moonK: 0.3, lampK: 0.45 };
     this.live = { ao: 0, ssr: 0, vol: 0, taa: false };
     this.frame = 0;
     this.submitMs = 0; // 場景繪製的 JS 時間(自動調整用來分辨 CPU/GPU 瓶頸)
@@ -142,7 +142,11 @@ export class GfxPass extends Pass {
     const before = this.live.taa;
     this.live = { ao: lv('ao'), ssr: lv('ssr'), vol: lv('vol'), taa: !!c.taa };
     if (this.live.taa !== before) this.reset = 2;
-    for (const t of [this.sceneRT, this.outRT]) if (t.samples !== (c.msaa | 0)) { t.samples = c.msaa | 0; t.dispose(); }
+    // 場景緩衝:TAA 開著時不多重取樣(TAA 的抖動本身就是抗鋸齒;4× HalfFloat 色彩 + 深度的寫入與解析在內顯上約 2 ms),
+    // 極致(taaMsaa)才兩個都用。輸出緩衝(手持武器畫在上面,不經過 TAA)照舊多重取樣 → 武器邊緣不鋸齒
+    const sceneN = this.live.taa && !c.taaMsaa ? 0 : c.msaa | 0;
+    if (this.sceneRT.samples !== sceneN) { this.sceneRT.samples = sceneN; this.sceneRT.dispose(); this.reset = 2; }
+    if (this.outRT.samples !== (c.msaa | 0)) { this.outRT.samples = c.msaa | 0; this.outRT.dispose(); }
     const A = LEVELS.ao[this.live.ao], R = LEVELS.ssr[this.live.ssr], V = LEVELS.vol[this.live.vol];
     if (A) { const u = this.mAO.uniforms; u.uSlices.value = A.slices; u.uSteps.value = A.steps; u.uRadius.value = A.radius; }
     if (R) { const u = this.mSSR.uniforms; u.uSteps.value = R.steps; u.uMaxDist.value = R.dist; u.uMaxRough.value = R.rough; }
