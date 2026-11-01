@@ -12,6 +12,7 @@ import { sfx, ghost } from '../audio.js';
 import { WRITINGS, STORY3, LINE_BY_ID } from './lines.js';
 import { models } from './ghosts.js';
 import { shadowTexture, drawFog, ballTexture, envelopeTexture } from './marks.js';
+import { seq } from '../story/voice.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[(Math.random() * a.length) | 0];
@@ -20,6 +21,9 @@ const KEEP = new Set(['emergency', 'exit', 'beacon', 'monitor', 'candle', 'fire'
 const tex = (c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
 const nick = () => { try { const n = localStorage.getItem('hz.nick'); return n && n.trim() ? n.trim().slice(0, 12) : '阿孫'; } catch { return '阿孫'; } };
 const _q = new THREE.Quaternion();
+const SHADE = 0x8fb0d8, RED = 0xc0202c; // 幻影 shade 材質的顏色(ghosts.js makeMat)/ 紅衣(只改 uniform,不換 shader)
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+let hbN = 0;
 
 // 第三輪的網格與畫面效果(材質都在 warmList 裡,主程式暖機時一起預編譯)
 export class HauntFx {
@@ -96,6 +100,35 @@ export function hauntKinds(h) {
     h.remember?.(v.id, { event: key, tag: v.mem || null, ghost: v.line ? (LINE_BY_ID[v.line]?.ghost ?? null) : null, card: v.card || null, text: v.text || null, pos: o.pos || null });
     v._hd = hd;
     return v;
+  }
+
+  // ---- 鬼月禁忌的後果(N13):熄一把火(game.soul)、207 的燈少一點油(game.story.lamp,有的話)、記住 ----
+  function taboo(kind) {
+    const lost = game.soul?.lose?.('taboo:' + kind) ?? false;
+    try { game.story?.lamp?.drain?.(0.1, 'taboo'); } catch { /* 燈還沒做好 */ }
+    game.flags?.inc?.('h.taboo.' + kind);
+    h.remember?.('taboo.' + kind, { event: 'taboo', tag: 'taboo' });
+    return lost;
+  }
+  // 叫名字時回頭:在你背後(回頭之後的背後,也就是你原本要去的方向)安排一次掩蔽伏擊。只有房主能放(殭屍是房主的);休息中也會觸發
+  function ambushBehind() {
+    const Am = game.ambush;
+    if (!Am?.force || (game.net && !game.net.isHost) || game.net?.pvp) return null;
+    const p = P(), [fx, fz] = fwdOf();
+    const w = (s) => { const dx = s.x - p.pos.x, dz = s.z - p.pos.z, d = Math.hypot(dx, dz) || 1, f = (dx * fx + dz * fz) / d; return f < -0.2 ? 3 : f < 0.3 ? 0.6 : 0.12; };
+    try { return Am.force('cover', { rest: game.phase !== 'fighting', lo: 3, hi: 18, minE: 3, R: 4.6, w }); } catch (e) { console.warn('[haunts] 伏擊', e); return null; }
+  }
+  // 撿起地上的紅包:熄一把火、紅衣的身影開始跟著你(收驚才解除)
+  function takeEnvelope(s) {
+    ghost.whoosh?.({ x: s.x, y: P().pos.y + 0.4, z: s.z }, 0.45);
+    game.inventory?.add?.('hongbao');
+    taboo('hongbao');
+    game.soul?.curse?.(true);
+    h.chill?.(0.4, 6);
+    if (!h._hbTaught) {
+      h._hbTaught = true;
+      h.after(1.2, () => seq(game, [['ks', '少年仔，你撿了地上的紅包？'], ['ks', '那是給死人的，快拿去阿嬤照片前面！']]));
+    }
   }
 
   // =================== 幾何查詢 ===================
@@ -329,6 +362,16 @@ export function hauntKinds(h) {
       ghost.breathNeck(0.7, side);
       h.chill?.(0.3, 5);
       h.after(1.8, () => story('tap', { ear: side }));
+      // 禁忌:往被拍的那一邊轉頭 → 熄一把火(往另一邊轉、不動:沒事)。yaw 變大 = 往左轉
+      const y0 = p.yaw, toward = -sg;
+      let t = 0;
+      h.watch((dt) => {
+        t += dt;
+        const d = wrap(P().yaw - y0) * toward;
+        if (d > 0.9) { taboo('tap'); ghost.stinger('hit', 0.45); P().addShake?.(0.15); h.chill?.(0.5, 6); return false; }
+        if (d < -0.9) return false; // 轉到另一邊:沒事
+        return t < 2.6;
+      });
       return side;
     } },
     // 背後有人叫你的名字(鬼月禁忌:不要回頭)。不回頭 → 阿嬤稱讚你;回頭 → 燈熄、刺擊、背後的人影
@@ -345,6 +388,8 @@ export function hauntKinds(h) {
           const x = q.x + fx * 1.6, z = q.z + fz * 1.6;
           if (free() && models.ready('man') && walk(c, x, z)) A.spawn({ tag: 'nameCall', fig: 'man', pose: 'stand', look: 'shade', alpha: 0.9, x, y: lv(c), z, yaw: Math.atan2(q.x - x, q.z - z), dur: 0.6, fadeIn: 0.03, vanish: { flash: false, look: 0, near: 0 } });
           h.after(2.8, () => story('nameBad'));
+          taboo('name');
+          ambushBehind();
           return false;
         }
         if (t > 4.5) { story('nameOk'); return false; }
@@ -411,15 +456,20 @@ export function hauntKinds(h) {
     } },
     // 地上一個紅包(鬼月禁忌:不要撿);走近看它 → 阿嬤:「紅包莫撿。」;轉開就不見了
     redEnvelope: { ok: (c) => indoor(c) && !X.envOn && !!envSpot(c), run(c) {
-      const s = envSpot(c), m = X.env;
-      m.position.set(s.x, lv(c) + 0.012, s.z); m.rotation.set(0, rand(0, 6.28), 0); m.visible = true; m.material.opacity = 1; X.envOn = true;
-      let t = 0, warned = false, unseen = 0;
+      const s = envSpot(c), m = X.env, y = lv(c);
+      m.position.set(s.x, y + 0.012, s.z); m.rotation.set(0, rand(0, 6.28), 0); m.visible = true; m.material.opacity = 1; X.envOn = true;
+      let t = 0, warned = false, unseen = 0, taken = false;
+      // [E] 撿起來(禁忌):互動由這裡登記,紅包不見就移除
+      const IX = game.interact;
+      const e = IX?.register?.({ x: s.x, y: y + 0.03, z: s.z }, { id: `h.taboo.hongbao.${++hbN}`, kind: 'pickup', name: '紅包', prompt: '撿起紅包', reach: 2.0, radius: 0.3, priority: 2, scope: 'run',
+        onUse: () => { if (taken) return false; taken = true; return true; } }) || null;
       h.watch((dt) => {
         t += dt;
+        if (taken) { m.visible = false; X.envOn = false; e?.remove?.(); takeEnvelope(s); return false; }
         const p = P(), d = Math.hypot(s.x - p.pos.x, s.z - p.pos.z);
         if (!warned && d < 3.4 && lookDot(s.x, s.z) > 0.7) { warned = true; story('envelope'); }
         unseen = lookDot(s.x, s.z) < 0.2 ? unseen + dt : 0;
-        if ((warned && unseen > 1.2) || unseen > 4 || t > 60 || d > 30) { m.visible = false; X.envOn = false; return false; }
+        if ((warned && unseen > 2.5) || unseen > 5 || t > 60 || d > 30) { m.visible = false; X.envOn = false; e?.remove?.(); return false; }
         return true;
       });
       return s;
@@ -432,6 +482,16 @@ export function hauntKinds(h) {
       let t = 0;
       h.watch((dt) => { t += dt; const turned = angDiff(P().yaw, y0) > 0.6; if (turned || t > 6.5) { X.edgeOut(turned); return false; } return true; });
       return side;
+    } },
+    // 撿了紅包之後(soul.js 排程,不進導演的隨機清單):紅衣的身影在走廊盡頭等你;看著她一陣子、走近、手電筒照她,她才走。收驚之後不再出現
+    redFollow: { ok: (c) => indoor(c) && free() && !!game.soul?.red && models.ready('patient') && !!c.figSpot?.(), run(c) {
+      const s = c.figSpot(), y = lv(c);
+      const a = A.spawn({ tag: 'redFollow', fig: 'patient', pose: 'stand', look: 'shade', alpha: 0.95, x: s.x, y, z: s.z, yaw: Math.atan2(c.px - s.x, c.pz - s.z), dur: 11, fadeIn: 1.0, vanish: { flash: true, look: 0.985, lookT: 1.8, near: 5 },
+        onEnd: (why, q) => { q?.mat?.uniforms?.uColor?.value?.setHex?.(SHADE); } });
+      if (!a) return null;
+      a.mat.uniforms.uColor.value.setHex(RED);
+      ghost.clip?.({ x: s.x, y: y + 1.2, z: s.z });
+      return a;
     } },
     // 頭七(第 7 次靜默期,index.js 指定):走廊盡頭站著阿嬤;看著她,她才走。「今天是頭七……阿嬤回來看你。」
     touqi: { ok: (c) => indoor(c) && free() && models.ready('nurse') && !!c.figSpot?.(), run(c) {

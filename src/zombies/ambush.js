@@ -283,9 +283,10 @@ class Ambush {
     if (this.hintAcc >= 0.08) { this._hints(this.hintAcc); this.hintAcc = 0; }
     if (!this._host()) return;
     // 玩家就在附近的虛擬點每幀檢查(觸發窗口可能只有零點幾秒:從轉角/門口經過)
-    if (this.slots.length && g.phase === 'fighting' && g.state === 'playing') {
+    if (this.slots.length && g.state === 'playing') {
       let pl = null;
-      for (let i = this.slots.length - 1; i >= 0; i--) { const s = this.slots[i]; if (s && s.hot) this._tickSlot(s, pl || (pl = this._players()), g.time); }
+      const fight = g.phase === 'fighting';
+      for (let i = this.slots.length - 1; i >= 0; i--) { const s = this.slots[i]; if (s && s.hot && (fight || s.rest)) this._tickSlot(s, pl || (pl = this._players()), g.time); }
     }
     this.acc += dt;
     if (this.acc < 0.25) return;
@@ -351,7 +352,7 @@ class Ambush {
     if (s.spoiled || bd > s.R + (this.g.story?.radio?.loud || 0) || bd < 1.2 || t - s.seenT < 4) return; // [story] 收音機開著,聽得到你
     const E = this._emerge(hs, sp.y, best, s.R);
     if (!E) { s.wrong = (s.wrong || 0) + 1; if (s.wrong === 1) this.stats.wrongDir++; return; }
-    if (this._allow('ambush', best, sp)) this._fire(s, E, best, hs);
+    if (this._allow(s.rest ? 'habit' : 'ambush', best, sp)) this._fire(s, E, best, hs);
   }
   // 現身位置:從 H 往「離開路線」的反方向再退 0.3m(更深的掩蔽),退不了就用 H;順便記下路線方向(現身時面向)
   _coverPos(sp) {
@@ -401,6 +402,7 @@ class Ambush {
     let z = null;
     try { z = g.spawnZombie(s.type); } catch (e) { console.warn('[ambush]', e); } finally { g._ambAt = null; this._mat = null; }
     if (!z || !z.amb) return null;
+    if (s.rest) z._habit = 'taboo'; // 休息時的(禁忌的後果):照習慣群的規則(不進店、下一波醒著就加入)
     this.lastTrig = g.time;
     this.blockT = g.time + 8; // 不會兩隻同時衝出來
     this.stats.fired++; this.stats.scares++;
@@ -440,7 +442,7 @@ class Ambush {
     if (i < 0) return;
     this.slots.splice(i, 1);
     if (s.spot.busy === s) s.spot.busy = null;
-    this.g.queue.unshift(s.type);
+    if (!s.rest) this.g.queue.unshift(s.type); // 休息時的不是出怪佇列裡的,逾時就算了
     this.stats.released++;
   }
   wakeAll(quiet = true) { for (const z of this.g.zombies) if (z.alive && z.amb && z.amb.dormant && !z._proxy) z._ambWake(quiet); }
@@ -789,11 +791,13 @@ class Ambush {
       }
     }
     for (const [k, h] of this.hints) if (!live.has(k)) { if (h.jig > 0) this.props.jiggle(h.gi, 0); this.hints.delete(k); }
+    const rest = g.phase === 'shop' || g.phase === 'break';
     for (const z of g.zombies) {
       const a = z.amb;
-      if (!a || !a.dormant || !z.alive || a.decoy || !isCorpse(a.code)) continue;
+      if (!a || !a.dormant || !z.alive || a.decoy) continue;
       const d = Math.hypot(z.pos.x - lp.x, z.pos.z - lp.z);
-      if (Math.abs(z.pos.y - lp.y) > 2.5 || d > 4.2) continue;
+      if (rest && !a.beat && d > 9 && d < 22 && Math.abs(z.pos.y - lp.y) < 2.5 && g.time >= (a.beatT || 0)) this._restBeat(z, a);
+      if (!isCorpse(a.code) || Math.abs(z.pos.y - lp.y) > 2.5 || d > 4.2) continue;
       a.brT = (a.brT ?? rand(0.5, 2.5)) - dt;
       if (a.brT <= 0) { a.brT = rand(3.5, 6.5); ambushSfx('breath', { x: z.pos.x, y: z.pos.y + 0.5, z: z.pos.z }); }
     }
@@ -809,9 +813,10 @@ class Ambush {
       H.at = t + 0.6;
       if (this._habitPlace()) H.n++; else if (++H.fail > 8) H.want = H.n;
     }
-    if (!corpses.length && !H.n) return;
+    if ((!corpses.length && !H.n && !this.slots.length) || g.story?.ending?.active) return; // 結局進行中:裝死的就一直裝死
     const pl = this._players(), sh = this.shot, shot = t - sh.t < 0.35 ? sh : null;
     for (const z of corpses) this._tickCorpse(z, pl, t, step, shot);
+    for (let i = this.slots.length - 1; i >= 0; i--) { const s = this.slots[i]; if (s && s.rest) this._tickSlot(s, pl, t); }
     for (const z of g.zombies) if (z._habit && z.alive && !z.amb && !z._proxy) this._habitShop(z);
   }
   // 這次休息放幾具:第 1 次休息 1 具、第 2~4 次 2 具、之後 3 具;驚嚇強度低 = 1、高 = +1(最多 3);關 = 0
@@ -905,6 +910,7 @@ class Ambush {
       if (!this._seen({ x: z.pos.x, y: z.pos.y, z: z.pos.z }, false)) {
         if (a.pool) { this.props.removePool(a.pool); this.cpools = this.cpools.filter((q) => q !== a.pool); }
         z._ambEnd(false);
+        z.alive = false; // 連線:房主的 byId 還留著牠時,遠端的命中直接略過
         z.dispose();
         g.zombies.splice(i, 1);
         this.habit.left++; this.stats.habitLeft++;
@@ -912,6 +918,21 @@ class Ambush {
       }
       a.habit = false; a.t0 = g.time; a.maxT = rand(60, 100);
     }
+  }
+
+  // 休息時的殭屍節拍(本機):看不到的、裝死的那一邊傳來一點動靜(拖了一步、悶悶的一聲);每具一次,導演的休息預算
+  _restBeat(z, a) {
+    const g = this.g, c = g.camera?.position;
+    a.beatT = g.time + 6;
+    if (!c || g.world.hasLineOfSight(c.x, c.y, c.z, z.pos.x, z.pos.y + 0.6, z.pos.z)) return;
+    const D = g.horror?.director;
+    let ok = false;
+    try { ok = !!D?.request?.('zbeat', { pos: z.pos }); } catch { ok = false; }
+    if (!ok) return;
+    a.beat = true;
+    const pos = { x: z.pos.x, y: z.pos.y + 0.3, z: z.pos.z };
+    try { sfx.zStep?.(z.type, pos); sfx.thud?.(pos, false); } catch { /* 略 */ }
+    try { D.notify('zbeat', { pos: z.pos }); } catch { /* 略 */ }
   }
 
   // ======================= 假屍體 =======================
@@ -1027,6 +1048,14 @@ class Ambush {
     if (!this.ready) this._build();
     if (kind === 'lurk') kind = 'cover';
     if (kind === 'habit') return this._habitPlace(opt);
+    if (opt.rest) { // 休息時的掩蔽伏擊(禁忌的後果):不從出怪佇列拿、不算 toSpawn;休息中也會觸發,下一波開始就作廢
+      const spot = opt.spot || this._pick(this.cover, false, opt);
+      if (!spot) return null;
+      const s = this._addSlot('cover', opt.type || 'walker', spot, g.time, { maxT: opt.maxT ?? 70, R: opt.R ?? 4.6 });
+      s.rest = true;
+      this.per.cover--; // 不佔這一波的名額
+      return s;
+    }
     if (kind === 'corpse') {
       const before = g.toSpawn;
       const z = g.spawnZombie(opt.type || 'walker');
