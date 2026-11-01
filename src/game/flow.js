@@ -8,6 +8,7 @@ import { settings } from '../ui/settings.js';
 import { buildInteract } from '../interact/index.js';
 import { createAmbush } from '../zombies/ambush.js';
 import { createChase } from '../zombies/chase.js'; // [zombies-w3] 追逐戰
+import { createNoise } from './noise.js'; // [w4] 噪音:出生點偏向最近的大噪音(game.noise)
 import { roundTail } from './roundtail.js'; // [zombies-w3] 回合收尾:卡住/走不到的搬近、最後幾隻獵殺、伏擊預留放回
 import { waveRoster, wavePace, waveKind, hpMul, SPECIAL, restTime, roundBonus, cleanBonus, POINTS, HOW_MUL, streakMul, streakTier, roundScore, saveBest } from './waves.js';
 
@@ -111,6 +112,7 @@ export const flowMethods = {
       if (typeof f !== 'function') continue;
       this[k] = (...a) => { const prev = this._killHow; this._killHow = 'melee'; try { return f.apply(this, a); } finally { this._killHow = prev; } };
     }
+    this.noise = createNoise(this); // [w4] 要在 onFire / explode 包好之後(它再包一層)
     window.addEventListener('keydown', (e) => this.onGameplayKey(e), true); // 捕獲階段:比 input.js 先處理
     this.weaponScene.visible = false; // 標題畫面不顯示手持武器
     this.chase = createChase(this); // [zombies-w3] 追逐戰(src/zombies/chase.js)
@@ -160,6 +162,7 @@ export const flowMethods = {
     this.rstats = null; // 本回合統計(startRound 建立)
     this.lastRound = null; // [N6] 上一波的數字(暫停選單)
     this._fxEnd(); // [w4 特殊波] 燈回來、警鈴停
+    this.noise?.reset(); // [w4] 換地圖後重新接門的事件
     this.ui.resetRun?.();
     this.ui.setCoins(0, true);
     this.ui.setScore?.(0, true);
@@ -242,6 +245,7 @@ export const flowMethods = {
     if (!players.length) players.push(this.player);
     const calm = (this._calmT || 0) > 12;
     const camp = this.campBehind?.(); // [w4 反站樁] 站樁太久:身後 14m 外可以出,而且優先(出生前已經有聲音預警)
+    const nz = this.noise; nz?.prime(); // [w4 噪音] 這次挑點用的「最近最大的噪音」
     const cand = [];
     for (const s of w.spawns) {
       if (s.bad || (s.vent && type !== 'crawler')) continue;
@@ -273,6 +277,7 @@ export const flowMethods = {
       if (now - (q.s._used ?? -99) < 6) k *= 0.15;
       if (Number.isFinite(q.fd)) k *= q.fd < lo + 4 ? 0.7 : q.fd > (calm ? 30 : 42) ? 0.6 : 1;
       if (q.back) k *= 3; // [w4 反站樁]
+      if (nz) k *= nz.spawnWeight(q.s); // [w4 噪音] 越吵的地方附近越容易出(只改權重,不改「看不到、夠遠」這些條件)
       return k;
     };
     const tiers = [
