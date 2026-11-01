@@ -102,9 +102,14 @@ const FS_COLOR = /* glsl */`
 		vec4 A = textureGrad( tSurfA, tA, aX, aY );
 		vec4 C = textureGrad( tSurfC, tA, aX, aY ); // r 缺口雜訊 g 第二組雜訊 b 纖維
 		vec4 Cm = textureGrad( tSurfC, tM, sTx * 0.3, sTy * 0.3 ); // 大尺度:r 斑駁 g 水漬
-		vec4 B = textureGrad( tSurfB, tB, bX, bY );
 		vec4 AX = textureGrad( tSurfA, tA + aX, aX, aY ), AY = textureGrad( tSurfA, tA + aY, aX, aY );
-		vec4 BX = textureGrad( tSurfB, tB + bX, bX, bY ), BY = textureGrad( tSurfB, tB + bY, bX, bY );
+		// 第二張細節圖(木紋/布紋/皮紋/鏽/絨毛)只有這幾種紋理型態會讀(surfH 與下面的紋理分支);其他類別省 3 次取樣
+		// (gt 來自參數表 × flat 頂點類別 → 同一個三角形內一致,分支不分歧;textureGrad 是顯式導數,分支內合法)
+		vec4 B = vec4( 0.5 ), BX = vec4( 0.5 ), BY = vec4( 0.5 );
+		if ( gt == 2 || gt == 3 || gt == 4 || gt == 8 || gt == 9 ) {
+			B = textureGrad( tSurfB, tB, bX, bY );
+			BX = textureGrad( tSurfB, tB + bX, bX, bY ); BY = textureGrad( tSurfB, tB + bY, bX, bY );
+		}
 		vec3 col = diffuseColor.rgb;
 		float L = surfLum( col );
 		col *= clamp( L, P0.x, P0.y ) / max( L, 1e-4 ); // 反照率校正:不要死黑、不要過亮的白
