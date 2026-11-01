@@ -187,7 +187,7 @@ const items = [
     why: '加護病房的內線；掛掉之後，阿嬤會從護理站打回來（PHONE.callback）。' },
   { id: 'h.ix.phone.secretary', kind: 'phone', zone: 'f3_secretary', mount: 'surface', near: null, style: 'desk', ext: '院長室', calls: [], ring: 'tension', special: null, // 王醫師整章只打一次(src/story/climax.js)
     why: '院長室秘書的電話；王志明用大新的網路打來（hc.20）。' },
-  { id: 'h.ix.typewriter', kind: 'typewriter', zone: 'f3_secretary', mount: 'surface', near: null, lines: ['tw.v3', 'tw.loop', 'tw.burn', 'tw.001', 'tw.207', 'tw.recover'],
+  { id: 'h.ix.typewriter', kind: 'typewriter', zone: 'f3_secretary', mount: 'surface', near: null, lines: ['tw.v3', 'tw.loop', 'tw.burn', 'tw.001', 'tw.207', 'tw.recover', 'tw.pa'],
     why: '秘書室的電動打字機接在院內網路上當印表機；大新的主機一直把排程送過來。' },
 
   // ================================================================== 電梯
