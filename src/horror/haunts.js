@@ -127,7 +127,7 @@ export function hauntKinds(h) {
     h.chill?.(0.4, 6);
     if (!h._hbTaught) {
       h._hbTaught = true;
-      h.after(1.2, () => seq(game, [['ks', '少年仔，你撿了地上的紅包？'], ['ks', '那是給死人的，快拿去阿嬤照片前面！']]));
+      h.after(1.2, () => seq(game, [['ks', '少年仔，你是不是撿了地上的紅包？'], ['ks', '那是給死人的！\n休息時拿去你阿嬤的照片前面。']]));
     }
   }
 
@@ -454,7 +454,7 @@ export function hauntKinds(h) {
       h.director.hold(12);
       return r;
     } },
-    // 地上一個紅包(鬼月禁忌:不要撿);走近看它 → 阿嬤:「紅包莫撿。」;轉開就不見了
+    // 地上一個紅包(鬼月禁忌:不要撿);走近看它 → 阿嬤:「路邊的紅包不要撿……」;轉開就不見了
     redEnvelope: { ok: (c) => indoor(c) && !X.envOn && !!envSpot(c), run(c) {
       const s = envSpot(c), m = X.env, y = lv(c);
       m.position.set(s.x, y + 0.012, s.z); m.rotation.set(0, rand(0, 6.28), 0); m.visible = true; m.material.opacity = 1; X.envOn = true;
