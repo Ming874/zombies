@@ -1,3 +1,4 @@
+import { installConsole } from './ui/console.js'; // 第一個載入:F8 控制面板的按鍵攔截要比其他模組的捕獲監聽器早註冊
 import * as THREE from 'three';
 import { Game } from './game.js';
 import { Quality } from './sys/quality.js';
@@ -11,6 +12,7 @@ import { prewarm, whenTypesReady, variantStats, getVariant, instantiate, forceVa
 import { allMaterials as allZombieMaterials } from './zombies/materials.js';
 import { loadRealistic, realisticMaterials, realisticStats } from './zombies/realistic.js'; // 寫實殭屍(載入本模組即註冊變體數,要在 prewarm 之前)
 import { stainWarmMesh } from './art/stainmat.js';
+import { createRocketProjectile } from './weapons/models.js';
 import * as audio from './audio.js';
 import { initNet } from './net/lobby.js';
 import { installHorror } from './horror/index.js';
@@ -79,6 +81,7 @@ installHorror(game); // [ghost] 靈異系統:驚嚇導演、耳語、幻影、�
 installDeduce(game); // [story] 線索卡、推理本(J)、擲筊、頭七(src/story)
 installObjectives(game); // [story] 目標鏈、區域解鎖、提示(src/story/objectives.js)
 installMotion(game); // [motion] 轉場與手感:開機、開場、燈篙節拍、受傷、倒下、暫停(src/ui/motion.js;全部是 post 的 uniform)
+installConsole(game); // F8 控制面板:/give 等指令(src/ui/console.js)
 window.__game = game; // 除錯用:在瀏覽器 console 操作 __game
 if (earlyStart) { // 建構途中按過開始:現在照常開始(按鈕的處理在 bindInput 才綁上)
   const b = document.getElementById('startBtn');
@@ -257,6 +260,7 @@ async function warmRuntime() {
   g.add(inst.mesh);
   for (const o of game.deduce?.warmObjects?.() || []) g.add(o); // [story] 筊杯
   g.add(stainWarmMesh()); // 寫實血跡材質(靜態貼花、血泊、滴落血漬共用)
+  g.add(createRocketProjectile()); // RPG 火箭(槍枝材質在世界場景的變體;第一發不會頓)
   for (const o of game.horror?.warmObjects?.() || []) g.add(o); // [ghost] 靈異材質(幻影、痕跡、字跡、寒氣)一起預編譯與離屏畫一次
   // 執行期才會建立的常見材質型態(曳光、血池/貼花、光暈與血條 sprite、粒子):program 只看功能旗標(貼圖/霧…),不看顏色數值
   const tex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);

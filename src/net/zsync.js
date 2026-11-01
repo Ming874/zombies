@@ -143,10 +143,10 @@ export class ZombieSync {
     s.client.sendBin(w.view());
   }
 
-  // 房主驗證遠端命中:每發上限(巴雷特 260×1.5;爆炸 240),每人另有額度(持續 900/秒、瞬間 3000,夠一顆手榴彈炸一群)
+  // 房主驗證遠端命中:每發上限(巴雷特 260×1.5;爆炸 340:RPG 爆心 320),每人另有額度(持續 900/秒、瞬間 3000,夠一顆手榴彈炸一群)
   budget(rp, dmg, flags) {
     if (!(dmg > 0)) return 0;
-    dmg = Math.min(dmg, flags & 1 ? 240 : 400);
+    dmg = Math.min(dmg, flags & 1 ? 340 : 400);
     const b = rp.zbud, now = performance.now();
     if (!b.init) { b.init = true; b.b = 3000; b.t = now; }
     b.b = Math.min(3000, b.b + ((now - b.t) / 1000) * 900);

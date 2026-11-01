@@ -1436,6 +1436,75 @@ function buildBarrett(g) {
   };
 }
 
+// ---------- RPG-7(扛在右肩):鋼製發射管、前後木質隔熱套、喇叭形後噴口、手槍握把、機械瞄具;管口裝著 PG-7V 彈頭 ----------
+const RPG = { BORE: 0.062, R: 0.0205, F0: -0.56, F1: 0.42 };
+// PG-7V 彈頭:f0 = 頸部後端(插進管口的位置),y = 軸心高度
+function warheadGeos(k, f0, y) {
+  k.add(M.steel, lathe([[f0, 0], [f0, 0.0165], [f0 + 0.045, 0.0165], [f0 + 0.045, 0]], 24, y)); // 頸部
+  k.add(M.olive, lathe([[f0 + 0.045, 0], [f0 + 0.045, 0.0165], [f0 + 0.062, 0.03], [f0 + 0.08, 0.0425], [f0 + 0.18, 0.0425], [f0 + 0.215, 0.039], [f0 + 0.27, 0.028], [f0 + 0.325, 0.0145], [f0 + 0.325, 0]], 36, y)); // 彈體與卵形頭
+  k.add(M.dark, lathe([[f0 + 0.1, 0], [f0 + 0.1, 0.0429], [f0 + 0.105, 0.0429], [f0 + 0.105, 0]], 36, y)); // 接縫
+  k.add(M.worn, lathe([[f0 + 0.325, 0], [f0 + 0.325, 0.0145], [f0 + 0.335, 0.011], [f0 + 0.37, 0.0068], [f0 + 0.385, 0.004], [f0 + 0.388, 0]], 18, y)); // 壓電引信探針
+}
+
+function buildRPG(g) {
+  const k = new Kit(), kh = new Kit();
+  const { BORE, R, F0, F1 } = RPG;
+  const P = M.park;
+  // 發射管、管口加厚環、喇叭形後噴口(內側暗色)
+  k.add(P, lathe([[-0.42, 0], [-0.42, R], [F1 - 0.012, R], [F1 - 0.012, 0]], 32, BORE));
+  k.add(M.steel, lathe([[F1 - 0.012, 0], [F1 - 0.012, R + 0.0025], [F1, R + 0.0025], [F1, 0]], 32, BORE));
+  k.add(P, lathe([[F0, 0], [F0, 0.0435], [F0 + 0.012, 0.044], [F0 + 0.06, 0.034], [F0 + 0.11, 0.025], [-0.42, R + 0.001], [-0.42, 0]], 32, BORE));
+  k.add(M.dark, lathe([[F0 - 0.001, 0], [F0 - 0.001, 0.04], [F0, 0.04], [F0, 0]], 32, BORE));
+  // 木質隔熱套(後:靠肩;前:左手托),兩端鋼箍
+  for (const [a, b] of [[-0.33, -0.08], [0.1, 0.29]]) {
+    k.add(M.akWood, lathe([[a, 0], [a, 0.027], [a + 0.008, 0.0315], [b - 0.008, 0.0315], [b, 0.027], [b, 0]], 32, BORE));
+    for (const f of [a - 0.004, b + 0.004]) k.add(M.steel, lathe([[f - 0.006, 0], [f - 0.006, R + 0.006], [f + 0.006, R + 0.006], [f + 0.006, 0]], 32, BORE));
+  }
+  // 握把座(連到發射管)、擊錘、手槍握把(A2 式)、護弓、扳機
+  k.add(P, side([[-0.035, -0.002], [0.095, -0.002], [0.095, BORE - R + 0.004, 0.004], [-0.035, BORE - R + 0.004, 0.004]], 0.03, { bevel: 0.0015 }));
+  k.add(M.worn, box(0.008, 0.02, 0.012, 0, 0.032, -0.042, 0.002));
+  k.add(M.polymer, side([[0.0205, -0.0018], [-0.0225, -0.0018], [-0.0305, -0.03, 0.01], [-0.0525, -0.0985, 0.008], [-0.0405, -0.1065, 0.006], [-0.0115, -0.1045, 0.008], [-0.0018, -0.0705, 0.012], [0.0045, -0.0548, 0.004], [0.0022, -0.0462, 0.006], [0.0122, -0.0222, 0.012], [0.0205, -0.0102]], 0.0302, { bevel: 0.006, seg: 3 }));
+  k.add(P, side([[0.006, 0.001], [0.08, 0.001], [0.08, -0.012, 0.002], [0.072, -0.036, 0.008], [0.016, -0.037, 0.008], [0.009, -0.025, 0.004]], 0.012, {
+    bevel: 0.0014, holes: [[[0.017, -0.0045, 0.002], [0.071, -0.0045, 0.002], [0.066, -0.029, 0.006], [0.021, -0.03, 0.006], [0.017, -0.022, 0.003]]],
+  }));
+  k.add(M.worn, side([[0.0362, -0.0038], [0.0418, -0.0038], [0.0408, -0.0142, 0.005], [0.0362, -0.0232, 0.0015], [0.0334, -0.0225, 0.0015], [0.0365, -0.0128, 0.004]], 0.0062, { bevel: 0.0012 }));
+  // 機械瞄具:照門缺口底與準星頂同高(瞄準線與管軸平行)
+  const SY = BORE + R + 0.038, top = BORE + R;
+  k.add(P, lathe([[0.3, 0], [0.3, R + 0.004], [0.322, R + 0.004], [0.322, 0]], 28, BORE)); // 準星座環
+  k.add(P, box(0.012, SY - 0.01 - top, 0.014, 0, (top + SY - 0.01) / 2, 0.311, 0.001));
+  k.add(M.steel, box(0.0026, 0.012, 0.003, 0, SY - 0.006, 0.311, 0)); // 準星柱
+  for (const sx of [-1, 1]) k.add(P, box(0.002, 0.018, 0.012, sx * 0.008, SY - 0.007, 0.311, 0.0005)); // 護耳
+  k.add(P, lathe([[-0.034, 0], [-0.034, R + 0.004], [-0.006, R + 0.004], [-0.006, 0]], 28, BORE)); // 照門座環
+  k.add(P, box(0.012, SY - 0.012 - top, 0.016, 0, (top + SY - 0.012) / 2, -0.02, 0.001));
+  k.add(M.steel, box(0.018, 0.01, 0.0025, 0, SY - 0.005, -0.02, 0)); // 照門片
+  for (const sx of [-1, 1]) k.add(M.steel, box(0.007, 0.005, 0.0025, sx * 0.0055, SY + 0.0025, -0.02, 0)); // 缺口兩側(寬 4mm)
+  k.build(g);
+  // 彈頭(發射後消失,換彈時從前下方送進管口)
+  const war = groupAt(g, 0, 0, 0);
+  warheadGeos(kh, F1 - 0.004, BORE);
+  kh.build(war);
+
+  return {
+    muzzle: new THREE.Vector3(0, BORE, -(F1 + 0.01)), length: F1 - F0, war,
+    grip: { a: (24 * Math.PI) / 180, c: [-0.0012, -0.0018], depth: 0.044, halfW: 0.0151, elbow: V(0.16, -0.3, 0.3) },
+    fore: { f: 0.19, y: BORE - 0.0315, halfW: 0.0315, elbow: V(-0.22, -0.3, 0.4) },
+    sight: { rear: [-0.02, SY], front: [0.311, SY], eye: 0.21, optic: 'iron' },
+    anim(shot, reload, empty, st) {
+      const t = reload < 0 ? 0 : reload;
+      war.visible = !empty || t > 0.2;
+      const ins = reload < 0 ? 1 : smooth(0.2, 0.55, t);
+      war.position.set(-0.05 * (1 - ins), -0.2 * (1 - ins), -0.12 * (1 - ins));
+      const L = st && st.left;
+      if (!L) return;
+      // 左手:往前下方拿新彈頭 → 跟著彈頭推進管口 → 回到隔熱套
+      const h = st.palm, go = smooth(0.04, 0.2, t) * (1 - smooth(0.58, 0.74, t));
+      const mx = war.position.x - 0.02, my = BORE - 0.05 + war.position.y, mz = -(F1 + 0.12) + war.position.z;
+      L.position.set(h.x + (mx - h.x) * go, h.y + (my - h.y) * go, h.z + (mz - h.z) * go);
+      L.rotation.set(0.3 * go, 0.4 * go, -0.6 * go);
+    },
+  };
+}
+
 // ---------- 戰術刀(KA-BAR 式):刀身朝 +Y、刃口朝前(-Z),原點在護手中心 ----------
 function knifeGeos(k) {
   k.add(M.bladeCoat, side([[-0.012, 0.004], [0.0205, 0.004, 0.002], [0.022, 0.112, 0.06], [0.0032, 0.18], [-0.0055, 0.157, 0.012], [-0.012, 0.134]], 0.0046, { bevel: 0.0009, cs: 8 }));
@@ -1469,7 +1538,7 @@ function grenadeGeos(k, withPin = true) {
   }
 }
 
-const BUILDERS = { pistol: buildPistol, revolver: buildRevolver, shotgun: buildShotgun, ak47: buildAK, m4a1: buildM4, barrett: buildBarrett };
+const BUILDERS = { pistol: buildPistol, revolver: buildRevolver, shotgun: buildShotgun, ak47: buildAK, m4a1: buildM4, barrett: buildBarrett, rpg: buildRPG };
 
 // ---------- 手臂 ----------
 // 右手直接併進 hands;左手放在以掌心為樞軸的群組(換彈/泵動時可以整隻移動、轉動)
@@ -1579,6 +1648,22 @@ export function createGrenadeProjectile() {
     nadeProto.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   }
   return nadeProto.clone();
+}
+
+// 世界中飛行的 RPG 火箭:彈頭朝 -Z,原點在彈頭頸部後端;後段是火箭發動機、噴嘴與張開的尾翼
+let rocketProto = null;
+export function createRocketProjectile() {
+  if (!rocketProto) {
+    const k = new Kit();
+    warheadGeos(k, 0, 0);
+    k.add(M.park, lathe([[-0.42, 0], [-0.42, 0.012], [-0.4, 0.0165], [0, 0.0165], [0, 0]], 20));
+    k.add(M.dark, lathe([[-0.44, 0], [-0.44, 0.009], [-0.42, 0.012], [-0.42, 0]], 16));
+    for (let i = 0; i < 4; i++) k.add(M.steel, rot(box(0.002, 0.03, 0.07, 0, 0.0315, -0.36, 0), 0, 0, i * HALF + Math.PI / 4));
+    rocketProto = new THREE.Group();
+    k.build(rocketProto);
+    rocketProto.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  return rocketProto.clone();
 }
 
 // 商店展示用:只有槍(與第一人稱共用幾何)

@@ -40,7 +40,7 @@ export class PvpMode {
     this.minutes = s.settings.minutes || 8;
   }
 
-  weapons() { return WEAPON_IDS.filter((id) => WEAPONS[id]); }
+  weapons() { return WEAPON_IDS.filter((id) => WEAPONS[id] && !WEAPONS[id].giveOnly); } // giveOnly(RPG):只能用控制面板取得
 
   install() {
     const s = this.s, g = this.g;

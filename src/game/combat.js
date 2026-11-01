@@ -3,7 +3,8 @@ import { sfx } from '../audio.js';
 import { WeaponFX, DECAL } from '../weapons/fx.js';
 import { CenterHud } from '../weapons/scope.js';
 import { castZombies, HITS } from '../weapons/ballistics.js';
-import { createGrenadeProjectile } from '../weapons/models.js';
+import { createGrenadeProjectile, createRocketProjectile } from '../weapons/models.js';
+import { WEAPONS } from '../weapons/weapon.js';
 import { Ballistics, powerOf } from '../physics/penetration.js';
 
 // 射擊、擊殺、爆炸、手榴彈、近戰、開鏡視野、玩家受傷。以 mixin 方式掛到 Game 上
@@ -18,6 +19,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const RAD = Math.PI / 180;
 const NADE_R = 0.034;
 const _sn = { x: 0, y: 1, z: 0 }, _bc = new THREE.Vector3(); // 樓梯坡面法線(手榴彈滾下樓梯)
+const _rd = new THREE.Vector3(), _rt = new THREE.Vector3(), _ZN = new THREE.Vector3(0, 0, -1); // 火箭(_updateRockets 專用)
 
 // 障礙物種類 → 材質
 const OBST_MAT = { statue: 'concrete', fountain: 'concrete', barricade: 'wood', health: 'wood', ammo: 'wood' };
@@ -46,6 +48,7 @@ export const combatMethods = {
     this.ballistics = this.world.ballistics = new Ballistics(this); // [physics] 子彈穿透/玻璃/鐵網(src/physics/penetration.js;翻越也會查櫃台玻璃)
     this.chud = new CenterHud();
     this.nades = []; // 飛行中的手榴彈
+    this.rockets = []; // 飛行中的 RPG 火箭
     this.gore = []; // 噴血源
     this.gorePool = [];
     this.boomLight = new THREE.PointLight(0xffa04a, 0, 24, 2); // 爆炸閃光(固定存在,避免 shader 重編)
@@ -136,6 +139,7 @@ export const combatMethods = {
       this.boomLight.intensity = 85 * k * k * (0.85 + Math.random() * 0.3);
     } else this.boomLight.intensity = 0;
     this._updateNades(dt);
+    this._updateRockets(dt);
     if (this.ballistics) this.ballistics.update(dt); // [physics] 玻璃碎片
     this._updateGore(dt);
     this.wfx.update(dt);
@@ -181,6 +185,7 @@ export const combatMethods = {
   // ---------- 開火 ----------
   fire(def, id, speedNorm) {
     if (!this.wfx) this.initCombat();
+    if (def.rocket) return this._fireRocket(def, speedNorm);
     const w = this.weapons, p = this.player, cam = this.camera;
     cam.updateMatrixWorld(true);
     const origin = cam.getWorldPosition(_o);
@@ -706,6 +711,123 @@ export const combatMethods = {
         g.mesh.rotation.z += g.spin.z * dt;
       }
       g.mesh.position.copy(g.p);
+    }
+  },
+
+  // ---------- RPG 火箭 ----------
+  // 開火:物理上從眼睛沿視線出發(貼臉的殭屍也打得到);畫面上的火箭從管口(右下方)出現,0.15 秒內併到彈道上
+  _fireRocket(def, speedNorm) {
+    const w = this.weapons, p = this.player, cam = this.camera;
+    cam.updateMatrixWorld(true);
+    const o = cam.getWorldPosition(_o);
+    const spread = w.spreadNow(speedNorm, p.sprinting);
+    const rk = w.recoilKick();
+    p.kick(rk[0], 0);
+    p.yaw += rk[1];
+    this._recoilYaw += rk[1];
+    const r = spread * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2;
+    _d.set(Math.cos(a) * Math.tan(r), Math.sin(a) * Math.tan(r), -1).normalize().applyQuaternion(cam.quaternion);
+    const ads = w.ads > 0.5;
+    _a.set(ads ? 0 : 0.17, ads ? -0.06 : -0.1, -0.5).applyQuaternion(cam.quaternion);
+    this.addRocket(o, _d, { owner: p, offset: _a });
+    if (this.net) this.net.onRocket?.(o, _d);
+    // 管口火光、後焰(往後噴的火與煙:自己看不到,但會照亮周圍、隊友看得到)、管口煙
+    this.muzzleLight.position.copy(o).addScaledVector(_d, 0.8);
+    this.muzzleLight.intensity = 60;
+    this.weaponLight.intensity = 8;
+    this._wl = 0.08;
+    this._backblast(o, _d);
+    this.wfx.muzzleSmoke(_a.copy(o).addScaledVector(_d, 0.9).addScaledVector(_up, -0.1), _d, 2);
+    p.addShake(0.3);
+    this.updateAmmoHud();
+  },
+
+  // 後焰:發射管後方 0.5~1.4m 噴出的火與白煙(o = 射手眼睛,f = 發射方向)
+  _backblast(o, f) {
+    const fx = this.wfx;
+    for (let i = 0; i < 14; i++) fx.smoke.spawn(o.x - f.x * rand(0.6, 1.4) + rand(-0.2, 0.2), o.y - f.y * 0.8 + rand(-0.15, 0.2), o.z - f.z * rand(0.6, 1.4) + rand(-0.2, 0.2), -f.x * rand(2, 6), rand(0, 0.6) - f.y * 3, -f.z * rand(2, 6), 0.3, rand(1.2, 2.2), 0.42, 0.4, 0.37, 0.55, rand(1.6, 2.8), 0.25, 1.6, 0.05);
+    for (let i = 0; i < 6; i++) fx.fire.spawn(o.x - f.x * rand(0.5, 1), o.y - f.y * 0.6, o.z - f.z * rand(0.5, 1), -f.x * rand(4, 8), -f.y * 4, -f.z * rand(4, 8), 0.2, rand(0.6, 1.1), 3.2, 1.9, 0.8, 0.85, rand(0.08, 0.16), 0, 1.5, 0.01);
+  },
+
+  // 飛行中的火箭:o = { owner 射手, harmless(連線:別人的火箭只有特效), offset 畫面上的起點偏移, t 已經飛行的秒數(連線延遲補償) }
+  addRocket(start, dir, o = {}) {
+    if (!this.wfx) this.initCombat();
+    const mesh = createRocketProjectile();
+    this.scene.add(mesh);
+    const k = {
+      mesh, p: start.clone(), v: dir.clone().normalize().multiplyScalar(WEAPONS.rpg.rocket.speed), t: 0, dist: 0, trail: 0, spin: Math.random() * 6,
+      owner: o.owner || this.player, harmless: !!o.harmless, off: o.offset ? o.offset.clone() : new THREE.Vector3(),
+    };
+    this.rockets.push(k);
+    if (o.t > 0 && this._rocketStep(k, Math.min(o.t, 0.5))) { this.rockets.pop(); return null; }
+    this._rocketPose(k);
+    return k;
+  },
+
+  _updateRockets(dt) {
+    const R = this.rockets;
+    for (let i = R.length - 1; i >= 0; i--) {
+      const k = R[i];
+      if (this._rocketStep(k, dt)) { R.splice(i, 1); continue; }
+      this._rocketPose(k);
+      this._rocketTrail(k, dt);
+    }
+  },
+
+  // 推進一段:碰到牆/樓板/道具/殭屍(對戰:其他玩家)或超過自毀時間就爆炸;回傳是否已爆炸
+  _rocketStep(k, dt) {
+    const W = this.world, R = WEAPONS.rpg.rocket;
+    k.t += dt;
+    k.v.y -= 1.2 * dt; // 續航發動機推著飛:只有一點點下墜
+    const sp = k.v.length();
+    _rd.copy(k.v).multiplyScalar(1 / sp);
+    const move = sp * dt;
+    this.ballistics?.smash(k.p, _rd, move); // 玻璃直接撞破穿過去
+    let hitT = W.rayDistance(k.p.x, k.p.y, k.p.z, _rd.x, _rd.y, _rd.z, move);
+    const n = castZombies(this._targets(), k.p, _rd, hitT);
+    for (let i = 0; i < n; i++) {
+      if (HITS[i].z.remote && HITS[i].z.remote === k.owner) continue; // 別人的火箭不會撞上他自己
+      hitT = Math.min(hitT, HITS[i].t);
+      break;
+    }
+    _rt.copy(k.p).addScaledVector(_rd, Math.min(hitT, move));
+    const gy = W.groundY ? W.groundY(_rt.x, _rt.z, _rt.y + 0.3) : null;
+    const ground = gy !== null && gy !== undefined && _rt.y < gy + 0.02;
+    if (hitT < move || ground || k.t >= R.life) {
+      if (hitT < move) _rt.copy(k.p).addScaledVector(_rd, Math.max(0, hitT - 0.12)); // 爆心退回表面外,遮蔽判定才看得到周圍
+      else if (ground) _rt.y = gy + 0.1;
+      this.scene.remove(k.mesh);
+      this.explodeAt(_rt, R.radius, WEAPONS.rpg.damage, { owner: k.owner, kind: 'rocket', self: R.self, shake: 1.3, harmless: k.harmless });
+      return true;
+    }
+    k.p.copy(_rt);
+    k.dist += move;
+    return false;
+  },
+
+  // 畫面位置與朝向:物理位置 + 起點偏移(0.15 秒收斂),彈頭朝飛行方向、繞軸自轉
+  _rocketPose(k) {
+    const m = k.mesh;
+    m.position.copy(k.p).addScaledVector(k.off, Math.max(0, 1 - k.t / 0.15));
+    m.quaternion.setFromUnitVectors(_ZN, _rd.copy(k.v).normalize());
+    m.rotateZ(k.spin);
+  },
+
+  // 尾焰與煙跡:續航發動機約 6m 後點火,之前只有一點煙
+  _rocketTrail(k, dt) {
+    const fx = this.wfx, d = _rd;
+    k.spin += dt * 18;
+    _rt.copy(k.mesh.position).addScaledVector(d, -0.45);
+    if (k.dist > 6) {
+      fx.fire.spawn(_rt.x, _rt.y, _rt.z, -d.x * 3, -d.y * 3, -d.z * 3, 0.1, 0.42, 4.2, 2.6, 1.2, 0.95, 0.08, 0, 0, 0.004);
+      if (Math.random() < dt * 30) fx.glow.spawn(_rt.x, _rt.y, _rt.z, -d.x * 6 + rand(-1, 1), -d.y * 6 + rand(-1, 1), -d.z * 6 + rand(-1, 1), 3, 1.6, 0.5, rand(0.15, 0.3), rand(0.006, 0.01), -999, 2, 1);
+    }
+    k.trail += k.v.length() * dt;
+    const gap = k.dist > 6 ? 0.8 : 2.5;
+    while (k.trail >= gap) {
+      k.trail -= gap;
+      const b = k.trail;
+      fx.smoke.spawn(_rt.x - d.x * b + rand(-0.04, 0.04), _rt.y - d.y * b + rand(-0.04, 0.04), _rt.z - d.z * b + rand(-0.04, 0.04), rand(-0.15, 0.15), rand(0, 0.15), rand(-0.15, 0.15), 0.16, rand(1, 1.6), 0.78, 0.77, 0.74, 0.55, rand(2.2, 3.2), 0.12, 1.4, 0.04);
     }
   },
 

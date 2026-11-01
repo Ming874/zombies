@@ -103,6 +103,8 @@ export const GUN = {
   ak47: { out: 1.3, vol: 0.86, crack: 3300, body: 650, bq: 1.6, thump: 86, thumpEnd: 36, tdur: 0.16, bdur: 0.23, room: 0.65, hall: 0.32, mech: 1500, bolt: 1150, casing: 2700, sharp: 1.15, drive: 4.5, cls: 'rifle', smp: 1.25 },
   m4a1: { out: 1.75, vol: 0.74, crack: 5800, body: 1600, bq: 1.2, thump: 118, thumpEnd: 44, tdur: 0.12, bdur: 0.16, room: 0.55, hall: 0.26, mech: 2500, bolt: 1950, spring: 840, casing: 4500, sharp: 0.9, drive: 3.5, cls: 'rifle', smp: 0.95 },
   barrett: { out: 0.74, vol: 1.15, crack: 7200, body: 430, bq: 0.8, thump: 54, thumpEnd: 22, tdur: 0.42, bdur: 0.5, room: 1.1, hall: 1.1, mech: 1100, casing: 2050, sharp: 2.4, drive: 6, big: true, cls: 'big', smp: 2.4 },
+  // RPG-7:沒有錄音樣本,全合成;hiss = 火箭發動機的嘶吼
+  rpg: { out: 0.85, vol: 1.1, crack: 1800, body: 300, bq: 0.7, thump: 46, thumpEnd: 20, tdur: 0.45, bdur: 0.55, room: 1.0, hall: 1.0, mech: 900, sharp: 2.2, drive: 5.5, big: true, cls: 'big', smp: 2.2, hiss: true },
 };
 const CASE_T = { pistol: [0.38, 0.6], ak47: [0.42, 0.62], m4a1: [0.38, 0.58], barrett: [0.7, 0.9] };
 
@@ -120,6 +122,10 @@ function gunBody(d, t, g, v, k) {
   mech(d, t, g, v);
   if (g.ring) metal(d, t + 0.002, g.ring, 0.09 * v, 0.35, [1, 1.47, 2.09, 2.9]);
   if (g.big) bigLayers(d, t, v);
+  if (g.hiss) { // 火箭發動機:點火的嘶吼 → 遠去的呼嘯
+    burst(d, t + 0.02, { buf: 'pink', type: 'bandpass', f: 2600, f1: 700, q: 0.6, dur: 1.1, a: 0.05, g: 0.5 * v });
+    burst(d, t + 0.25, { buf: 'pink', type: 'highpass', f: 3000, f1: 1500, dur: 0.6, a: 0.1, g: 0.2 * v });
+  }
 }
 // 機件往復(滑套/槍機/緩衝彈簧):錄音槍聲上也疊一層,讓連發每發都有細微不同的機械聲
 function mech(d, t, g, v) {
@@ -230,7 +236,7 @@ export const foley = {
     wpn(id);
     if (id === 'shotgun') return shellIn();
     if (reloadH) reloadH.kill();
-    const NOM = { pistol: 1.5, revolver: 2.6, ak47: 2.5, m4a1: 2.1, barrett: 3.6 };
+    const NOM = { pistol: 1.5, revolver: 2.6, ak47: 2.5, m4a1: 2.1, barrett: 3.6, rpg: 2.8 };
     const len = Number.isFinite(dur) && dur > 0 ? dur : NOM[id] || 1.5;
     const h = emit({ bus: 'sfx', prio: 4, room: 0.2, dur: len + 0.8, gain: 0.38 });
     if (!h) return;
@@ -254,7 +260,7 @@ export const foley = {
     const w = wpn(id);
     const h = emit({ bus: 'sfx', prio: 4, room: 0.15, dur: 0.7, gain: 0.8 });
     if (!h) return;
-    const heavy = w === 'barrett' || w === 'shotgun' || w === 'ak47';
+    const heavy = w === 'barrett' || w === 'shotgun' || w === 'ak47' || w === 'rpg';
     S.play('holster', { h, g: 0.55, semi: heavy ? -2 : 0 });
     cloth(h.in, h.t, 0.22, 0.13);
     clack(h.in, h.t + 0.13, heavy ? 1500 : 2200, 0.16);
@@ -625,6 +631,12 @@ function reloadSeq(h, id, len, empty, surf) {
       metal(d, t0 + at(0.85), 620, 0.1, 0.35, [1, 1.9, 3.1, 4.6]);
       tone(d, t0 + at(0.85), { f: 90, f1: 45, dur: 0.14, g: 0.35 });
     }
+  } else if (id === 'rpg') { // 拿出彈頭 0.08 → 滑進管口 0.3 → 卡榫 0.52 → 扳起擊錘 0.8
+    cloth(d, t0 + at(0.08), 0.3, 0.14);
+    slide(d, t0 + at(0.3), 600, 1000, 0.22, 0.2);
+    clack(d, t0 + at(0.52), 900, 0.55);
+    tone(d, t0 + at(0.52), { f: 120, f1: 60, dur: 0.12, g: 0.3 });
+    if (empty) { click(d, t0 + at(0.8), 1900, 0.32); click(d, t0 + at(0.83), 2700, 0.24); }
   } else if (id === 'ak47') { // 傾斜 0.08 → 撥下彈匣 0.18~0.36 → 新彈匣 0.5~0.66 → (空膛)拉機柄 0.8
     P('ak.magout', 0.17, 1.1, (t) => { clack(d, t, 1100, 0.4); slide(d, t + 0.09, 1200, 700, 0.15, 0.2); });
     rattle(d, t0 + at(0.38), 'metal', 0.09, surf);

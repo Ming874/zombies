@@ -9,13 +9,14 @@ import { ZombieSync } from './zsync.js';
 import { CoopMode } from './coop.js';
 import { PvpMode } from './pvp.js';
 import { NetHud } from './hud.js';
+import { findItem, applyGive } from '../game/give.js';
 
 // 多人連線的一場比賽(game.net)。
 // 原則:每一端只模擬自己的玩家;房主另外模擬回合、出怪、殭屍 AI 並廣播快照;
 // 打殭屍 → 命中送給房主結算;打玩家 → 命中送給被打的人(由被打的人驗證、套用防彈衣並回報死亡)。
 // 與遊戲的整合點(都是明確的呼叫,不改內部流程):
 //   game.update 開頭 net.update(dt)、本機玩家更新後 net.afterPlayer(dt);
-//   combat:每發曳光 net.onShot(終點, 打中肉體)、丟手榴彈 net.onGrenade(起點, 速度)、對遠端玩家的傷害 net.damageRemote(p, 量, 來源, 種類)、
+//   combat:每發曳光 net.onShot(終點, 打中肉體)、丟手榴彈 net.onGrenade(起點, 速度)、射出火箭 net.onRocket(起點, 方向)、對遠端玩家的傷害 net.damageRemote(p, 量, 來源, 種類)、
 //           game.extraTargets(對戰時把遠端玩家的命中盒加進射線/近戰判定)、game.addNade / explode(z, fxOnly) / killFx(z, hit)。
 // 其餘以「實例層級的方法包裝」掛上(hook),離開連線時全部還原,單人模式行為不變。
 const INTERP_DELAY = 100; // 遠端玩家插值延遲(ms)
@@ -145,6 +146,15 @@ export class NetSession {
     if (!fin(p.x, p.y, p.z, v.x, v.y, v.z)) return;
     this.send('nd', [r2(p.x), r2(p.y), r2(p.z), r2(v.x), r2(v.y), r2(v.z), Math.round(this.client.serverNow())]);
   }
+  // combat:本機射出 RPG 火箭 → 其他人模擬同一顆(只有特效,傷害由射手那一端結算)
+  onRocket(p, d) {
+    this.mode.onFire?.();
+    if (!fin(p.x, p.y, p.z, d.x, d.y, d.z)) return;
+    const r3 = (x) => Math.round(x * 1000) / 1000;
+    this.send('rk', [r2(p.x), r2(p.y), r2(p.z), r3(d.x), r3(d.y), r3(d.z), Math.round(this.client.serverNow())]);
+  }
+  // 控制面板:房主用 /give 把物品送給某個座位(伺服器只轉發房主送的 'gv')
+  give(slot, key, count) { return this.send('gv', [key, count ?? null], slot); }
 
   // ---------- 生命週期 ----------
   start() {
@@ -224,6 +234,8 @@ export class NetSession {
     g.resetRun();
     for (const n of g.nades || []) g.scene.remove(n.mesh);
     if (g.nades) g.nades.length = 0;
+    for (const k of g.rockets || []) g.scene.remove(k.mesh);
+    if (g.rockets) g.rockets.length = 0;
     g.state = 'menu';
     g.paused = false;
     g.phase = 'fighting';
@@ -322,6 +334,24 @@ export class NetSession {
       if (Math.hypot(d[0] - rp.pos.x, d[2] - rp.pos.z) > 6) return;
       const late = fin(d[6]) ? clamp((this.client.serverNow() - d[6]) / 1000, 0, 0.6) : 0.1;
       g.addNade(new THREE.Vector3(d[0], d[1], d[2]), new THREE.Vector3(d[3], d[4], d[5]), { owner: rp, harmless: true, t: 0.28 + late });
+    });
+    // 別人射出的 RPG 火箭:同一條彈道,只有特效;依延遲補上已經飛行的時間
+    this.on('rk', (d, f) => {
+      const rp = this.remotes.get(f);
+      if (!rp || !Array.isArray(d) || !fin(d[0], d[1], d[2], d[3], d[4], d[5])) return;
+      if (Math.hypot(d[0] - rp.pos.x, d[2] - rp.pos.z) > 6 || Math.hypot(d[3], d[4], d[5]) < 0.5) return;
+      const late = fin(d[6]) ? clamp((this.client.serverNow() - d[6]) / 1000, 0, 0.5) : 0.1;
+      const from = new THREE.Vector3(d[0], d[1], d[2]);
+      rp.avatar?.fire();
+      sfx.remoteShot?.('rpg', from);
+      g.addRocket(from, _v.set(d[3], d[4], d[5]), { owner: rp, harmless: true, t: late });
+    });
+    // 控制面板 /give(只收房主送的):物品直接加到本機玩家
+    this.on('gv', (d, f) => {
+      if (f !== this.hostSlot || !Array.isArray(d)) return;
+      const key = findItem(d[0]);
+      const msg = key ? applyGive(g, key, fin(d[1]) ? d[1] : undefined) : null;
+      if (msg) this.hud.feed(`${this.nameOf(f)}（房主）給了你：${msg}`, 'host');
     });
     this.zs.listen();
     this.mode.listen();

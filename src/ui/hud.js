@@ -185,13 +185,14 @@ export class Hud {
     });
     this._set('mag', mag, (v) => { this.magEl.textContent = v; });
     this._set('res', reserve, (v) => { this.resEl.textContent = `/ ${v}`; });
-    const st = mag === 0 ? (reserve === 0 ? 'empty dry' : 'empty') : cap && mag <= Math.max(1, Math.floor(cap * 0.25)) ? 'low' : '';
+    const low = cap && mag < cap && mag <= Math.max(1, Math.floor(cap * 0.25)); // 單發武器(RPG)裝滿時不算彈藥不足
+    const st = mag === 0 ? (reserve === 0 ? 'empty dry' : 'empty') : low ? 'low' : '';
     this._set('ammost', st + (reserve === 0 ? ' dry' : ''), (v) => { this.ammoEl.className = `hd-ammo ${v}`; });
     // 中央提示
     let warn = '', cls = '';
     if (!reloading) {
       if (mag === 0 && reserve === 0) { warn = '沒有彈藥'; cls = 'red blink'; }
-      else if (mag === 0 || (cap && mag <= Math.max(1, Math.floor(cap * 0.25)) && reserve > 0)) { warn = '按 [R] 換彈'; cls = mag === 0 ? 'red' : ''; }
+      else if (mag === 0 || (low && reserve > 0)) { warn = '按 [R] 換彈'; cls = mag === 0 ? 'red' : ''; }
       else if (reserve === 0 && cap && mag <= cap) { warn = '彈藥不足'; cls = ''; }
     }
     this.warn(warn, cls);

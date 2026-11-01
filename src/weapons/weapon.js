@@ -62,9 +62,20 @@ export const WEAPONS = {
     flash: 'brake', casing: 'rifle', casingSize: [0.0204, 0.099], move: 0.88,
     stats: { damage: 1, rate: 0.12, accuracy: 0.97, range: 1, mobility: 0.28 },
   },
+  // 火箭筒:不走射線,射出實體火箭(combat.js addRocket),命中即爆炸(explodeAt);damage = 爆心傷害
+  // rocket:{ speed 初速 m/s, radius 爆炸半徑, self 對玩家的傷害倍率, life 自毀秒數 };giveOnly:商店與對戰選槍不出現,只能用控制面板 /give 取得
+  rpg: {
+    name: 'RPG-7', desc: 'PG-7V 火箭推進榴彈 · 單發裝填', price: 0, damage: 320, rpm: 30, auto: false,
+    mag: 1, reserveStart: 4, reserveCap: 6, reload: 2.8, spread: 0.01, kick: 0.1, pitch: 0.05,
+    hold: [0.2, -0.16, -0.52], slot: 7, ads: { zoom: 1.3, spread: 0.003, time: 0.34, optic: 'iron' },
+    rocket: { speed: 48, radius: 6.5, self: 0.44, life: 4.5 }, giveOnly: true,
+    falloff: null, minDmg: 1, bloom: 0, moveSpread: 1.3, recoil: { yaw: [0], rand: 0.3 },
+    flash: 'shotgun', casing: null, move: 0.85,
+    stats: { damage: 1, rate: 0.04, accuracy: 0.55, range: 0.9, mobility: 0.25 },
+  },
 };
 
-export const ORDER = ['pistol', 'revolver', 'shotgun', 'ak47', 'm4a1', 'barrett'];
+export const ORDER = ['pistol', 'revolver', 'shotgun', 'ak47', 'm4a1', 'barrett', 'rpg'];
 
 const MOD_KEYS = ['damage', 'mag', 'reload', 'spread'];
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);

@@ -179,7 +179,7 @@ export class Game {
       return;
     }
 
-    const paused = this.paused || this.shopUIOpen;
+    const paused = this.paused || this.shopUIOpen || this.consoleOpen; // consoleOpen:F8 控制面板(src/ui/console.js)
     if (paused && !this.net) return; // [net] 多人模式世界不暫停,只是本機玩家不能操作
 
     const p = this.player;

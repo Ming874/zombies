@@ -34,7 +34,7 @@ const MAXP = { coop: 4, pvp: 8 };
 const BIN = { STATE: 1, ZSNAP: 2 }; // 二進位訊息種類
 const BIN_MAX = { [BIN.STATE]: 2048, [BIN.ZSNAP]: 24576 };
 // 只有房主能送的遊戲事件(回合、殭屍、對其他玩家的傷害結算…)
-const HOST_ONLY = new Set(['zn', 'zd', 'hz', 'rs', 're', 'go', 'ps', 'pe', 'hurt', 'sh', 'sync', 'rv', 'rq', 'cd']);
+const HOST_ONLY = new Set(['zn', 'zd', 'hz', 'rs', 're', 'go', 'ps', 'pe', 'hurt', 'sh', 'sync', 'rv', 'rq', 'cd', 'gv']); // gv:控制面板 /give
 const now = () => Date.now();
 const mono = () => performance.now();
 
