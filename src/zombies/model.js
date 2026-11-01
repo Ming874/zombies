@@ -1294,8 +1294,6 @@ let forced = null;
 export function forceVariant(type, i) { forced = { type, i }; }
 export const getVariantAt = (type, i) => getVariant(type, i | 0);
 export const variantIndexOf = (v) => (v && v.k != null ? v.k : 0);
-// 這個類型已經有建好的變體(生成時挑得到,不必同步建模)
-export const variantReady = (type) => !!cache[type]?.some(Boolean);
 export function getVariant(type, k) {
   if (k == null && forced && forced.type === type) { k = forced.i; forced = null; }
   const list = cache[type] || (cache[type] = []);
@@ -1318,10 +1316,9 @@ export function getVariant(type, k) {
   return buildSync(type, 0);
 }
 // 選單期間預建:有 Worker 時第一次呼叫就全部平行送出;沒有時每次排一個到 requestIdleCallback 同步建
-// main 只用到這些外觀(src/zombie.js 的 LOOKS;爬行者、追獵者不建)
-const ORDER = ['walker', 'walker', 'walker', 'runner', 'bloater', 'brute', 'screamer', 'surgeon', 'straitjacket', 'burned', 'stalker', 'hazmat',
-  'walker', 'walker', 'walker', 'runner', 'runner', 'runner', 'bloater', 'bloater', 'brute', 'brute',
-  'screamer', 'screamer', 'surgeon', 'surgeon', 'straitjacket', 'straitjacket', 'burned', 'burned', 'stalker', 'stalker', 'hazmat'];
+const ORDER = ['walker', 'walker', 'walker', 'runner', 'crawler', 'bloater', 'brute', 'screamer', 'surgeon', 'straitjacket', 'burned', 'stalker', 'hazmat',
+  'walker', 'walker', 'walker', 'runner', 'runner', 'runner', 'crawler', 'crawler', 'crawler', 'bloater', 'bloater', 'brute', 'brute',
+  'screamer', 'screamer', 'surgeon', 'surgeon', 'straitjacket', 'straitjacket', 'burned', 'burned', 'stalker', 'stalker', 'hazmat', 'pursuer'];
 export const VARIANT_TYPES = Object.keys(PER_TYPE);
 // 提供者可改變數,所以每次重算;還在下載的外部模型不算(不擋暖機)
 const TOTAL = () => { let n = 0; for (const t in PER_TYPE) for (let k = 0; k < PER_TYPE[t]; k++) if (!pending(t, k)) n++; return n; };

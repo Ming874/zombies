@@ -1,0 +1,11 @@
+/* 唯一的字幕區(src/ui/captions.js):畫面下方中間,一次一個人;同一個人的上一句變淡、縮小、不再重複名字 */
+body #gh-subs { bottom: 7.5%; gap: .3em; }
+body #gh-subs .ix-sub { max-width: min(62vw, 46em); }
+body #gh-subs .prev { opacity: .42; transform: scale(.9); transition: opacity .3s, transform .3s; }
+body #gh-subs .prev > small, body #gh-subs .prev > b { display: none; }
+body #gh-subs .ix-sub.prev { font-size: .95em; padding: .16em .7em .2em; }
+/* 聲音字幕(「（電話停了。）」、雜訊):小小的、淡淡的 */
+body #gh-subs .ix-sub.snd { font-size: .82em; padding: .14em .7em .18em; background: rgba(4, 6, 6, .36); color: rgba(208, 208, 198, .72); font-style: italic; letter-spacing: .14em; }
+body #gh-subs .cut { pointer-events: none; }
+/* 訊息/撿取合併的「×N」 */
+.hd-x { font-weight: 700; opacity: .85; margin-left: .15em; }

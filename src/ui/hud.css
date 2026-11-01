@@ -1,0 +1,160 @@
+/* HUD:只用 transform / opacity 做動畫;所有元素 position:fixed 依契約 §3.13 版位 */
+#hud { --hud-text: #e8e3d6; --hud-dim: rgba(232, 227, 214, .62); --hud-gold: #f2c84b; --hud-red: #d63b30; --hud-amber: #ffb347;
+  --hud-blue: #8db7d8; --hud-green: #7fe08f; --num: "Bahnschrift", "DIN Alternate", "Arial Narrow", "Microsoft JhengHei", sans-serif;
+  font-size: clamp(12px, 1.55vh, 17px); color: var(--hud-text); }
+#hud .hd { position: fixed; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.6); }
+#hud svg { width: 1em; height: 1em; display: inline-block; vertical-align: -0.14em; }
+#hud kbd.kc, .kc { display: inline-block; min-width: 1.5em; padding: 0 .35em; margin: 0 .2em; border: 1px solid rgba(255,255,255,.55); border-bottom-width: 2px;
+  border-radius: 3px; font: 700 .82em/1.45 var(--num); text-align: center; color: #fff; background: rgba(255,255,255,.08); text-shadow: none; vertical-align: .08em; }
+
+/* ---- 左上:樓層/區域 ---- */
+.hd-loc { left: 1.6em; top: 1.3em; display: flex; align-items: center; gap: .6em; font-weight: 700; letter-spacing: .12em; }
+.hd-floor { font: 700 1.25em/1 var(--num); padding: .22em .45em; border: 1px solid rgba(232,227,214,.55); border-radius: 2px; background: rgba(10,12,12,.45); letter-spacing: .04em; }
+.hd-zone { font-size: 1.02em; opacity: .9; transition: opacity .35s; }
+.hd-zone.swap { opacity: 0; }
+.hd-maphint { font-size: .78em; opacity: .55; font-weight: 400; margin-left: .3em; }
+.hd-zonebig { left: 1.6em; top: 4.2em; font-size: 1.9em; font-weight: 700; letter-spacing: .32em; opacity: 0; color: #ece7da;
+  text-shadow: 0 2px 10px #000, 0 0 30px rgba(0,0,0,.8); white-space: nowrap; }
+.hd-zonebig b { font-family: var(--num); letter-spacing: .06em; color: var(--hud-amber); }
+.hd-zonebig small { display: block; font-size: .42em; letter-spacing: .5em; opacity: .7; margin-top: .35em; font-weight: 400; }
+
+/* ---- 上中:回合 ---- */
+.hd-round { left: 50%; top: 1em; transform: translateX(-50%); text-align: center; }
+.hd-rn { font-size: 1.85em; font-weight: 700; letter-spacing: .38em; padding-left: .38em; }
+.hd-rn b { font-family: var(--num); font-size: 1.15em; color: #f1ece0; }
+.hd-rs { margin-top: .15em; font-size: .95em; letter-spacing: .2em; color: var(--hud-dim); }
+.hd-rs b { font-family: var(--num); font-size: 1.2em; color: var(--hud-text); margin: 0 .15em; }
+.hd-rs.rest b { color: var(--hud-amber); }
+.hd-rs.urgent b { color: #ff6a5a; }
+.hd-rs .nx { font-style: normal; color: #ff7a5a; letter-spacing: .1em; }
+
+/* ---- 右上:金幣 ---- */
+.hd-coins { right: 1.8em; top: 1.2em; display: flex; align-items: center; gap: .45em; font: 700 1.6em/1 var(--num); color: var(--hud-gold); }
+.hd-coins svg { width: 1.05em; height: 1.05em; filter: drop-shadow(0 0 5px rgba(240,190,60,.45)); }
+.hd-cgain { font-size: .7em; color: #ffe7a0; opacity: 0; }
+
+/* ---- 右上:分數 / 連殺 ---- */
+.hd-score { right: 1.8em; top: 4.2em; font-size: .9em; letter-spacing: .2em; color: var(--hud-dim); text-align: right; }
+.hd-score b { font: 700 1.25em/1 var(--num); letter-spacing: .04em; color: var(--hud-text); margin-left: .3em; }
+.hd-streak { right: 1.8em; top: 5.7em; width: 8.5em; text-align: right; font-weight: 700; color: #ffd27a; }
+.hd-streak b { display: inline-block; font-size: 1.15em; letter-spacing: .12em; transform-origin: 100% 50%; }
+.hd-streak span { font: 700 1em var(--num); margin-left: .45em; color: var(--hud-text); }
+.hd-streak .hd-bar { height: .22em; margin-top: .3em; border: 0; background: rgba(0,0,0,.45); }
+.hd-streak .fill { background: #ffb347; transform-origin: 100% 50%; transition: none; }
+.hd-streak.hot b { color: #ff8a4a; text-shadow: 0 0 10px rgba(255, 110, 40, .7), 0 1px 2px #000; }
+
+/* ---- 左下:生命 / 護甲 / 耐力 ---- */
+.hd-vitals { left: 1.8em; bottom: 1.6em; width: 19em; }
+.hd-row { display: flex; align-items: center; gap: .55em; }
+.hd-row + .hd-row { margin-top: .45em; }
+.hd-row > svg { width: 1.15em; height: 1.15em; flex: none; }
+.hd-row .num { font: 700 1.55em/1 var(--num); min-width: 2.1em; text-align: right; }
+.hd-bar { position: relative; flex: 1; height: .9em; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.22); overflow: hidden; }
+.hd-bar > div { position: absolute; inset: 0; transform-origin: 0 50%; }
+.hd-bar .trail { background: #f3d0b0; opacity: .55; transition: transform .55s ease-in .25s; }
+.hd-bar .fill { transition: transform .16s ease-out; }
+.hd-bar .seg { background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(0,0,0,.55) calc(10% - 1px) 10%); }
+.hd-hp svg { color: #e65045; }
+.hd-hp .fill { background: linear-gradient(#e2483c, #9a1f19); }
+.hd-hp.low .num { color: #ff5446; animation: hd-pulse 1s ease-in-out infinite; }
+.hd-hp.low svg { animation: hd-pulse 1s ease-in-out infinite; }
+.hd-hp.heal .fill { background: linear-gradient(#7ee08a, #2f9a49); }
+.hd-ar { height: 1.15em; }
+.hd-ar svg { color: var(--hud-blue); }
+.hd-ar .num { font-size: 1.15em; color: #cfe3f2; }
+.hd-ar .hd-bar { height: .55em; }
+.hd-ar .fill { background: linear-gradient(#a9cbe6, #4f7fa6); }
+.hd-ar.off { opacity: .28; }
+.hd-st { height: .7em; }
+.hd-st svg { color: #e8dc8a; width: .95em !important; height: .95em !important; }
+.hd-st .hd-bar { height: .32em; border: 0; background: rgba(0,0,0,.45); }
+.hd-st .fill { background: #e8dc8a; transition: transform .1s linear, background-color .3s; }
+.hd-st.tired .fill { background: #c9773c; }
+.hd-st.full { opacity: 0; transition: opacity .8s .6s; }
+.hd-st { transition: opacity .2s; }
+.hd-hide { display: none !important; }
+
+/* ---- 右下:武器 / 彈藥 / 道具 ---- */
+.hd-weapon { right: 1.9em; bottom: 1.4em; text-align: right; }
+.hd-wname { font-size: .95em; letter-spacing: .32em; color: var(--hud-dim); font-weight: 700; }
+.hd-wname em { font-style: normal; color: var(--hud-amber); letter-spacing: .1em; margin-left: .4em; }
+.hd-wname .tier { font-style: normal; font-size: .62em; letter-spacing: .12em; color: var(--hud-amber); margin-right: .55em; vertical-align: .15em; text-shadow: 0 0 6px rgba(255, 170, 60, .6), 0 1px 2px #000; }
+.hd-ammo { font-family: var(--num); font-weight: 700; line-height: 1; margin-top: .1em; }
+.hd-ammo .mag { font-size: 3.3em; display: inline-block; }
+.hd-ammo .res { font-size: 1.55em; opacity: .7; margin-left: .25em; }
+.hd-ammo.low .mag { color: var(--hud-amber); }
+.hd-ammo.empty .mag { color: #ff5446; }
+.hd-ammo.dry .res { color: #ff5446; opacity: 1; }
+.hd-inv { margin-top: .5em; display: flex; justify-content: flex-end; gap: 1.1em; font: 700 1.15em/1 var(--num); }
+.hd-inv span { display: inline-flex; align-items: center; gap: .3em; }
+.hd-inv span.zero { opacity: .32; }
+.hd-inv svg { width: 1.2em; height: 1.2em; }
+.hd-inv .g svg { color: #a5b27a; }
+.hd-inv .m svg { color: #e9e4da; }
+.hd-inv kbd.kc { font-size: .65em; }
+
+/* ---- 準心周圍:受傷方向 ---- */
+.hd-dmg { left: 50%; top: 50%; width: 0; height: 0; }
+.hd-dmg i { position: absolute; left: -9.5em; top: -9.5em; width: 19em; height: 19em; border-radius: 50%; opacity: 0; box-sizing: border-box;
+  border: .85em solid transparent; border-top-color: rgba(235, 28, 18, .95); filter: drop-shadow(0 0 8px rgba(255, 30, 10, .85)); will-change: transform, opacity; }
+
+/* ---- 擊殺跳字 ---- */
+.hd-pops { left: 50%; top: 50%; width: 0; height: 0; }
+.hd-pop { position: absolute; left: 3.2em; top: -2.6em; white-space: nowrap; font: 700 1.6em/1 var(--num); color: var(--hud-gold); opacity: 0; will-change: transform, opacity; }
+.hd-pop small { font-family: "Microsoft JhengHei", sans-serif; font-size: .62em; letter-spacing: .15em; margin-left: .4em; color: #ffd9a8; }
+.hd-pop.head small { color: #ff8b6a; }
+.hd-pop.melee small { color: #b9e3ff; }
+
+/* ---- 右側中:訊息列 ---- */
+.hd-feed { right: 1.8em; top: 34%; width: 24em; display: flex; flex-direction: column; align-items: flex-end; gap: .35em; }
+.hd-msg { font-size: .98em; padding: .3em .7em .3em .6em; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.55) 30%);
+  border-right: 2px solid var(--c, rgba(232,227,214,.6)); white-space: nowrap; letter-spacing: .06em; will-change: transform, opacity; }
+.hd-msg svg { margin-right: .4em; color: var(--c, currentColor); }
+.hd-msg b { color: var(--c, #fff); font-family: var(--num); }
+
+/* ---- 中下:互動提示 / 彈藥警告 / 治療 ---- */
+.hd-prompt { left: 50%; bottom: 21%; transform: translateX(-50%); font-size: 1.2em; letter-spacing: .08em; padding: .45em 1.1em;
+  background: rgba(8,10,10,.62); border: 1px solid rgba(255,255,255,.18); border-left: 3px solid var(--hud-amber); white-space: nowrap; }
+.hd-prompt.dim { border-left-color: rgba(255,255,255,.35); color: var(--hud-dim); }
+.hd-warn { left: 50%; top: calc(50% + 3.6em); transform: translateX(-50%); font-size: .95em; font-weight: 700; letter-spacing: .25em; padding-left: .25em; white-space: nowrap; color: var(--hud-amber); }
+.hd-warn.red { color: #ff5446; }
+.hd-warn.blink { animation: hd-pulse .9s ease-in-out infinite; }
+.hd-heal { left: 50%; top: calc(50% + 5.4em); transform: translateX(-50%); width: 13em; text-align: center; font-size: .95em; letter-spacing: .3em; color: #9ff0ae; }
+.hd-heal .hd-bar { height: .4em; margin-top: .35em; border-color: rgba(159,240,174,.4); }
+.hd-heal .fill { background: #7fe08f; transition: none; }
+
+/* ---- 回合間:補給站方向標記 ---- */
+.hd-wp { left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: .1em; color: var(--hud-amber); font: 700 .95em/1 var(--num); will-change: transform; }
+.hd-wp svg { width: 1.9em; height: 1.9em; filter: drop-shadow(0 0 6px rgba(255,170,60,.7)); }
+.hd-wp .arr { width: 0; height: 0; border: .45em solid transparent; border-bottom: .75em solid var(--hud-amber); margin-bottom: .1em; display: none; }
+.hd-wp.edge .arr { display: block; }
+.hd-wp small { font-family: "Microsoft JhengHei", sans-serif; font-size: .78em; letter-spacing: .1em; opacity: .85; }
+
+/* ---- 撿取訊息 ---- */
+.hd-pick { left: 50%; bottom: 28%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: .35em; }
+.hd-pk { font-size: 1.45em; font-weight: 700; letter-spacing: .18em; white-space: nowrap; text-align: center; will-change: transform, opacity; }
+.hd-pk small { display: block; font-size: .58em; letter-spacing: .06em; margin-top: .1em; opacity: .82; }
+.hd-pk svg { width: 1em; height: 1em; margin-right: .45em; filter: drop-shadow(0 0 5px currentColor); }
+
+/* ---- 左側中:新手提示 ---- */
+.hd-tip { left: 1.6em; top: 34%; width: 21em; padding: .6em .9em .7em; background: linear-gradient(90deg, rgba(10, 12, 11, .82), rgba(10, 12, 11, .55));
+  border-left: 3px solid var(--hud-amber); text-shadow: 0 1px 2px #000; }
+.hd-tip .tt { display: flex; align-items: center; gap: .45em; font-size: .9em; letter-spacing: .2em; color: var(--hud-amber); }
+.hd-tip .tt .ic svg { width: 1.05em; height: 1.05em; }
+.hd-tip .tt .sp { flex: 1; }
+.hd-tip .tt small { font-size: .78em; letter-spacing: .1em; color: var(--hud-dim); }
+.hd-tip .tt kbd.kc { font-size: .72em; }
+.hd-tip .tx { margin-top: .35em; font-size: .98em; line-height: 1.7; letter-spacing: .04em; color: var(--hud-text); }
+.hd-tip .tx kbd.kc { font-size: .78em; }
+.hd-tip .tl { height: 2px; margin-top: .5em; background: rgba(255, 255, 255, .1); }
+.hd-tip .tl i { display: block; height: 100%; background: var(--hud-amber); transform-origin: 0 50%; opacity: .7; }
+
+/* ---- 標題橫幅 ---- */
+.hd-banner { left: 0; right: 0; top: 22%; text-align: center; font-size: 3.5em; letter-spacing: .32em; padding-left: .32em; font-weight: 700; color: #d6d9cf; opacity: 0;
+  text-shadow: 0 2px 14px #000, 0 0 40px rgba(0,0,0,.7); }
+.hd-banner small { display: block; font-size: .36em; letter-spacing: .3em; margin-top: .7em; opacity: .85; font-weight: 400; }
+.hd-banner.red { color: #d8483c; }
+.hd-banner.gold { color: #f0c860; }
+
+
+@keyframes hd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }

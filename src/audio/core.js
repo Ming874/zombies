@@ -980,9 +980,3 @@ export function curve(n, fn) {
   for (let i = 0; i < n; i++) c[i] = fn(i / (n - 1), i);
   return c;
 }
-
-// ---------- main:配樂狀態決定環境嗡鳴的音量(src/audio.js 的 ambient 套用)----------
-export function ambienceLevel(v) {
-  A.ambLevel = v;
-  if (A.ambG && A.ctx) A.ambG.gain.setTargetAtTime(v, A.ctx.currentTime, 2);
-}

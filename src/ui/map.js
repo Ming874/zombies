@@ -179,7 +179,7 @@ export class MapUI {
     }
     for (const p of this.pois.values()) if (!p.seen && (p.level ?? 0) === li && at(p.x, p.z)) { p.seen = true; this.marksN++; }
   }
-  _supplies() { return []; } // main 沒有補給櫃(test 的地圖上會記看過的彈藥櫃/醫療櫃)
+  _supplies() { const g = this.game || this._g; const w = g?.world; return w?.supplies?.length ? w.supplies : this.L.supplies || []; }
 
   // 劇情系統:整區揭開(例如拿到平面圖上的某一頁)、登記劇情點
   reveal(zoneId) {

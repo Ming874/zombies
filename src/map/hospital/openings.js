@@ -4,9 +4,10 @@ import { DIRS, ARROW } from './shell.js';
 import { revealFor } from './style.js';
 import { buildLeaves } from './leaves.js';
 import { buildFacade } from './facade.js';
+import hospitalPack from '../../interact/packs/hospital.js';
 
 // 劇情包會上鎖的區域(src/interact/doors.js 的鎖只關得住掛在鉸鍊上的門扇):通往這些區域的門洞兩扇都要掛著,不倒、不缺
-const LOCKS = []; // main 沒有劇情上鎖的門(test 由 src/interact/packs/hospital.js 提供)
+const LOCKS = hospitalPack.items.filter((i) => i.kind === 'lock' && i.door);
 const SEALED = new Set(LOCKS.map((i) => i.door)), SEALED_OUT = new Set(LOCKS.filter((i) => i.outer).map((i) => i.door)); // outer:外門也鎖
 
 // 門(門框、門楣、門扇的各種狀態)、窗(窗框、玻璃狀態、木板封窗、百葉、窗簾、鐵條)、

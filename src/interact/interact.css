@@ -1,0 +1,110 @@
+/* 互動系統:按住進度、字幕、道具列、閱讀器、密碼鍵盤、保險絲盒(src/interact/ui.js) */
+.ix-hold { left: 50%; top: calc(50% + 5.4em); transform: translateX(-50%); width: 14em; text-align: center; font-size: .95em; letter-spacing: .25em; color: var(--hud-amber); }
+.ix-hold .hd-bar { height: .4em; margin-top: .35em; border-color: rgba(255,179,71,.45); }
+.ix-hold .fill { background: var(--hud-amber); transition: none; transform-origin: 0 50%; }
+
+.ix-subs { left: 50%; bottom: 9.5%; transform: translateX(-50%); width: min(62vw, 46em); display: flex; flex-direction: column; align-items: center; gap: .35em; }
+.ix-sub { max-width: 100%; padding: .32em .9em .36em; background: rgba(4,6,6,.62); border-radius: 2px; font-size: 1.12em; line-height: 1.55; letter-spacing: .06em; text-align: center;
+  color: #ece6d6; animation: ixSubIn .25s ease-out; transition: opacity .4s; }
+.ix-sub b { display: block; font-size: .72em; letter-spacing: .3em; font-weight: 700; opacity: .9; }
+.ix-sub.phone span { font-style: italic; }
+.ix-sub.radio span, .ix-sub.tv span { text-shadow: 0 0 6px rgba(160,210,190,.35), 0 1px 2px #000; }
+.ix-sub.out { opacity: 0; }
+@keyframes ixSubIn { from { opacity: 0; transform: translateY(.4em); } to { opacity: 1; transform: none; } }
+
+.ix-inv { left: 1.8em; bottom: 7.6em; display: flex; gap: .45em; font-size: .82em; letter-spacing: .12em; color: var(--hud-dim); }
+.ix-inv span { padding: .15em .55em; border: 1px solid rgba(232,227,214,.28); background: rgba(10,12,12,.45); }
+.ix-inv b { font-family: var(--num); color: var(--hud-amber); }
+
+/* ---- 全螢幕面板(閱讀器 z 28:地圖之上、商店之下) ---- */
+.ix-modal { position: fixed; inset: 0; z-index: 28; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1em;
+  background: radial-gradient(ellipse at 50% 45%, rgba(6,7,7,.55), rgba(0,0,0,.86)); opacity: 0; transition: opacity .2s; pointer-events: none;
+  font-size: clamp(12px, 1.6vh, 18px); color: #e8e3d6; }
+.ix-modal.on { opacity: 1; }
+.ix-modal .ft { font-size: .82em; letter-spacing: .15em; color: rgba(232,227,214,.6); text-shadow: 0 1px 2px #000; }
+.ix-modal .kc { display: inline-block; min-width: 1.4em; padding: 0 .3em; margin: 0 .15em; border: 1px solid rgba(232,227,214,.5); border-bottom-width: 2px; border-radius: 3px;
+  font: 700 .9em/1.35 var(--num, sans-serif); text-align: center; color: #f1ece0; background: rgba(255,255,255,.06); }
+
+/* 紙張:米黃底 + 雜訊 + 汙漬 + 橫線;手寫用標楷體 */
+.ix-reader .sheet { position: relative; width: min(34em, 86vw); max-height: 72vh; overflow: auto; padding: 2.2em 2.4em 2.4em; color: #2a2620;
+  background:
+    radial-gradient(ellipse at 82% 12%, rgba(120,84,40,.22), transparent 38%),
+    radial-gradient(ellipse at 12% 88%, rgba(90,60,30,.18), transparent 42%),
+    radial-gradient(circle at 70% 70%, rgba(110,40,30,.08), transparent 18%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .3  0 0 0 0 .22  0 0 0 .2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(#e9e0c9, #ddd2b6);
+  box-shadow: 0 1.2em 3em rgba(0,0,0,.7), inset 0 0 4em rgba(90,70,40,.35); transform: rotate(-.6deg);
+  font-family: "Noto Serif TC", "Source Han Serif TC", "PMingLiU", "MingLiU", serif; scrollbar-width: none; }
+.ix-reader.hand .sheet { font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", "Noto Serif TC", serif;
+  background-image: radial-gradient(ellipse at 82% 12%, rgba(120,84,40,.22), transparent 38%), radial-gradient(ellipse at 12% 88%, rgba(90,60,30,.18), transparent 42%),
+    repeating-linear-gradient(transparent 0 1.86em, rgba(70,90,140,.22) 1.86em calc(1.86em + 1px)), linear-gradient(#ebe3cd, #ded4b9); }
+.ix-reader.k-chart .sheet, .ix-reader.k-log .sheet { font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+.ix-reader.k-drawing .sheet { background: linear-gradient(#f2efe6, #e7e2d4); font-family: "DFKai-SB", "KaiTi", serif; color: #3a2a6a; }
+.ix-reader.k-photo .sheet, .ix-reader.k-polaroid .sheet { background: #f4f2ec; color: #24221e; transform: rotate(1.2deg); }
+.ix-reader .kd { font-size: .75em; letter-spacing: .4em; color: rgba(60,48,34,.65); margin-bottom: .6em; }
+.ix-reader h2 { margin: 0 0 .35em; font-size: 1.35em; letter-spacing: .12em; font-weight: 700; }
+.ix-reader .meta { font-size: .85em; letter-spacing: .12em; color: rgba(50,40,30,.7); margin-bottom: 1.1em; }
+.ix-reader .tx { font-size: 1.08em; line-height: 1.86; letter-spacing: .06em; white-space: normal; }
+/* 錄音帶:黑底標籤 + 逐行逐字稿 */
+.ix-reader.tape .sheet { color: #d9d4c6; background: linear-gradient(#1b1d1c, #111312); border: 1px solid #3a3d39; box-shadow: 0 1.2em 3em rgba(0,0,0,.8);
+  font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; transform: none; }
+.ix-reader.tape .kd { color: #9fb5a8; }
+.ix-reader.tape .meta { color: rgba(217,212,198,.6); }
+.ix-reader .tr { list-style: none; margin: 0; padding: 0; }
+.ix-reader .tr li { padding: .28em 0 .3em .8em; border-left: 2px solid transparent; line-height: 1.6; opacity: .55; transition: opacity .2s, border-color .2s; }
+.ix-reader .tr li b { display: inline-block; min-width: 6.5em; margin-right: .6em; font-size: .82em; letter-spacing: .12em; color: #a8c4b4; }
+.ix-reader .tr li.on { opacity: 1; border-left-color: #c9a45a; }
+
+/* 密碼鍵盤:金屬面板 + 綠色液晶;病歷終端:黑底綠字 */
+.ix-keypad .pad, .ix-fuse .pad { width: min(19em, 80vw); padding: 1.3em 1.4em 1.1em; background: linear-gradient(#3b3f3d, #262928); border: 1px solid #555a56; border-radius: 6px;
+  box-shadow: 0 1.2em 3em rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.08); font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+.ix-keypad .kt, .ix-fuse .kt { font-size: .95em; letter-spacing: .2em; font-weight: 700; color: #e4dfd0; }
+.ix-keypad .ks, .ix-fuse .ks { margin-top: .3em; font-size: .78em; letter-spacing: .1em; color: rgba(228,223,208,.6); }
+.ix-keypad .disp { display: flex; gap: .4em; justify-content: center; margin: .9em 0 .4em; padding: .55em; background: #0f1a12; border: 1px solid #1f3022; box-shadow: inset 0 0 1em rgba(0,0,0,.8); }
+.ix-keypad .disp i { width: 1.6em; height: 2em; font: 700 1.5em/2em var(--num, monospace); font-style: normal; text-align: center; color: #7dff9a; text-shadow: 0 0 8px rgba(110,255,140,.6); border-bottom: 2px solid rgba(125,255,154,.25); }
+.ix-keypad .disp i.on { border-bottom-color: rgba(125,255,154,.7); }
+.ix-keypad .out { min-height: 1.6em; margin-bottom: .5em; font-size: .9em; line-height: 1.5; letter-spacing: .08em; text-align: center; color: #9fe3b0; }
+.ix-keypad.bad .out { color: #ff7a6a; }
+.ix-keypad.bad .disp i { color: #ff7a6a; text-shadow: 0 0 8px rgba(255,90,70,.6); }
+.ix-keypad .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45em; }
+.ix-keypad .keys span { padding: .45em 0; text-align: center; font: 700 1.15em/1 var(--num, sans-serif); color: #ddd8ca; background: linear-gradient(#5a5f5b, #444845); border-radius: 4px;
+  box-shadow: 0 2px 0 #1d1f1e; transition: transform .08s; }
+.ix-keypad .keys span.hit { transform: translateY(2px); box-shadow: 0 0 0 #1d1f1e; background: #6b706c; }
+.ix-keypad .ft, .ix-fuse .ft { margin-top: .9em; font-size: .72em; letter-spacing: .08em; text-align: center; }
+.ix-keypad.term .pad { width: min(26em, 86vw); background: #070c09; border-color: #1c3324; }
+.ix-keypad.term .kt { color: #7dff9a; font-family: "Consolas", "Noto Sans Mono", monospace; }
+.ix-keypad.term .out { min-height: 4.5em; text-align: left; padding: .5em .7em; background: #040805; border: 1px solid #12261a; font-family: "Consolas", "Noto Sans TC", monospace; color: #8af0a3; }
+.ix-keypad.term .keys span { background: #0e1a12; color: #7dff9a; box-shadow: 0 2px 0 #020402; }
+
+.ix-fuse ul { list-style: none; margin: .9em 0 0; padding: 0; display: flex; flex-direction: column; gap: .4em; }
+.ix-fuse li { display: flex; align-items: center; gap: .6em; padding: .45em .6em; background: #1a1c1b; border: 1px solid #3a3e3b; font-size: .92em; letter-spacing: .08em; }
+.ix-fuse li span { flex: 1; }
+.ix-fuse li em { font-style: normal; font-size: .8em; color: #8a8f8a; }
+.ix-fuse li.on { border-color: #8a6a2a; }
+.ix-fuse li.on em { color: #ffc35a; text-shadow: 0 0 6px rgba(255,180,60,.5); }
+.ix-fuse li.no { opacity: .55; }
+
+/* 響鈴提示:琥珀色的電話徽章(與電話指示燈同色)+ 距離 + 指向箭頭;畫面內變成電話上方的小標記,每響一聲擴散一圈 */
+.ix-ring { left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity .25s; will-change: transform, opacity; pointer-events: none;
+  --amber: #ffc56a; color: var(--amber); }
+.ix-ring .badge { position: absolute; left: -1.25em; top: -1.25em; width: 2.5em; height: 2.5em; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle, rgba(60,36,10,.78) 0, rgba(14,10,6,.72) 70%); border: 2px solid var(--amber);
+  box-shadow: 0 0 10px rgba(255,170,60,.65), 0 0 22px rgba(255,140,30,.3), inset 0 0 8px rgba(255,170,60,.25); }
+.ix-ring .badge svg { width: 1.35em; height: 1.35em; filter: drop-shadow(0 0 3px rgba(255,180,80,.8)); }
+.ix-ring .rip { position: absolute; left: -1.25em; top: -1.25em; width: 2.5em; height: 2.5em; border-radius: 50%; border: 2px solid var(--amber); opacity: 0; }
+.ix-ring .dir { position: absolute; left: 0; top: 0; width: 0; height: 0; display: none; }
+.ix-ring .dir u { position: absolute; left: -.62em; top: -2.75em; width: 0; height: 0; border-left: .62em solid transparent; border-right: .62em solid transparent;
+  border-bottom: .9em solid var(--amber); filter: drop-shadow(0 0 4px rgba(255,160,50,.9)); }
+.ix-ring span { position: absolute; left: 0; top: 1.55em; transform: translateX(-50%); white-space: nowrap; font-size: .95em; font-weight: 600; letter-spacing: .14em;
+  color: #ffe2b0; padding: .1em .55em; background: rgba(12,9,6,.62); border-top: 1px solid rgba(255,197,106,.55); border-bottom: 1px solid rgba(255,197,106,.55);
+  text-shadow: 0 0 6px rgba(0,0,0,.9), 0 1px 2px #000; }
+.ix-ring.edge { font-size: 1.12em; }
+.ix-ring.edge .dir { display: block; }
+.ix-ring.see .badge, .ix-ring.wall .badge { left: -.95em; top: -.95em; width: 1.9em; height: 1.9em; }
+.ix-ring.see .rip, .ix-ring.wall .rip { left: -.95em; top: -.95em; width: 1.9em; height: 1.9em; }
+.ix-ring.see .badge svg, .ix-ring.wall .badge svg { width: 1.05em; height: 1.05em; }
+.ix-ring.see span, .ix-ring.wall span { top: 1.2em; font-size: .85em; }
+.ix-ring.wall .badge { border-style: dashed; box-shadow: 0 0 8px rgba(255,170,60,.4); } /* 隔著牆:虛線、淡 */
+/* 能接了:提示列琥珀色、跟著鈴聲亮 */
+.hd-prompt.ix-answer { color: #ffe2b0; border-color: rgba(255,197,106,.7); box-shadow: 0 0 14px rgba(255,160,50,.35); animation: ix-answer 3s infinite; }
+@keyframes ix-answer { 0%, 36% { text-shadow: 0 0 10px rgba(255,180,80,.9); } 37%, 100% { text-shadow: 0 0 4px rgba(255,180,80,.35); } }

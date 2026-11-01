@@ -1,0 +1,106 @@
+/* 推理本(J):一本攤開的舊筆記本。紙張沿用閱讀器的米黃紙 + 雜訊 + 汙漬;題目印刷體,填進去的詞用手寫(標楷)。 */
+.dd-book { position: fixed; inset: 0; z-index: 29; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1em;
+  background: radial-gradient(ellipse at 50% 46%, rgba(10,9,8,.55), rgba(0,0,0,.9) 70%); opacity: 0; pointer-events: none; transition: opacity .22s;
+  font-size: clamp(12px, 1.55vh, 18px); color: #2a2620; user-select: none; }
+.dd-book.on { opacity: 1; pointer-events: auto; cursor: default; }
+.dd-spread { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(66em, 95vw); height: min(40em, 84vh); transform: rotate(-.5deg) translateY(.6em); transition: transform .3s;
+  filter: drop-shadow(0 1.6em 2.4em rgba(0,0,0,.85)); }
+.dd-book.on .dd-spread { transform: rotate(-.5deg); }
+.dd-page { position: relative; overflow: hidden auto; padding: 2em 2.3em 2.2em; scrollbar-width: thin; scrollbar-color: rgba(90,70,40,.4) transparent;
+  background:
+    radial-gradient(ellipse at 80% 14%, rgba(120,84,40,.2), transparent 36%),
+    radial-gradient(ellipse at 18% 86%, rgba(90,60,30,.16), transparent 40%),
+    radial-gradient(circle at 64% 72%, rgba(110,40,30,.07), transparent 16%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .3  0 0 0 0 .22  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    repeating-linear-gradient(transparent 0 2.05em, rgba(70,90,140,.17) 2.05em calc(2.05em + 1px)),
+    linear-gradient(#e8dfc6, #dbd0b3);
+  font-family: "Noto Serif TC", "Source Han Serif TC", "PMingLiU", "MingLiU", serif; }
+.dd-l { border-radius: .5em 0 0 .5em; box-shadow: inset -2.6em 0 2.4em -2em rgba(60,40,20,.55), inset 0 0 3.5em rgba(90,70,40,.3); }
+.dd-r { border-radius: 0 .5em .5em 0; box-shadow: inset 2.6em 0 2.4em -2em rgba(60,40,20,.55), inset 0 0 3.5em rgba(90,70,40,.3); }
+.dd-l::before { content: ''; position: absolute; top: 0; bottom: 0; left: 3.1em; width: 1px; background: rgba(170,50,40,.35); } /* 紅色邊線 */
+.dd-l::after { content: '207'; position: absolute; right: .6em; bottom: -.15em; font: 700 7em/1 "Noto Serif TC", serif; color: rgba(120,30,20,.045); pointer-events: none; transform: rotate(-8deg); }
+.dd-hd { display: flex; justify-content: space-between; font: .74em/1.4 "Noto Sans TC", "Microsoft JhengHei", sans-serif; letter-spacing: .38em; color: rgba(60,48,34,.62); margin: 0 0 .8em .9em; }
+.dd-book h2 { margin: 0 0 .9em .55em; font-size: 1.32em; line-height: 1.5; letter-spacing: .1em; font-weight: 700; color: #241f19; }
+.dd-sent { margin-left: .55em; }
+.dd-sent p { margin: 0 0 1.05em; font-size: 1.12em; line-height: 2.05; letter-spacing: .05em; }
+.dd-slot { position: relative; display: inline-block; min-width: 5.2em; margin: 0 .18em; padding: 0 .45em; border: 0; border-bottom: 1.5px solid rgba(60,45,30,.6); background: none;
+  font: inherit; line-height: 1.5; color: #7a1d14; cursor: pointer; vertical-align: baseline; border-radius: .2em .2em 0 0; transition: background .15s, box-shadow .15s; }
+.dd-slot sup { position: absolute; left: -.15em; top: -.6em; font: 600 .55em/1 "Noto Sans TC", sans-serif; color: rgba(60,48,34,.5); }
+.dd-slot.full { font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif; font-size: 1.08em; color: #6d1810; text-shadow: 0 0 .5px rgba(80,10,5,.6); }
+.dd-slot.empty em { font: normal .72em/1 "Noto Sans TC", sans-serif; letter-spacing: .2em; color: rgba(60,48,34,.38); }
+.dd-slot:hover { background: rgba(140,100,40,.12); }
+.dd-slot.sel { background: rgba(180,120,40,.18); box-shadow: 0 0 0 1px rgba(150,90,30,.45); }
+.dd-slot.drop { background: rgba(150,40,30,.12); box-shadow: 0 0 0 1px rgba(150,40,30,.45) inset; }
+.dd-sent.solved .dd-slot { cursor: default; border-bottom-color: rgba(120,30,20,.5); }
+.dd-stat { display: flex; gap: 1.4em; margin: .6em 0 0 .55em; font: .82em/1.5 "Noto Sans TC", "Microsoft JhengHei", sans-serif; letter-spacing: .14em; color: rgba(50,40,30,.72); }
+.dd-hint { margin: .9em 0 0 .55em; font: .86em/1.7 "DFKai-SB", "KaiTi", serif; color: rgba(60,48,34,.7); }
+.dd-hint.ready { color: #7a1d14; font-size: .98em; }
+.dd-book kbd { display: inline-block; min-width: 1.3em; padding: 0 .28em; margin: 0 .1em; border: 1px solid currentColor; border-bottom-width: 2px; border-radius: 3px; font: 700 .85em/1.35 var(--num, sans-serif); text-align: center; opacity: .85; }
+.dd-truth { position: relative; margin: 1.4em .2em 0 .55em; padding: 1em 1.2em 1.1em; border-top: 1px dashed rgba(90,60,30,.4); font: .98em/1.95 "DFKai-SB", "KaiTi", serif; color: #3a2a1c; }
+.dd-truth h3 { margin: 0 0 .3em; font: 600 .78em/1 "Noto Sans TC", sans-serif; letter-spacing: .4em; color: rgba(60,48,34,.6); }
+.dd-truth p { margin: 0; }
+.dd-seal { position: absolute; right: .4em; top: -1.6em; padding: .25em .45em; border: 2px solid rgba(170,30,20,.7); border-radius: .2em; color: rgba(170,30,20,.78);
+  font: 700 1.25em/1 "DFKai-SB", "KaiTi", serif; letter-spacing: .2em; transform: rotate(9deg); mix-blend-mode: multiply; }
+.dd-tabs { display: flex; gap: .3em; margin: -.4em 0 1em; border-bottom: 1px solid rgba(90,70,40,.3); }
+.dd-tabs button { position: relative; padding: .35em .9em .3em; border: 0; background: none; cursor: pointer; font: 600 .9em/1.4 "Noto Sans TC", "Microsoft JhengHei", sans-serif; letter-spacing: .25em; color: rgba(50,40,30,.55); }
+.dd-tabs button.on { color: #2a2018; box-shadow: inset 0 -2px 0 rgba(122,29,20,.7); }
+.dd-tabs small { font-family: var(--num, sans-serif); letter-spacing: 0; opacity: .7; margin-left: .2em; }
+.dd-tabs i { position: relative; top: -.15em; margin-left: .35em; font: normal .62em/1 "Noto Sans TC", sans-serif; color: #fff; background: #8a2418; padding: .15em .3em; border-radius: .2em; letter-spacing: 0; }
+.dd-tabs .dd-x { margin-left: auto; font-size: 1.2em; letter-spacing: 0; color: rgba(50,40,30,.5); }
+.dd-cat { margin-bottom: 1em; transition: opacity .15s; }
+.dd-cat.dim { opacity: .38; }
+.dd-cat h4 { margin: 0 0 .45em; font: 600 .74em/1 "Noto Sans TC", sans-serif; letter-spacing: .38em; color: rgba(60,48,34,.6); }
+.dd-cat.hot h4 { color: #7a1d14; }
+.dd-w { display: inline-block; margin: 0 .45em .5em 0; padding: .2em .6em .22em; border: 1px solid rgba(80,60,40,.38); border-radius: .25em; background: rgba(255,250,235,.45);
+  font: 1.02em/1.4 "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif; color: #2e241b; cursor: grab; box-shadow: 0 1px 0 rgba(60,40,20,.15); transform: rotate(-.4deg); transition: background .12s, transform .12s; }
+.dd-w:nth-child(2n) { transform: rotate(.5deg); }
+.dd-w:hover { background: rgba(255,240,200,.85); transform: translateY(-1px); }
+.dd-w.used { opacity: .45; text-decoration: line-through rgba(120,30,20,.45); }
+.dd-cat.hot .dd-w { border-color: rgba(122,29,20,.55); }
+.dd-empty { margin-top: 2em; font: .95em/1.8 "DFKai-SB", "KaiTi", serif; color: rgba(60,48,34,.55); }
+.dd-cards { list-style: none; margin: 0; padding: 0; }
+.dd-cards li { padding: .45em .3em .4em; border-bottom: 1px dotted rgba(90,70,40,.3); cursor: pointer; }
+.dd-cards li b { font-weight: 600; letter-spacing: .06em; }
+.dd-cards li small { float: right; font: .72em/2 "Noto Sans TC", sans-serif; letter-spacing: .2em; color: rgba(60,48,34,.5); }
+.dd-cards li p { margin: .5em 0 .2em; font: .92em/1.85 "DFKai-SB", "KaiTi", serif; color: #3a2e22; white-space: normal; }
+.dd-cards li.open { background: rgba(255,250,235,.4); }
+.dd-ft { font: .8em/1.4 "Noto Sans TC", "Microsoft JhengHei", sans-serif; letter-spacing: .14em; color: rgba(232,227,214,.62); text-shadow: 0 1px 2px #000; }
+.dd-ft kbd { color: #f1ece0; }
+
+/* HUD:新線索的小記號(右上方,地圖提示下面) */
+.dd-badge { position: absolute; right: 1.6em; top: 7.4em; display: flex; align-items: center; gap: .55em; padding: .35em .7em; opacity: 0; transform: translateX(.6em); transition: opacity .4s, transform .4s;
+  font: .82em/1.3 "Microsoft JhengHei", "Noto Sans TC", sans-serif; letter-spacing: .14em; color: #e8dcc0; background: linear-gradient(90deg, rgba(20,16,10,0), rgba(20,16,10,.55) 30%); pointer-events: none; }
+.dd-badge b { color: #e3c98a; font-weight: 700; }
+.dd-badge kbd { display: inline-block; min-width: 1.3em; padding: 0 .25em; border: 1px solid rgba(232,227,214,.55); border-bottom-width: 2px; border-radius: 3px; font: 700 .9em/1.3 var(--num, sans-serif); text-align: center; }
+.dd-badge i { font-style: normal; font-family: var(--num, sans-serif); color: #fff; background: #8a2418; border-radius: .2em; padding: 0 .35em; }
+.dd-badge i:empty { display: none; }
+.dd-badge.has { opacity: .55; transform: none; }
+.dd-badge.flash { opacity: 1; transform: none; animation: dd-pulse 1.2s ease-out 2; }
+@keyframes dd-pulse { 0% { filter: brightness(1.8); } 100% { filter: none; } }
+.dd-slot.hint { box-shadow: 0 0 0 2px rgba(170,30,20,.55); border-radius: 50% / 40%; } /* 提示:這一格不對(紅筆圈起來) */
+
+/* 目標列:左上角,地點下面;細、淡、動作 + 對象 */
+.ob-line { left: 1.6em; top: 3.5em; display: flex; align-items: center; gap: .55em; max-width: 34em; font: .95em/1.4 "Noto Serif TC", "PMingLiU", serif; letter-spacing: .22em;
+  color: rgba(232,226,210,.78); text-shadow: 0 1px 3px #000, 0 0 10px rgba(0,0,0,.8); transition: opacity .6s; pointer-events: none; }
+.ob-line i { width: .42em; height: .42em; border: 1px solid rgba(214,180,120,.75); transform: rotate(45deg); flex: none; }
+.ob-line.hide { opacity: 0; }
+.ob-line.new span { animation: ob-in 2.4s ease-out; }
+@keyframes ob-in { 0% { opacity: 0; filter: blur(3px); letter-spacing: .5em; } 12% { opacity: .9; } 16% { opacity: .2; } 22% { opacity: 1; filter: none; color: #f3e2b8; } 100% { letter-spacing: .22em; } }
+/* 提示:東西閃一下 */
+.ob-glint { left: 0; top: 0; width: 36px; height: 36px; margin: -18px 0 0 -18px; opacity: 0; transition: opacity .8s; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,244,214,.95) 0 8%, rgba(255,226,160,.35) 18%, transparent 55%); filter: blur(.3px); }
+.ob-glint::before, .ob-glint::after { content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 1px; margin: -.5px 0 0 -15px; background: linear-gradient(90deg, transparent, rgba(255,240,205,.8), transparent); }
+.ob-glint::after { transform: rotate(90deg); }
+.ob-glint.on { opacity: .9; animation: ob-tw 2.2s ease-in-out infinite; }
+@keyframes ob-tw { 0%, 100% { filter: brightness(.6); } 45% { filter: brightness(1.4); } 55% { filter: brightness(.9); } }
+
+/* 目標列的「為什麼」(CLARITY_PLAN §7.1):淡 40%、小一號 */
+.ob-line small { opacity: .6; font-size: .84em; letter-spacing: .12em; white-space: nowrap; }
+.ob-line.new small { animation: ob-in 2.4s ease-out; }
+.dd-next { margin: 0 0 1em; padding: .6em .8em; border: 1px solid rgba(122,29,20,.35); border-radius: .25em; background: rgba(255,248,230,.5); font: 1em/1.6 "Noto Serif TC", serif; color: #2a2018; }
+.dd-next b { color: #7a1d14; letter-spacing: .1em; }
+.dd-next small { opacity: .65; margin-left: .2em; font-size: .86em; }
+.dd-notes { margin: 0; padding: 0 0 0 1.2em; }
+.dd-notes li { margin: 0 0 .55em; font: .98em/1.75 "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif; color: #2e241b; }
+.dd-notes li.new { color: #7a1d14; animation: dd-new 1.6s ease-out; }
+@keyframes dd-new { from { background: rgba(200,140,60,.35); } to { background: transparent; } }

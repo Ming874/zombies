@@ -1,0 +1,69 @@
+/* 結局〈天光〉(src/story/ending.js):字幕、提示、那一頁、照片、片尾。全部 DOM,不新增 shader。 */
+#st-end { position: fixed; inset: 0; z-index: 58; pointer-events: none; font-family: "Noto Serif TC", "Source Han Serif TC", "Songti TC", "PMingLiU", serif; color: #efe6d2; }
+#st-end .st-black { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity var(--ms, 1200ms) ease; }
+#st-end .st-black.on { opacity: 1; }
+#st-end .st-dawn { position: absolute; inset: 0; opacity: 0; mix-blend-mode: soft-light; background: linear-gradient(to top, rgba(255, 176, 120, .85) 0%, rgba(232, 150, 160, .55) 38%, rgba(120, 140, 190, .25) 72%, rgba(40, 50, 80, 0) 100%); }
+#st-end .st-bars::before, #st-end .st-bars::after { content: ''; position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 900ms cubic-bezier(.4, 0, .2, 1); }
+#st-end .st-bars::before { top: 0; } #st-end .st-bars::after { bottom: 0; }
+#st-end .st-bars.on::before, #st-end .st-bars.on::after { height: 7vh; }
+/* 字幕:下方置中,說話的人用小字 */
+#st-end .st-sub { position: absolute; left: 50%; bottom: 12vh; transform: translateX(-50%); width: min(78vw, 980px); text-align: center; }
+#st-end .st-line { opacity: 0; transform: translateY(6px); transition: opacity 700ms ease, transform 900ms ease; font-size: clamp(17px, 1.6vw, 25px); line-height: 1.7; letter-spacing: .08em; text-shadow: 0 0 10px rgba(0, 0, 0, .9), 0 1px 3px #000; }
+#st-end .st-line.on { opacity: 1; transform: none; }
+#st-end .st-line small { display: block; font-size: .56em; letter-spacing: .3em; opacity: .62; margin-bottom: .25em; font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; }
+#st-end .st-line[data-w="ama"] { color: #f4ead8; font-size: clamp(19px, 1.9vw, 30px); letter-spacing: .16em; }
+#st-end .st-line[data-w="n"] { font-style: normal; color: #d8cdb6; opacity: 0; font-size: clamp(15px, 1.3vw, 21px); letter-spacing: .14em; }
+#st-end .st-line[data-w="n"].on { opacity: .9; }
+/* 黑畫面上的字(旁白) */
+#st-end .st-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1em; text-align: center; }
+#st-end .st-mid p { margin: 0; opacity: 0; transition: opacity 1400ms ease; font-size: clamp(17px, 1.55vw, 24px); letter-spacing: .2em; color: #e6dcc6; }
+#st-end .st-mid p.on { opacity: 1; }
+/* 數數 */
+#st-end .st-count { position: absolute; left: 50%; top: 62%; transform: translate(-50%, -50%); font-size: clamp(54px, 7vw, 110px); letter-spacing: .1em; color: rgba(250, 238, 214, .0); text-shadow: 0 0 24px rgba(255, 210, 160, .35); transition: color 600ms ease; }
+#st-end .st-count.on { color: rgba(250, 238, 214, .82); }
+/* 提示 [E] */
+#st-end .st-ask { position: absolute; left: 50%; bottom: 26vh; transform: translateX(-50%); opacity: 0; transition: opacity 600ms ease; font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif; font-size: clamp(14px, 1.15vw, 18px); letter-spacing: .14em; color: #f2e4c0; text-shadow: 0 0 8px #000; }
+#st-end .st-ask.on { opacity: 1; }
+#st-end .st-ask kbd { display: inline-block; min-width: 1.6em; padding: .1em .45em; margin-right: .6em; border: 1px solid rgba(242, 228, 192, .7); border-radius: 3px; font: inherit; }
+#st-end .st-skip { position: absolute; right: 2.2vw; bottom: 2.4vh; font-family: "Microsoft JhengHei", sans-serif; font-size: 12px; letter-spacing: .12em; color: rgba(230, 220, 200, .45); }
+#st-end .st-skip i { display: inline-block; width: 0; height: 2px; vertical-align: middle; margin-left: .6em; background: rgba(240, 220, 180, .8); }
+/* 那一頁(交班簿的紙) */
+#st-end .st-page { position: absolute; left: 50%; top: 46%; width: min(560px, 82vw); transform: translate(-50%, -50%) rotate(-1.2deg); padding: 2.2em 2.4em 2.6em; opacity: 0; transition: opacity 1100ms ease;
+  background: linear-gradient(180deg, #e9dfc7 0%, #e2d6b9 100%); color: #2c2a33; box-shadow: 0 18px 60px rgba(0, 0, 0, .65);
+  background-image: repeating-linear-gradient(180deg, transparent 0 2.05em, rgba(80, 110, 160, .22) 2.05em 2.1em), linear-gradient(180deg, #ebe2ca, #e0d3b4); }
+#st-end .st-page.on { opacity: 1; }
+#st-end .st-page .pl { font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", "Noto Serif TC", serif; font-size: clamp(16px, 1.35vw, 21px); line-height: 2.1em; opacity: 0; transition: opacity 1500ms ease; color: #23263a; }
+#st-end .st-page .pl.on { opacity: .92; }
+#st-end .st-page .pl.last { margin-top: .9em; font-size: 1.22em; color: #1d1f33; }
+#st-end .st-page .hd { font-family: "Microsoft JhengHei", sans-serif; font-size: 11px; letter-spacing: .3em; color: rgba(40, 40, 60, .55); margin-bottom: .8em; }
+/* 照片(背面)與片尾 */
+#st-end .st-card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; opacity: 0; transition: opacity 1400ms ease; background: #050505; }
+#st-end .st-card.on { opacity: 1; }
+#st-end .st-card .k { font-family: "Microsoft JhengHei", sans-serif; font-size: 12px; letter-spacing: .5em; color: rgba(230, 220, 200, .55); margin-bottom: 1.4em; }
+#st-end .st-card h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 4vw, 60px); letter-spacing: .32em; color: #f1e7d0; }
+#st-end .st-card h2 { margin: .9em 0 0; font-weight: 400; font-size: clamp(18px, 1.6vw, 26px); letter-spacing: .4em; color: #d9c79e; }
+#st-end .st-card p { margin: .5em 0; font-size: clamp(14px, 1.15vw, 18px); letter-spacing: .18em; color: rgba(236, 226, 206, .82); max-width: 70vw; line-height: 1.9; }
+#st-end .st-card p.ded { margin-top: 2.2em; color: #efe2c2; }
+.st-photo { width: min(360px, 70vw); aspect-ratio: 4 / 3; padding: 1.4em 1.6em; box-sizing: border-box; transform: rotate(1.4deg); text-align: left; position: relative;
+  background: linear-gradient(160deg, #efe8da, #e2d8c4); box-shadow: 0 20px 60px rgba(0, 0, 0, .7); color: #2b2a35; }
+.st-photo::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 70% 30%, rgba(160, 120, 60, .12), transparent 60%), radial-gradient(ellipse at 20% 90%, rgba(120, 90, 40, .14), transparent 55%); pointer-events: none; }
+.st-photo .stamp { font-family: "Microsoft JhengHei", sans-serif; font-size: 11px; letter-spacing: .25em; color: rgba(150, 70, 50, .65); }
+.st-photo .hand { margin-top: 1.6em; font-family: "DFKai-SB", "BiauKai", "標楷體", "KaiTi", serif; font-size: clamp(18px, 1.6vw, 24px); line-height: 1.9; color: #2a2f52; }
+.st-photo .sig { text-align: right; margin-top: .6em; font-family: "DFKai-SB", "BiauKai", "標楷體", serif; font-size: clamp(16px, 1.3vw, 20px); color: #2a2f52; }
+/* 最後的兩個按鈕 */
+#st-end .st-btns { position: absolute; left: 50%; bottom: 13vh; transform: translateX(-50%); display: flex; gap: 1.4em; opacity: 0; transition: opacity 900ms ease; pointer-events: none; z-index: 72; }
+#st-end .st-btns.on { opacity: 1; pointer-events: auto; }
+#st-end .st-btns button { pointer-events: auto; cursor: pointer; background: transparent; border: 1px solid rgba(230, 214, 180, .5); color: #efe3c6; padding: .7em 1.8em; font: inherit; font-size: 15px; letter-spacing: .3em; }
+#st-end .st-btns button:hover { background: rgba(240, 220, 180, .1); border-color: rgba(240, 220, 180, .9); }
+body.st-ending #hud, body.st-ending #crosshair, body.st-ending #wx-reticle { visibility: hidden; }
+body.st-ending #hud .rd-hud { visibility: visible; } /* 結局:手上只剩收音機(REDESIGN §6.3) */
+body.st-ending #gh-subs { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { #st-end * { transition-duration: 200ms !important; } }
+/* 阿嬤叫你回來(src/story/revive.js):她的聲音一次比一次小 → 字卡跟著變淡、變小 */
+.mo-card.ama.st-mid .t { opacity: .82; font-size: clamp(36px, 5.2vw, 76px); }
+.mo-card.ama.st-weak .t { opacity: .6; font-size: clamp(30px, 4.2vw, 62px); letter-spacing: .28em; }
+.mo-card.ama.st-faint .t { opacity: .42; font-size: clamp(26px, 3.6vw, 52px); letter-spacing: .32em; }
+.st-revive { position: fixed; inset: 0; z-index: 61; background: #000; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 500ms ease; pointer-events: none;
+  font-family: "Noto Serif TC", "Source Han Serif TC", "PMingLiU", serif; color: #efe6d2; font-size: clamp(40px, 6vw, 88px); letter-spacing: .18em; }
+.st-revive.on { opacity: 1; }
+.st-revive.mid div { opacity: .82; } .st-revive.weak div { opacity: .6; font-size: .8em; } .st-revive.faint div { opacity: .42; font-size: .7em; }

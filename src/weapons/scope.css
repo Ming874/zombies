@@ -1,0 +1,52 @@
+/* 武器代理:瞄準鏡覆蓋層(狙擊鏡 / ACOG)、紅點、動態準心、命中標記(全部由 src/weapons/scope.js 建立) */
+#wx-scope { position: fixed; inset: 0; pointer-events: none; display: none; overflow: hidden; opacity: 0; }
+#wx-scope.on { display: block; }
+#wx-scope .lens { position: absolute; left: 50%; top: 50%; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 200vmax #000; } /* overflow:鏡筒陰影只畫在鏡窗內 */
+/* ACOG:較小的目鏡圓窗 + 橡膠眼罩環 + 外圍暗化(仍隱約看得到周圍) */
+#wx-scope.acog .lens { box-shadow: 0 0 0 0.9vmin #020202, 0 0 0 3.2vmin rgba(10,11,11,.97), 0 0 0 200vmax rgba(3,4,4,.86); }
+#wx-scope .rt { position: absolute; inset: 0; width: 100%; height: 100%; }
+#wx-scope.sniper .rt.acog, #wx-scope.acog .rt.sniper { display: none; }
+#wx-scope.acog .hint, #wx-scope.acog .breath { display: none; }
+#wx-scope .lens::before { /* 鏡內暗角 + 邊緣色差(紅外藍內) */
+  content: ""; position: absolute; inset: -1px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,0,0,0) 58%, rgba(0,0,0,.28) 74%, rgba(0,0,0,.82) 92%, #000 99%);
+  box-shadow: inset 7px 0 14px -6px rgba(255,60,20,.35), inset -7px 0 14px -6px rgba(40,140,255,.32), inset 0 0 0 2px rgba(0,0,0,.9);
+}
+#wx-scope .shade { position: absolute; inset: -40%; border-radius: 50%; will-change: transform;
+  background: radial-gradient(circle, rgba(0,0,0,0) 34%, rgba(0,0,0,.55) 41%, rgba(0,0,0,.94) 47%); }
+#wx-scope .glare { position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(ellipse 40% 26% at 30% 22%, rgba(190,210,255,.07), rgba(0,0,0,0) 70%),
+              radial-gradient(ellipse 60% 60% at 72% 80%, rgba(120,255,190,.035), rgba(0,0,0,0) 70%); }
+#wx-scope .info { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); text-align: center; font: 600 12px/1.4 "Microsoft JhengHei", "PingFang TC", sans-serif; color: rgba(210,225,210,.75); letter-spacing: 2px; text-shadow: 0 0 3px #000; }
+#wx-scope .breath { width: 120px; height: 4px; margin: 4px auto 0; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
+#wx-scope .breath i { display: block; height: 100%; width: 100%; background: rgba(160,220,170,.85); transition: background .2s; }
+#wx-scope .breath.tired i { background: rgba(230,90,70,.9); }
+#wx-scope .blink { position: absolute; inset: 0; background: #000; opacity: 0; }
+
+/* 紅點反射鏡的準直光點:永遠在畫面正中央(= 彈著點),紅色發光,亮處暗處都看得清楚 */
+#wx-dot { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; opacity: 0; }
+#wx-dot::after { content: ""; position: absolute; left: -2.5px; top: -2.5px; width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(circle, #fff1ea 0 22%, #ff3a22 45%, rgba(255,40,20,.85) 70%, rgba(255,30,10,0) 100%);
+  box-shadow: 0 0 4px 1px rgba(255,40,20,.85), 0 0 10px 2px rgba(255,30,10,.35); }
+
+#wx-reticle { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; transition: opacity .08s; }
+#wx-reticle i { position: absolute; background: rgba(238,238,228,.9); box-shadow: 0 0 2px rgba(0,0,0,.95); will-change: transform; }
+#wx-reticle .t, #wx-reticle .b { left: -1px; width: 2px; height: 8px; }
+#wx-reticle .l, #wx-reticle .r { top: -1px; width: 8px; height: 2px; }
+#wx-reticle .t { top: -8px; } #wx-reticle .b { top: 0; }
+#wx-reticle .l { left: -8px; } #wx-reticle .r { left: 0; }
+#wx-reticle .d { left: -1px; top: -1px; width: 2px; height: 2px; border-radius: 1px; }
+#wx-reticle .ring { left: 0; top: 0; background: none; border: 1.5px solid rgba(238,238,228,.75); border-radius: 50%; box-shadow: 0 0 2px rgba(0,0,0,.8), inset 0 0 2px rgba(0,0,0,.8); }
+#wx-reticle.shotgun .t, #wx-reticle.shotgun .b, #wx-reticle.shotgun .l, #wx-reticle.shotgun .r { display: none; }
+#wx-reticle:not(.shotgun) .ring { display: none; }
+
+#wx-hit { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; opacity: 0; }
+#wx-hit i { position: absolute; left: -1px; top: -16px; width: 2px; height: 7px; background: #f4f4ee; box-shadow: 0 0 2px #000; transform-origin: 1px 16px; }
+#wx-hit i:nth-child(1) { transform: rotate(45deg); } #wx-hit i:nth-child(2) { transform: rotate(135deg); }
+#wx-hit i:nth-child(3) { transform: rotate(225deg); } #wx-hit i:nth-child(4) { transform: rotate(315deg); }
+#wx-hit.head i { background: #ffb43a; height: 9px; top: -18px; transform-origin: 1px 18px; }
+#wx-hit.kill i { background: #ff3326; width: 3px; left: -1.5px; height: 11px; top: -21px; transform-origin: 1.5px 21px; box-shadow: 0 0 4px rgba(255,40,20,.8), 0 0 1px #000; }
+#wx-hit .skull { position: absolute; left: -11px; top: 24px; width: 22px; height: 22px; display: none; filter: drop-shadow(0 0 2px #000); }
+#wx-hit.kill.head .skull { display: block; }
+#wx-hit.pop { animation: wx-pop .32s ease-out; }
+@keyframes wx-pop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }

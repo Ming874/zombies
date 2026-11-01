@@ -17,7 +17,7 @@ const KIND = { fire: 'fire', cell: 'cell', glass: 'glass', wood: 'wood', chapel:
 const NAME = { fire: '防火門', cell: '隔離房門', glass: '玻璃門', wood: '木門', chapel: '禮拜堂木門', metal: '鐵門', swing: '雙開門', ward: '病房門' };
 // 子彈穿透類別(physics/truth.js MATS):木門/病房門 = wood、玻璃門 = glass、鐵門/雙開門 = metal、防火門與隔離房門 = heavy(手槍打不穿)
 const PEN = { fire: 'heavy', cell: 'heavy', metal: 'metal', swing: 'metal', glass: 'glass', ward: 'wood', wood: 'wood', chapel: 'wood' };
-const BARRICADE_HP = 9, MAX_BARRICADES = 3;
+const BARRICADE_COST = 10, BARRICADE_HP = 9, MAX_BARRICADES = 3;
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
 export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], leafApi = null, fixtures = null } = {}) {
@@ -31,6 +31,23 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
     l.anim = null;
   }
   const list = [...ways.values()];
+  // 門扇關上時的那條線:門洞是 2m 深的牆格,(cx,cz) 是格子中心,門扇掛在房間那一面(離中心 1m)。
+  // 推門、關門前的「門口有人」都量到這條線(以前量格子中心:從門扇那一側來的殭屍停在 1.39m 外,永遠推不開)
+  for (const w of list) {
+    let x = 0, z = 0;
+    for (const l of w.leaves) { x += l.group.position.x + Math.cos(l.closed) * l.lw / 2; z += l.group.position.z - Math.sin(l.closed) * l.lw / 2; }
+    w.lx = x / w.leaves.length; w.lz = z / w.leaves.length;
+    const l0 = w.leaves[0], l1 = w.leaves[1];
+    w.ux = Math.abs(Math.cos(l0.closed)); w.uz = Math.abs(Math.sin(l0.closed)); // 沿著門線的方向
+    w.hw = l1 ? Math.hypot(l1.group.position.x - l0.group.position.x, l1.group.position.z - l0.group.position.z) / 2 : l0.lw / 2;
+  }
+  // (x,z) 到門線(線段)的水平距離;out.n = 由這一點指向門線的單位法向(判斷殭屍是不是想穿過去)
+  const lineD = (w, x, z, out = null) => {
+    const dx = x - w.lx, dz = z - w.lz, along = dx * w.ux + dz * w.uz, perp = dx * w.uz - dz * w.ux;
+    if (out) { const s = perp > 0 ? -1 : 1; out.nx = w.uz * s; out.nz = -w.ux * s; }
+    return Math.hypot(Math.max(0, Math.abs(along) - w.hw), perp);
+  };
+  const _n = { nx: 0, nz: 0 };
   const kindOf = (w) => KIND[w.style] || 'ward';
   const isOpen = (l) => angDiff(l.group.rotation.y, l.swingA) < 0.15 || angDiff(l.group.rotation.y, l.swingB) < 0.15;
   const isClosed = (l) => angDiff(l.group.rotation.y, l.closed) < 0.12;
@@ -96,15 +113,35 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
     return far(l.swingA) >= far(l.swingB) ? l.swingA : l.swingB;
   };
   const pos = (w, dy = 1.1) => ({ x: w.cx, y: w.y + dy, z: w.cz });
-  const blocked = (w) => { // 關門前:門口有人/殭屍就不關
-    const near = (p) => p && Math.abs(p.y - w.y) < 1.6 && Math.hypot(p.x - w.cx, p.z - w.cz) < 1.05;
-    if (near(game.player.pos)) return true;
-    for (const z of game.zombies) if (z.alive && near(z.pos)) return true;
-    if (game.players) for (const p of game.players) if (p !== game.player && near(p.pos)) return true;
+  // 門扇 l 從現在的角度轉到關上時,會不會掃到站在 (x,z)、半徑 r 的人:扇形(鉸鍊為圓心、半徑 = 門扇長 + r)裡,
+  // 角度落在「現在 → 關上」那一段(加上身體的角寬)。關上後壓在身上(離門線太近)也算。
+  const sweeps = (l, x, z, r) => {
+    const vx = x - l.group.position.x, vz = z - l.group.position.z, d = Math.hypot(vx, vz);
+    if (d > l.lw + r) return false;
+    if (d < r + 0.12) return true;
+    const a0 = l.group.rotation.y, span = Math.atan2(Math.sin(l.closed - a0), Math.cos(l.closed - a0)); // 與 swing() 一樣走最短的那一側
+    const rel = Math.atan2(Math.sin(Math.atan2(-vz, vx) - a0), Math.cos(Math.atan2(-vz, vx) - a0));
+    const m = Math.asin(Math.min(1, (r + 0.08) / d));
+    return rel >= Math.min(0, span) - m && rel <= Math.max(0, span) + m;
+  };
+  // 關門前:門扇關上的路徑上(或門線上)有人/殭屍就不關。只看真的會被門扇掃到的地方:
+  // 站在門洞裡、門扇開向另一邊的人照樣可以把門帶上(以前量門洞中心 1.05m,站在走廊那側的門洞裡永遠關不了)
+  const blocked = (w) => {
+    const hit = (p, r) => {
+      if (!p || Math.abs(p.y - w.y) > 1.6) return false;
+      if (lineD(w, p.x, p.z) < r + 0.1) return true;
+      for (const l of w.leaves) if (sweeps(l, p.x, p.z, r)) return true;
+      return false;
+    };
+    if (hit(game.player.pos, 0.35)) return true;
+    for (const z of game.zombies) if (z.alive && hit(z.pos, Math.min(0.6, z.T?.radius || 0.35))) return true;
+    if (game.players) for (const p of game.players) if (p !== game.player && p.alive !== false && hit(p.pos, 0.35)) return true;
     return false;
   };
 
-  function setState(w, st, { by = null, sound = true, net = true, fast = false } = {}) { // st:'closed' | 'open'
+  // force:不檢查門口有沒有人(多人同步:房主已經判定過)。回傳是否照做(關門時門口有人 → false,門不動)
+  function setState(w, st, { by = null, sound = true, net = true, fast = false, force = false } = {}) { // st:'closed' | 'open'
+    if (st === 'closed' && !force && blocked(w)) return false; // 驚嚇事件甩門、劇情關門:不會把門關在人身上
     for (const l of w.leaves) {
       const to = st === 'closed' ? l.closed : by ? awayFrom(l, by.x, by.z) : (isOpen(l) ? l.group.rotation.y : l.swingA);
       if (angDiff(l.group.rotation.y, to) < 0.02 && !l.anim) continue;
@@ -113,6 +150,7 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
     if (sound) (st === 'closed' ? ixs.doorClose : ixs.doorOpen)(pos(w), kindOf(w));
     if (net) sync(w);
     ix.emit('door', w, st);
+    return true;
   }
 
   // ---------- 木板 ----------
@@ -190,8 +228,12 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
         if (!z.alive) continue;
         const p = z.pos;
         if (Math.abs(p.y - w.y) > 1.6) continue;
-        const d = Math.hypot(p.x - w.cx, p.z - w.cz);
-        if (d > 1.15) continue;
+        // 貼在門扇前(到門線 半徑+0.42 內;以前量門洞中心 1.15m,從門扇那一側來的殭屍停在 1.39m,永遠推不開),
+        // 而且想往門那邊走(z.want = 這一幀的導航方向,朝門線;站著不動、沿著牆走過門口的不算;壓在門線上時不看方向)
+        const d = lineD(w, p.x, p.z, _n);
+        if (d > Math.min(0.6, z.T?.radius || 0.35) + 0.42) continue;
+        const wt = z.want;
+        if (d > 0.12 && wt && (wt.speed < 0.05 || wt.x * _n.nx + wt.z * _n.nz < 0.15)) continue;
         const kk = PUSH[z.type] || 1;
         if (kk > k) { k = kk; who = z; }
         z._noProg = 0; // 正在推門/捶門:不算卡住(不會瞬移走)
@@ -232,7 +274,7 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
         else if (!d[2] && w.bar) unbar(w, true, false);
         if (w.bar) w.bar.hp = d[2];
         const want = d[1] === 0 ? 'closed' : 'open';
-        if ((want === 'closed') !== allClosed(w)) setState(w, want, { net: false });
+        if ((want === 'closed') !== allClosed(w)) setState(w, want, { net: false, force: true });
       });
     }
     return true;
@@ -249,15 +291,25 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
     w.px = px; w.pz = pz;
     const e = ix.register({ x: px, y: w.y + 1.05, z: pz }, {
       id: `door:${w.key}`, kind: 'door', name: nm, reach: 2.4, radius: 0.6, losPad: 0.6, hold: 0,
-      // main:只有開門/關門(test 的「按住 E 釘木板」是另一套玩法,不在 main)
-      prompt: () => {
+      prompt: (ctx) => {
         if (w.lock && !unlocked(w)) return { text: w.lock.text || `${nm} · 上鎖了`, dim: true };
-        if (w.bar) return '拆掉木板';
-        return allClosed(w) ? `打開${nm}` : `關上${nm}`;
+        if (w.bar) { e.hold = 1.6; e.onTap = null; e.holdText = '拆木板'; return '拆掉木板'; }
+        const closed = allClosed(w);
+        if (closed && !ctx.mp || closed && ctx.isHost) { e.hold = 2.2; e.onTap = tap; e.holdText = '釘木板'; e.tapText = `打開${nm}`; return `釘上木板（${BARRICADE_COST} 元）`; }
+        e.hold = 0; e.onTap = null;
+        return closed ? `打開${nm}` : `關上${nm}`;
       },
       onUse: (ctx) => {
         if (w.lock && !unlocked(w)) return false;
         if (w.bar) { unbar(w, false); ixs.barricadeBreak(pos(w)); return; }
+        if (e.hold > 0) { // 按住完成:釘木板
+          const p = game.player;
+          if ((p.coins || 0) < BARRICADE_COST) { game.ui.pickup(`需要 ${BARRICADE_COST} 元`, '#a3a39a'); sfx.pickupDeny(); return false; }
+          p.coins -= BARRICADE_COST; game.ui.setCoins(p.coins); game.ui.spend?.(BARRICADE_COST);
+          const side = sideOf(w, p.pos);
+          barricade(w, side);
+          return;
+        }
         return tap(ctx);
       },
     });
@@ -273,6 +325,7 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
     }
     w.e = e;
   }
+  const sideOf = (w, p) => (w.leaves[0].axis === 'z' ? (p.z > w.cz ? 1 : -1) : (p.x > w.cx ? 1 : -1));
 
   // ---------- 鎖 ----------
   // 劇情包的 lock({ door: zoneId, item, flag, text, consume })在建構時鎖上;劇情代理在執行期用 api.lock / api.unlock(見下面)。
@@ -390,6 +443,7 @@ export function setupDoors(game, ix, { leaves = [], seed = 77, lockSpecs = [], l
 
   const api = {
     list, ways, colliders, setState, barricade, unbar, isClosed, allClosed, leakWays, planks: planks.im,
+    blocked, // 門扇關上的路徑上有沒有人/殭屍(驚嚇事件、劇情要甩門前可以先問;setState('closed') 本身也會檢查)
     shadow(w, stop = false) { shade = { w, t0: game.time, stop }; }, // 測試/劇情用:讓某扇門後面有人影
     // ---- 劇情鎖(執行期)----
     //  lock(target, { text, flag, item, consume, unlockText, persist }) → 鎖上的門洞數

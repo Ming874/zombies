@@ -1,0 +1,28 @@
+/* 手提收音機的 HUD(src/story/radio.js):左下角,生命條上面。舉起時放大;阿嬤那台是木頭外框、貼著膠帶 */
+.rd-hud { left: 1.8em; bottom: 10.2em; display: flex; align-items: flex-end; gap: .6em; transform-origin: 0 100%; transition: transform .28s cubic-bezier(.2,.7,.2,1), opacity .3s; pointer-events: none; }
+.rd-hud.raised { transform: scale(1.55); }
+.rd-body { position: relative; width: 9.4em; height: 3.1em; border-radius: .35em; background: linear-gradient(#2c2925, #1b1916); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 2px 6px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); }
+.rd-hud.ama .rd-body { background: linear-gradient(#6a4528, #4a2e18); border-color: rgba(255,214,160,.28); }
+.rd-win { position: absolute; left: .45em; top: .45em; width: 5.4em; height: 1.35em; border-radius: .15em; background: linear-gradient(#e9c98c, #c99a52); box-shadow: inset 0 0 6px rgba(80,40,0,.6); overflow: hidden; transition: filter .4s; }
+.rd-f { position: absolute; left: .35em; top: .12em; font: 700 .72em/1.4 "Consolas", monospace; color: #3a2408; letter-spacing: .08em; }
+.rd-needle { position: absolute; top: .1em; bottom: .1em; width: 2px; background: #b0201a; left: calc(var(--k, .9) * 100%); animation: rd-wob 1.6s ease-in-out infinite; transition: left .5s cubic-bezier(.3,.8,.3,1); }
+@keyframes rd-wob { 0%, 100% { transform: translateX(-1px); } 50% { transform: translateX(1px); } }
+.rd-sig { position: absolute; right: .55em; top: .5em; display: flex; align-items: flex-end; gap: 2px; height: 1em; }
+.rd-sig b { width: 3px; background: rgba(255,255,255,.18); }
+.rd-sig b:nth-child(1) { height: 35%; } .rd-sig b:nth-child(2) { height: 65%; } .rd-sig b:nth-child(3) { height: 100%; }
+.rd-sig b.on { background: #9fd0a0; }
+.rd-led { position: absolute; right: .6em; bottom: .45em; width: .45em; height: .45em; border-radius: 50%; background: #3a3a34; box-shadow: none; }
+.rd-hud.talk .rd-led { background: #7fe08a; box-shadow: 0 0 6px #7fe08a; }
+.rd-hud.wait .rd-led { background: #e0b060; animation: rd-blink .8s steps(2) infinite; }
+@keyframes rd-blink { 50% { opacity: .2; } }
+/* 雜訊大小:刻度窗跟著抖一下亮 */
+.rd-hud:not(.off) .rd-win { filter: brightness(calc(.9 + var(--n, 0) * .5)); }
+.rd-hud.flash .rd-win { filter: brightness(1.9) saturate(1.4); }
+.rd-hud.off .rd-win { filter: brightness(.35) saturate(.4); }
+.rd-hud.dead .rd-win { background: #1a1612; box-shadow: inset 0 0 6px #000; }
+.rd-hud.dead .rd-needle { left: 2%; animation: none; }
+.rd-tape { display: none; position: absolute; left: .4em; bottom: .25em; font: italic .5em/1.2 "Noto Serif TC", serif; color: rgba(255,236,200,.85); background: rgba(240,230,200,.18); padding: 0 .3em; white-space: nowrap; }
+.rd-hud.ama .rd-tape { display: block; }
+.rd-key { font-size: .78em; color: var(--hud-dim, #9a9a90); letter-spacing: .12em; display: flex; align-items: center; gap: .35em; white-space: nowrap; }
+.rd-hud.raised .rd-key { font-size: .55em; }
+.rd-key kbd { font: 700 .9em/1 "Consolas", monospace; border: 1px solid rgba(255,255,255,.35); border-radius: 3px; padding: .15em .35em; color: #ddd; }

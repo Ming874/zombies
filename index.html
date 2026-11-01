@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>廢棄醫院 · 殭屍生存</title>
+<meta name="description" content="等天光（Before Daybreak）：網頁 3D 恐怖射擊。第一章〈第七暝〉——2003 年封院十四天的聖心醫院，一盞從來沒有熄過的燈。一波波活屍、推理、合作與對戰連線。" />
+<title>等天光 · 第七暝</title>
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif; color: #d8d8d0; user-select: none; }
   canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
   #hud.on { display: block; }
+  /* 準心(src/weapons/scope.js 接手)、命中標記與受傷暈影;其餘 HUD 由 src/ui/hud.js 建立 */
   #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
   #crosshair i { position: absolute; background: rgba(235,235,225,.85); box-shadow: 0 0 2px #000; }
   #crosshair i:nth-child(1) { left: -1px; top: -12px; width: 2px; height: 7px; }
@@ -20,45 +22,13 @@
   #hit::after { transform: rotate(-45deg); }
   #hit.head::before, #hit.head::after { background: #ff3b2f; }
   #damage { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(120,0,0,0) 35%, rgba(150,0,0,.85) 100%); opacity: 0; transition: opacity .35s; }
-  .panel { position: absolute; font-weight: 700; text-shadow: 0 1px 3px #000; }
-  #health { left: 28px; bottom: 26px; width: 260px; }
-  #health .lbl { font-size: 13px; letter-spacing: 2px; opacity: .8; }
-  #health .bar { height: 14px; border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.5); margin-top: 4px; }
-  #health .fill { height: 100%; width: 100%; background: linear-gradient(#c93b32, #8f1d18); transition: width .2s; }
-  #health .num { font-size: 26px; }
-  #ammo { right: 30px; bottom: 24px; text-align: right; }
-  #ammo .wname { font-size: 14px; letter-spacing: 3px; opacity: .8; }
-  #ammo .count { font-size: 44px; line-height: 1; }
-  #ammo .count small { font-size: 22px; opacity: .65; }
-  #coins { right: 28px; top: 22px; font-size: 24px; color: #f2c84b; display: flex; align-items: center; gap: 8px; }
-  #coins .dot { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff1a6, #d7a520 60%, #8a6410); box-shadow: 0 0 6px rgba(240,190,60,.6); }
-  #coins .gain { color: #ffe9a0; font-size: 18px; opacity: 0; transition: opacity .3s; }
-  #roundinfo { left: 50%; top: 20px; transform: translateX(-50%); text-align: center; }
-  #roundinfo .r { font-size: 30px; letter-spacing: 6px; }
-  #roundinfo .z { font-size: 14px; opacity: .75; letter-spacing: 2px; }
-  #banner { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-size: 54px; letter-spacing: 12px; font-weight: 700; color: #cfd3c8; text-shadow: 0 2px 12px #000; opacity: 0; transition: opacity .6s; }
-  #banner small { display: block; font-size: 20px; letter-spacing: 4px; margin-top: 12px; opacity: .85; }
-  #prompt { position: absolute; left: 50%; bottom: 20%; transform: translateX(-50%); font-size: 20px; text-shadow: 0 1px 4px #000; background: rgba(0,0,0,.45); padding: 8px 18px; border: 1px solid rgba(255,255,255,.25); display: none; }
+  /* 全螢幕覆蓋層(主選單 / 暫停 / 死亡):內容由 src/ui/menu.js 建立,這裡只是載入前的樣子 */
   .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: rgba(0,0,0,.72); z-index: 10; }
   .overlay.on { display: flex; }
   .overlay h1 { font-size: 56px; letter-spacing: 10px; margin: 0 0 8px; font-weight: 700; color: #cfd3c8; }
   .overlay p { margin: 6px 0; font-size: 17px; opacity: .85; line-height: 1.7; }
-  .overlay .btn { margin-top: 22px; padding: 12px 36px; font-size: 20px; letter-spacing: 4px; color: #e8e8e0; background: #7a1a15; border: 1px solid #b4443a; cursor: pointer; font-family: inherit; }
-  .overlay .btn:hover { background: #99241d; }
-  .keys { margin-top: 18px; font-size: 14px; opacity: .7; line-height: 1.9; }
-  .overlay .btn:disabled { opacity: .6; cursor: wait; }
-  #shop { z-index: 11; background: rgba(0,0,0,.78); }
-  #shop .box { width: min(760px, 92vw); border: 1px solid #4b5a4b; background: rgba(14,18,14,.96); padding: 22px 28px; text-align: left; }
-  #shop h2 { margin: 0 0 4px; letter-spacing: 6px; color: #9fe0a0; font-size: 28px; }
-  #shop .bal { margin-bottom: 14px; color: #f2c84b; font-size: 18px; }
-  #shop .item { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.1); }
-  #shop .item .nm { flex: 1; font-size: 20px; }
-  #shop .item .nm small { display: block; font-size: 13px; opacity: .6; margin-top: 2px; }
-  #shop .item .pr { color: #f2c84b; width: 90px; text-align: right; font-size: 18px; }
-  #shop button { font-family: inherit; font-size: 16px; padding: 8px 20px; cursor: pointer; background: #234a27; color: #e8f2e8; border: 1px solid #4a8a50; }
-  #shop button:disabled { background: #2a2a2a; border-color: #444; color: #777; cursor: not-allowed; }
-  #shop .foot { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; opacity: .85; }
-  #shop .foot button { background: #7a1a15; border-color: #b4443a; }
+  .boot { letter-spacing: 6px; opacity: .5; font-size: 13px; animation: boot 3.5s ease-in-out infinite; }
+  @keyframes boot { 50% { opacity: .22; } }
 </style>
 </head>
 <body>
@@ -68,42 +38,17 @@
   <div id="crosshair"><i></i><i></i><i></i><i></i></div>
   <div id="hit"></div>
   <div id="damage"></div>
-  <div class="panel" id="health"><div class="lbl">生命</div><div class="bar"><div class="fill" id="hpfill"></div></div><div class="num" id="hpnum">100</div></div>
-  <div class="panel" id="ammo"><div class="wname" id="wname">手槍</div><div class="count"><span id="mag">17</span> <small>/ <span id="reserve">90</span></small></div></div>
-  <div class="panel" id="coins"><span class="gain" id="coingain"></span><span class="dot"></span><span id="coinnum">0</span></div>
-  <div class="panel" id="roundinfo"><div class="r">第 <span id="round">1</span> 回合</div><div class="z">殭屍剩餘 <span id="zleft">0</span></div></div>
-  <div id="banner"></div>
-  <div id="prompt"></div>
 </div>
 
 <div class="overlay on" id="menu">
-  <h1>廢棄醫院</h1>
-  <p>殭屍橫行的聖心醫院。四層樓的醫院與外圍，撐過每一個回合。<br />每 5 回合結束，一樓便利商店（金水商行）會拉起捲門賣武器。</p>
-  <button class="btn" id="startBtn">開始遊戲</button>
-  <div class="keys">WASD 移動　Shift 奔跑　滑鼠 瞄準／射擊　R 換彈　1-4 切換武器<br />F 手電筒　E 開關門／商店　M 地圖（PgUp／PgDn 翻樓層）　N 開始下一回合（商店內）</div>
+  <h1>等天光</h1>
+  <p class="boot">暖機中</p>
+  <button id="startBtn" hidden></button>
 </div>
+<div class="overlay" id="pause"><button id="resumeBtn" hidden></button></div>
+<div class="overlay" id="dead"><div id="deadinfo"></div><button id="restartBtn" hidden></button></div>
 
-<div class="overlay" id="pause">
-  <h1>暫停</h1>
-  <p>點擊畫面繼續</p>
-  <button class="btn" id="resumeBtn">繼續</button>
-</div>
-
-<div class="overlay" id="dead">
-  <h1 style="color:#b02a22">你死了</h1>
-  <p id="deadinfo"></p>
-  <button class="btn" id="restartBtn">重新開始</button>
-</div>
-
-<div class="overlay" id="shop">
-  <div class="box">
-    <h2>武器商店</h2>
-    <div class="bal">金幣：<span id="shopcoins">0</span></div>
-    <div id="shopitems"></div>
-    <div class="foot"><span>E / Esc 關閉商店 · N 開始下一回合</span><button id="shopNext">開始下一回合</button></div>
-  </div>
-</div>
-
+<noscript><p style="position:fixed;inset:0;display:grid;place-items:center;color:#ccc;font-size:18px">這個遊戲需要啟用 JavaScript 與 WebGL。</p></noscript>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>

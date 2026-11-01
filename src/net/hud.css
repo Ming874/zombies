@@ -1,0 +1,138 @@
+/* 多人 HUD(版位見開發契約 §3.13:上方中偏下 = 計分/倒數;左下生命條上方 = 聊天;右側中 = 訊息) */
+#mp-hud { position: fixed; inset: 0; pointer-events: none; z-index: 6; font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif; color: #e4e6de; text-shadow: 0 1px 3px #000; }
+#mp-hud .mp-panel { background: rgba(8, 12, 12, 0.62); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; }
+
+/* 上方中偏下:多人計分 / 準備狀態 */
+#mp-top { position: absolute; left: 50%; top: 94px; transform: translateX(-50%); display: none; gap: 14px; align-items: center; padding: 5px 16px; font-size: 15px; letter-spacing: 1px; white-space: nowrap; }
+#mp-top.on { display: flex; }
+#mp-top b { color: #ffd46a; font-weight: 700; }
+#mp-top .me { color: #8fe0ff; }
+#mp-top .time { font-variant-numeric: tabular-nums; color: #fff; font-weight: 700; }
+#mp-top .lead { color: #ffb090; }
+#mp-top .dim { opacity: 0.7; font-size: 13px; }
+
+/* 開場倒數 */
+#mp-count { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 700; color: #f0e8d8; opacity: 0; transition: opacity 0.2s; }
+#mp-count.on { opacity: 0.92; }
+
+/* 中央訊息 */
+#mp-center { position: absolute; left: 50%; top: 36%; transform: translateX(-50%); font-size: 26px; letter-spacing: 3px; font-weight: 700; color: #f3eee2; opacity: 0; transition: opacity 0.35s; text-align: center; }
+#mp-center.on { opacity: 1; }
+
+/* 救援 / 倒地 */
+#mp-revive { position: absolute; left: 50%; bottom: 27%; transform: translateX(-50%); text-align: center; display: none; min-width: 300px; padding: 8px 16px; }
+#mp-revive.on { display: block; }
+#mp-revive .t { font-size: 18px; letter-spacing: 1px; }
+#mp-revive .bar { height: 8px; margin-top: 7px; background: rgba(255, 255, 255, 0.12); border-radius: 2px; overflow: hidden; }
+#mp-revive .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #41c46a, #9cf0a8); }
+#mp-downed { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; display: none; }
+#mp-downed.on { display: block; }
+#mp-downed .big { font-size: 40px; font-weight: 700; color: #ff5040; letter-spacing: 8px; }
+#mp-downed .sub { font-size: 17px; margin-top: 6px; opacity: 0.9; }
+#mp-downed .help { font-size: 17px; margin-top: 8px; color: #9cf0a8; }
+#mp-spec { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); font-size: 17px; padding: 6px 16px; display: none; }
+#mp-spec.on { display: block; }
+#mp-respawn { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); text-align: center; display: none; }
+#mp-respawn.on { display: block; }
+#mp-respawn .big { font-size: 34px; font-weight: 700; color: #ff6a50; letter-spacing: 4px; }
+#mp-respawn .sub { font-size: 18px; margin-top: 6px; }
+
+/* 隊友列表(左側中) */
+#mp-team { position: absolute; left: 22px; top: 42%; transform: translateY(-50%); display: none; flex-direction: column; gap: 6px; }
+#mp-team.on { display: flex; }
+#mp-team .m { width: 172px; padding: 5px 9px; font-size: 13px; }
+#mp-team .m .n { display: flex; justify-content: space-between; gap: 6px; }
+#mp-team .m .n span:last-child { opacity: 0.7; font-size: 12px; }
+#mp-team .m .hp { height: 5px; margin-top: 4px; background: rgba(255, 255, 255, 0.12); }
+#mp-team .m .hp i { display: block; height: 100%; background: #4cd964; transition: width 0.25s; }
+#mp-team .m.down { border-color: rgba(255, 80, 60, 0.7); }
+#mp-team .m.down .hp i { background: #ff4030; }
+#mp-team .m.dead, #mp-team .m.off { opacity: 0.5; }
+
+/* 訊息(右側中;遊戲本身有 ui.feed 時改用它) */
+#mp-feed { position: absolute; right: 24px; top: 38%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 46vw; }
+#mp-feed div { font-size: 14px; padding: 3px 10px; background: rgba(8, 12, 12, 0.55); border-left: 3px solid #8a9a8a; transition: opacity 0.6s; white-space: nowrap; }
+#mp-feed .kill { border-color: #ffd046; color: #fff2c0; }
+#mp-feed .dead, #mp-feed .down { border-color: #ff4a3a; color: #ffd0c8; }
+#mp-feed .join, #mp-feed .revive { border-color: #4cd964; }
+#mp-feed .leave, #mp-feed .warn { border-color: #b0b0a0; color: #c8c8c0; }
+#mp-feed .host { border-color: #5ab0ff; }
+#mp-feed .fade { opacity: 0; }
+
+/* 聊天(左下,生命條上方) */
+#mp-chat { position: absolute; left: 26px; bottom: 112px; width: min(420px, 40vw); }
+#mp-chat .log { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow: hidden; justify-content: flex-end; }
+#mp-chat .log div { font-size: 14px; padding: 2px 8px; background: rgba(0, 0, 0, 0.42); transition: opacity 0.8s; overflow-wrap: anywhere; }
+#mp-chat .log div b { color: #8fd8ff; margin-right: 6px; }
+#mp-chat .log div.mine b { color: #ffd46a; }
+#mp-chat .log div.sys { color: #c8c0a8; font-style: italic; }
+#mp-chat .log.idle div.old { opacity: 0; }
+#mp-chat input { display: none; pointer-events: auto; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 6px 9px; font: inherit; font-size: 15px; color: #fff; background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.35); outline: none; }
+#mp-chat.typing input { display: block; }
+#mp-chat.typing .log div { opacity: 1 !important; }
+
+/* 網路狀態 */
+#mp-net { position: absolute; right: 28px; top: 58px; font-size: 11px; opacity: 0.6; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+#mp-net.bad { color: #ff9a6a; opacity: 0.95; }
+#mp-status { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 16px; font-size: 15px; display: none; }
+#mp-status.on { display: block; }
+#mp-status.warn { border-color: #ff8a5a; color: #ffd0b8; }
+
+/* 計分板(Tab) */
+#mp-board { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); min-width: 560px; padding: 14px 20px 10px; display: none; background: rgba(6, 9, 9, 0.86); }
+#mp-board.on { display: block; }
+#mp-board h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: 3px; display: flex; justify-content: space-between; }
+#mp-board h3 small { font-size: 13px; opacity: 0.7; letter-spacing: 1px; }
+#mp-board table { width: 100%; border-collapse: collapse; font-size: 15px; }
+#mp-board th { text-align: left; font-weight: 400; opacity: 0.6; font-size: 12px; letter-spacing: 1px; padding: 3px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+#mp-board td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); font-variant-numeric: tabular-nums; }
+#mp-board tr.me td { color: #ffd46a; }
+#mp-board td.st { font-size: 12px; opacity: 0.8; }
+#mp-board .foot { margin-top: 8px; font-size: 11px; opacity: 0.55; text-align: right; }
+
+/* 對戰選武器 */
+#mp-picker { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); padding: 10px 14px; display: none; pointer-events: auto; }
+#mp-picker.on { display: block; }
+#mp-picker .h { font-size: 14px; letter-spacing: 2px; opacity: 0.8; margin-bottom: 8px; text-align: center; }
+#mp-picker .row { display: flex; gap: 8px; }
+#mp-picker button { font: inherit; width: 112px; padding: 8px 6px 7px; color: #e8e8e0; background: rgba(30, 34, 32, 0.9); border: 1px solid rgba(255, 255, 255, 0.18); cursor: pointer; text-align: left; }
+#mp-picker button:hover { background: rgba(50, 58, 54, 0.95); }
+#mp-picker button.sel { border-color: #ffd046; box-shadow: 0 0 0 1px #ffd046 inset; }
+#mp-picker button .k { font-size: 11px; opacity: 0.6; }
+#mp-picker button .nm { font-size: 15px; font-weight: 700; margin: 2px 0 5px; }
+#mp-picker button .st { display: grid; grid-template-columns: 26px 1fr; gap: 2px 4px; font-size: 10px; opacity: 0.8; align-items: center; }
+#mp-picker button .st i { display: block; height: 4px; background: rgba(255, 255, 255, 0.15); }
+#mp-picker button .st i b { display: block; height: 100%; background: #c9b46a; }
+
+/* 結算 */
+#mp-results { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.74); pointer-events: auto; }
+#mp-results.on { display: flex; }
+#mp-results .box { min-width: 520px; max-width: 92vw; padding: 24px 30px; background: rgba(12, 15, 14, 0.96); border: 1px solid #4a524a; text-align: center; }
+#mp-results h2 { margin: 0; font-size: 44px; letter-spacing: 10px; color: #e8dcc8; }
+#mp-results .sub { margin: 8px 0 16px; font-size: 17px; opacity: 0.85; }
+#mp-results table { width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 18px; }
+#mp-results th { font-weight: 400; font-size: 12px; opacity: 0.6; padding: 4px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+#mp-results td { padding: 7px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+#mp-results tr:first-child td { color: #ffd46a; }
+#mp-results .btns { display: flex; gap: 12px; justify-content: center; }
+#mp-results button { font: inherit; font-size: 17px; letter-spacing: 3px; padding: 10px 26px; color: #eee; background: #2c3a30; border: 1px solid #4a8a5a; cursor: pointer; }
+#mp-results button.red { background: #7a1a15; border-color: #b4443a; }
+#mp-results button:hover { filter: brightness(1.2); }
+#mp-results .wait { margin-top: 10px; font-size: 13px; opacity: 0.6; }
+
+/* 對戰:沒有回合,隱藏回合資訊 */
+body.mp-pvp .hd-round, body.mp-pvp .hd-coins, body.mp-pvp .hd-score, body.mp-pvp .hd-streak { display: none !important; }
+/* 計分板開著時,下面的大字(重生倒數、擊殺訊息)先藏起來 */
+#mp-hud.board #mp-respawn, #mp-hud.board #mp-center, #mp-hud.board #mp-downed { opacity: 0 !important; }
+
+/* 擊殺訊息列(畫在 ui.feed 的 .hd-msg 裡):擊殺者 [武器] 受害者 */
+.hd-msg .mp-kf { display: inline-flex; align-items: center; gap: .25em; margin: 0 .55em; padding: .05em .45em; font-size: .82em; letter-spacing: .04em; color: #d8d2c2; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); border-radius: 2px; }
+.hd-msg .mp-kf svg { margin: 0 !important; width: 1em; height: 1em; color: #ff8a6a; }
+
+/* 斷線重連 */
+#mp-recon { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); display: none; flex-direction: column; align-items: center; gap: 10px; padding: 18px 34px 16px; background: rgba(8, 10, 10, 0.86); border: 1px solid rgba(255, 140, 90, 0.5); }
+#mp-recon.on { display: flex; }
+#mp-recon .t { font-size: 22px; letter-spacing: 4px; color: #ffd0b8; font-weight: 700; }
+#mp-recon .sub { font-size: 14px; opacity: 0.8; letter-spacing: 1px; }
+#mp-recon .spin { width: 26px; height: 26px; border: 3px solid rgba(255, 255, 255, 0.2); border-top-color: #ffb090; border-radius: 50%; animation: mp-spin 0.9s linear infinite; }
+@keyframes mp-spin { to { transform: rotate(360deg); } }

@@ -160,7 +160,6 @@ export function sting(key, g = 1, fo = 0) {
   const e = stingEl(key);
   if (!e) return false;
   const S = STINGS[key], n = A.ctx.currentTime, el = e.el;
-  const ready = el.readyState >= 2; // 跳回開頭之前判斷(seek 期間 readyState 會暫時掉到 1)
   if (!e.on) { e.on = true; e.src.connect(e.g); }
   const tok = ++e.tok;
   if (fo > 0) setTimeout(() => { if (e.tok === tok && e.on) { el.pause(); e.on = false; try { e.src.disconnect(); } catch { /* 已斷 */ } } }, (fo + 1.7) * 1000);
@@ -170,5 +169,5 @@ export function sting(key, g = 1, fo = 0) {
   if (fo > 0) { e.g.gain.setValueAtTime((S.g ?? 1) * g, n + fo); e.g.gain.linearRampToValueAtTime(0, n + fo + 1.5); }
   const p = el.play();
   if (p && p.catch) p.catch(() => {});
-  return ready;
+  return el.readyState >= 2;
 }

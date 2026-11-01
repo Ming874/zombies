@@ -1,0 +1,16 @@
+{
+  "name": "hz-zombie-models",
+  "private": true,
+  "type": "module",
+  "description": "建置工具:把 Microsoft Rocketbox 角色轉成遊戲殭屍 GLB(不進遊戲執行檔)",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.2.0",
+    "sharp": "^0.35.5"
+  }
+}

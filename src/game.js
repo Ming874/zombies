@@ -2,57 +2,56 @@ import * as THREE from 'three';
 
 import { World } from './map/collision.js';
 import { buildHospitalSteps } from './map/hospital.js';
-import { buildBlockout } from './map/blockout.js';
-import { Weather } from './map/weather.js';
-import { makeBloodSplat } from './map/textures.js';
-import { applyTruth } from './physics/truth.js';
 import { warmPMREM } from './sys/warmup.js';
-import { installProgramSort } from './sys/drawsort.js';
-import { setupPost } from './game/post.js';
-import { buildInteract } from './interact/index.js';
-import { MapUI } from './ui/map.js';
+import { buildBlockout } from './map/blockout.js';
 import { Player } from './player.js';
-import { WeaponSystem, ORDER } from './weapons/weapon.js';
-import { Zombie, LOOK_TYPES, warmZombies } from './zombie.js';
-import { prewarm, variantReady } from './zombies/model.js';
-import { ZU } from './zombies/materials.js';
+import { WeaponSystem } from './weapons/weapon.js';
+import { prewarm } from './zombies/model.js';
+import { Hazards } from './zombies/hazards.js';
 import { Coins } from './coins.js';
-import { Shop } from './shop.js';
 import { UI } from './ui.js';
-import { sfx, resume as resumeAudio } from './audio.js';
+import { sfx } from './audio.js';
+import { setupPost } from './game/post.js';
+import { fxMethods } from './game/fx.js';
+import { combatMethods } from './game/combat.js';
+import { flowMethods } from './game/flow.js';
+import { inputMethods } from './game/input.js';
+import { createPhysics } from './physics/index.js';
+import { applyTruth } from './physics/truth.js';
+import { Weather } from './map/weather.js';
+import { installProgramSort } from './sys/drawsort.js';
+import { instrument } from './gfx/gpuprof.js';
 
-// 出怪點:從離玩家 SPAWN_MIN 公尺以外的出生點隨機挑一個,但只挑走路距離 SPAWN_PATH 公尺以內的
-// (地圖有四層,太遠的出生點殭屍要繞好幾分鐘才到);都不符合時退回走路距離最近的一個
-const SPAWN_MIN = 14, SPAWN_PATH = 60;
-
+// 遊戲主體:建立渲染器/場景/各系統,並跑主迴圈。
+// 細節分在 src/game/*:fx(粒子/血池)、combat(射擊/傷害/爆炸)、flow(回合/出怪/商店/死亡)、input(輸入)、post(後處理)
 export class Game {
   // opts.deferred:只建最基本的欄位,其餘由 buildSteps() 分段建構(main.js 分時執行,載入時主執行緒不會被佔住好幾秒)
   constructor(canvas, opts = {}) {
     this.canvas = canvas;
     this.deferredBuild = !!opts.deferred;
     this.ui = new UI();
-    this.ui.game = this;
     this.state = 'menu'; // menu | playing | dead
     this.phase = 'fighting'; // fighting | collecting | break | shop
     this.time = 0;
     this.shopUIOpen = false;
     this.input = { fireHeld: false, firePressed: false };
     this.look = { x: 0, y: 0 };
+    this.net = null; // 連線層(多人模式時由 src/net 設定)
     if (!opts.deferred) { const it = this.buildSteps(); while (!it.next().done) { /* 同步建完 */ } }
   }
 
-  // 建構流程(generator):每一段之後 yield;yield 出 Promise 時,分時執行器會等它完成(同步建構時略過)
+  // [perf] 建構流程(generator):每一段之後 yield;yield 出 Promise 時,分時執行器會等它完成(同步建構時略過)
   *buildSteps() {
     // ---- 渲染器 ----
     const renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance' });
-    renderer.debug.checkShaderErrors = !import.meta.env.PROD;
+    renderer.debug.checkShaderErrors = !import.meta.env.PROD; // 正式版不查 shader 錯誤日誌(那些查詢會同步等編譯完成;建構期間的預編譯也適用)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap; // r18x 已棄用 PCFSoftShadowMap(會退回 PCF 並警告)
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     this.renderer = renderer;
-    this._dsort = installProgramSort(renderer); // 不透明物件依 shader program 分組繪製(src/sys/drawsort.js)
+    this._dsort = installProgramSort(renderer); // [draws] 不透明物件依 shader program 分組繪製(src/sys/drawsort.js)
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050606);
@@ -71,7 +70,7 @@ export class Game {
     this.weaponScene.add(this.weaponLight);
     yield;
 
-    // ---- 世界:聖心醫院四層 + 戶外(src/map;取自 test 分支)----
+    // ---- 世界 ----
     // 網址帶 ?blockout 時用灰盒場景;正式場景建構失敗時也退回灰盒(並撤銷失敗前登記的碰撞盒)
     this.world = new World();
     const nBoxes = this.world.boxes.length;
@@ -85,63 +84,61 @@ export class Game {
     }
     this.hospital = built && built.group ? built : buildBlockout(this.world, this.world.layout, this.scene);
     this.scene.add(this.hospital.group);
-    if (this.hospital.events) this.hospital.events.auto = false; // main 沒有驚嚇事件:地圖只當場景(燈管老化的閃爍照舊)
     yield;
-    this.deferRainBake = !!this.deferredBuild; // 分時載入:遮雨圖等 main.js 開始畫面前再烘
-    this.weather = new Weather(this); // 雨、濕地、低霧、閃電、暴風雲與城市剪影(每幀掛在 hospital.update 之後)
+    this.deferRainBake = !!this.deferredBuild; // [perf] 分時載入:遮雨圖等 main.js 開始畫面前再烘
+    this.weather = new Weather(this); // 雨、濕地、低霧、閃電、暴風雲與城市剪影(src/map/weather.js;每幀掛在 hospital.update 之後)
     yield;
+    // 室內環境反射(src/mats/surface.js)與大氣環境貼圖會在建構中就地做 PMREM:先在背景把它的 shader 編好
     yield warmPMREM(this, [], { sizes: [256] }).catch(() => {});
-    // 店面與門(碰撞盒要在 buildNav 之前登記)
-    this.shop = new Shop(this.scene, this.world, { game: this, steps: true });
-    yield* this.shop.steps;
-    this.shop.steps = null;
+    yield* this.buildGameplayWorldSteps(); // 補給站店面與補給點(碰撞盒要在 buildNav 之前登記)
+    this.truth = applyTruth(this.world, this.hospital); // [physics] 碰撞高度 = 看到的高度、道具材質(src/physics/truth.js)
     yield;
-    buildInteract(this);
-    yield;
-    this.truth = applyTruth(this.world, this.hospital); // 碰撞高度 = 看到的高度(欄杆、床…)
-    yield;
-    // 靜態幾何 → 每材質一個 BatchedMesh(區塊實例 + PVS;src/map/hospital/batch.js),分段執行
+    // [draws] 靜態幾何 → 每材質一個 BatchedMesh(區塊實例 + PVS;src/map/hospital/batch.js),分段執行
     try { if (this.hospital.batchSteps) yield* this.hospital.batchSteps(this); } catch (e) { console.error('[hospital] 靜態批次失敗', e); }
     this.world.buildNav(); // 場景與道具的碰撞盒都登記好之後才建導航
     yield;
 
     this.player = new Player(this.camera, this.world);
-    sfx.attachGame(this); // 3D 音效的視線遮蔽、樓層悶音(門、雨聲)
+    sfx.attachGame(this); // [audio] 視線遮蔽、樓層悶音、地面材質、房間殘響、畫質、玩家狀態(蹲下/喘息)
+    this.players = [this.player]; // 多人時會加入遠端玩家(殭屍追最近的)
     this.weapons = new WeaponSystem(this.weaponScene);
     this.weapons.onFire = (def, id, speed) => this.fire(def, id, speed);
+    yield;
     this.coins = new Coins(this.scene);
+    this.coins.player = this.player;
+    this.coins.world = this.world;
     this.coins.onGain = (n) => {
       this.player.coins += n;
       this.ui.setCoins(this.player.coins);
       this.ui.coinGain(n);
     };
     this.zombies = [];
+    this.queue = [];
+    this.hazards = new Hazards(this.scene);
+    this.zctx = { player: this.player, players: this.players, world: this.world, zombies: this.zombies, hazards: this.hazards, game: this };
 
     // 槍口閃光燈(照亮環境)
     this.muzzleLight = new THREE.PointLight(0xffa850, 0, 14, 2);
     this.scene.add(this.muzzleLight);
 
     this.ray = new THREE.Raycaster();
-    this.tmpV = new THREE.Vector3();
-    this.bloodTex = makeBloodSplat();
-    this.bloodMat = new THREE.MeshBasicMaterial({ map: this.bloodTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, color: 0xcccccc });
-    this.pools = [];
     this.makeParticles();
-    this.tracers = [];
+    // 物理(src/physics:Rapier WASM,預設在 Web Worker 非同步載入;載入前或失敗時 ready=false,遊戲照舊運作)
+    this.physics = createPhysics(this);
     yield;
-
-    // ---- 後處理(src/game/post.js:GPU 效果、Bloom、調色、分區 LUT)與地圖(M)----
     setupPost(this);
-    this.map = this.ui.map = new MapUI(this.ui);
     yield;
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
 
+    this.initCombat(); // 先建好(含固定存在的爆炸閃光燈):光源數量是 shader 參數,之後的任何預編譯才會用對的光源數
+    yield;
+    this.initGameplay(); // 掉落物、商店介面、HUD、設定、按鍵(src/game/flow.js)
     this.resetRun();
+    this.setMood('menu');
     this.ui.setHP(this.player.hp, this.player.maxHp);
     this.updateAmmoHud();
-    sfx.setMood('menu');
   }
 
   resize() {
@@ -155,337 +152,60 @@ export class Game {
     this.post.uniforms.aspect.value = w / h;
   }
 
-  // ---------- 粒子 ----------
-  makeParticles() {
-    this.particles = [];
-    const geo = new THREE.BoxGeometry(0.025, 0.025, 0.025);
-    this.blood = new THREE.MeshBasicMaterial({ color: 0x6a0808 });
-    this.spark = new THREE.MeshBasicMaterial({ color: 0xffb060 });
-    this.dust = new THREE.MeshBasicMaterial({ color: 0x8a8578 });
-    for (let i = 0; i < 160; i++) {
-      const m = new THREE.Mesh(geo, this.blood);
-      m.visible = false;
-      this.scene.add(m);
-      this.particles.push({ m, v: new THREE.Vector3(), life: 0 });
-    }
-    this.pIdx = 0;
-  }
-
-  burst(pos, normal, kind, n) {
-    const mat = kind === 'blood' ? this.blood : kind === 'spark' ? this.spark : this.dust;
-    for (let i = 0; i < n; i++) {
-      const p = this.particles[this.pIdx++ % this.particles.length];
-      p.m.material = mat;
-      p.m.visible = true;
-      p.m.position.copy(pos);
-      p.gy = (this.world.groundY(pos.x, pos.z, pos.y) ?? pos.y - 1) + 0.02; // 落在這一層的地面
-      const sp = kind === 'blood' ? 2.6 : 3.2;
-      p.v.set((Math.random() - 0.5) * sp, Math.random() * sp * 0.7, (Math.random() - 0.5) * sp).addScaledVector(normal, sp * 0.5);
-      p.life = 0.35 + Math.random() * 0.4;
-      p.m.scale.setScalar(kind === 'blood' ? 0.8 + Math.random() : 0.6 + Math.random() * 0.6);
-    }
-  }
-
-  updateParticles(dt) {
-    for (const p of this.particles) {
-      if (p.life <= 0) continue;
-      p.life -= dt;
-      if (p.life <= 0) { p.m.visible = false; continue; }
-      p.v.y -= 9 * dt;
-      p.m.position.addScaledVector(p.v, dt);
-      if (p.m.position.y < p.gy) { p.m.position.y = p.gy; p.v.multiplyScalar(0.2); }
-    }
-    for (let i = this.tracers.length - 1; i >= 0; i--) {
-      const t = this.tracers[i];
-      t.life -= dt;
-      t.line.material.opacity = Math.max(0, t.life / 0.06) * 0.5;
-      if (t.life <= 0) { this.scene.remove(t.line); t.line.geometry.dispose(); this.tracers.splice(i, 1); }
-    }
-    this.muzzleLight.intensity *= Math.pow(0.0001, dt);
-    if (this.muzzleLight.intensity < 0.3) this.muzzleLight.intensity = 0;
-    for (const p of this.pools) {
-      if (p.grow < 1) {
-        p.grow = Math.min(1, p.grow + dt * 0.4);
-        const s = p.size * (0.15 + 0.85 * p.grow);
-        p.mesh.scale.set(s, s, 1);
-      }
-    }
-  }
-
-  addPool(x, y, z) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.bloodMat);
-    m.rotation.x = -Math.PI / 2;
-    m.rotation.z = Math.random() * 6.28;
-    m.position.set(x, y + 0.015 + this.pools.length * 0.0002, z);
-    m.scale.set(0.2, 0.2, 1);
-    this.scene.add(m);
-    this.pools.push({ mesh: m, grow: 0, size: 1.0 + Math.random() * 0.8 });
-  }
-
-  // ---------- 射擊 ----------
-  fire(def, id, speedNorm) {
-    const cam = this.camera;
-    this.player.kick(def.pitch, def.pitch * 0.9);
-    cam.updateMatrixWorld(true);
-    const origin = new THREE.Vector3();
-    cam.getWorldPosition(origin);
-    const spread = def.spread * (1 + speedNorm * 1.6 + (this.player.sprinting ? 1 : 0));
-    const dir = new THREE.Vector3((Math.random() - 0.5) * 2 * spread, (Math.random() - 0.5) * 2 * spread, -1).normalize().applyQuaternion(cam.quaternion);
-
-    this.muzzleLight.position.copy(origin).addScaledVector(dir, 0.8);
-    this.muzzleLight.intensity = 38;
-    this.weaponLight.intensity = 6;
-    setTimeout(() => { this.weaponLight.intensity = 0; }, 45);
-
-    const liveZ = this.zombies.filter((z) => z.alive);
-    for (const z of liveZ) z.root.updateMatrixWorld(true);
-    const live = liveZ.flatMap((z) => z.meshes);
-    this.ray.set(origin, dir);
-    this.ray.near = 0;
-    this.ray.far = 90;
-    const hits = this.ray.intersectObjects(live, false);
-    const wallDist = this.world.rayDistance(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 90);
-    const end = new THREE.Vector3();
-
-    if (hits.length && hits[0].distance < wallDist) {
-      const h = hits[0];
-      const z = h.object.userData.zombie;
-      const part = h.object.userData.part;
-      const head = part === 'head';
-      const dmg = def.damage * (head ? 2 : 1);
-      end.copy(h.point);
-      const killed = z.damage(dmg, part);
-      this.burst(h.point, dir.clone().negate(), 'blood', head ? 14 : 8);
-      this.ui.hitMarker(head);
-      (head ? sfx.headshot : sfx.hit)();
-      if (killed) this.onKill(z);
-    } else {
-      end.copy(origin).addScaledVector(dir, wallDist);
-      const n = dir.clone().negate();
-      this.burst(end, n, 'spark', 4);
-      this.burst(end, n, 'dust', 4);
-      sfx.wall();
-    }
-
-    // 曳光
-    const start = new THREE.Vector3(0.18, -0.12, -0.8).applyMatrix4(cam.matrixWorld);
-    const geo = new THREE.BufferGeometry().setFromPoints([start, end]);
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
-    this.scene.add(line);
-    this.tracers.push({ line, life: 0.06 });
-
-    this.updateAmmoHud();
-  }
-
-  onKill(z) {
-    this.coins.drop(z.pos.x, z.pos.y, z.pos.z, 5);
-    this.addPool(z.pos.x, z.pos.y, z.pos.z);
-    z.corpse = 6;
-  }
-
-  // ---------- 流程 ----------
-  resetRun() {
-    for (const z of this.zombies) z.dispose();
-    this.zombies.length = 0;
-    this.coins.clear();
-    for (const p of this.pools) this.scene.remove(p.mesh);
-    this.pools.length = 0;
-    this.shop.setOpen(false, true);
-    if (this.shopUIOpen) this.closeShop(false);
-    this.interact.resetRun(); // 門回到地圖的初始狀態
-    this.ui.map.resetRun(); // 地圖迷霧每局重來
-    this.hospital.reset?.();
-    this.player.hp = this.player.maxHp;
-    this.player.coins = 0;
-    const st = this.world.start;
-    this.player.pos.set(st.x, st.y || 0, st.z);
-    this.player.yaw = st.yaw || 0;
-    this.player.pitch = 0;
-    this.player.vx = this.player.vz = 0;
-    this.player.update(0, false); // 鏡頭放到起點(選單畫面)
-    // 重新給武器(只剩手槍)
-    this.weapons.inv = {};
-    this.weapons.give('pistol');
-    this.weapons.switchTo('pistol', true);
-    this.round = 0;
-    this.ui.setCoins(0);
-    this.ui.setHP(this.player.hp, this.player.maxHp);
-  }
-
-  begin() {
-    resumeAudio();
-    if (!this.ambientStarted) { sfx.ambient(); this.ambientStarted = true; }
-    this.resetRun();
-    this.state = 'playing';
-    this.startRound(1);
-  }
-
-  startRound(n) {
-    this.round = n;
-    this.toSpawn = 5 + 3 * (n - 1);
-    this.spawnTimer = 3;
-    this.maxAlive = Math.min(12, 6 + Math.floor(n / 2));
-    this.phase = 'fighting';
-    this.weapons.resupply();
-    this.shop.setOpen(false);
-    this.interact.newRound();
-    for (const p of this.pools) this.scene.remove(p.mesh);
-    this.pools.length = 0;
-    this.ui.setRound(n);
-    this.ui.banner(`第 ${n} 回合`, `殭屍 ${this.toSpawn} 隻`, 3000);
-    this.ui.prompt(null);
-    sfx.roundStart();
-    sfx.setMood(n % 5 === 0 ? 'boss' : 'fight'); // 每 5 回合(商店開放前)是高潮回合
-    this.updateAmmoHud();
-  }
-
-  zombiesLeft() {
-    return this.toSpawn + this.zombies.filter((z) => z.alive).length;
-  }
-
-  spawnZombie() {
-    const p = this.player.pos, W = this.world;
-    // 通風口出生點是 test 的爬行者專用,main 不用
-    const pts = W.spawns.filter((s) => !s.vent).map((s) => ({ s, d: Math.hypot(s.x - p.x, s.y - p.y, s.z - p.z), path: W.flowDistance(s.x, s.y, s.z) }));
-    const far = pts.filter((q) => q.d > SPAWN_MIN);
-    let cand = far.filter((q) => q.path <= SPAWN_PATH);
-    if (!cand.length && far.length) cand = [far.reduce((a, b) => (b.path < a.path ? b : a))];
-    if (!cand.length) cand = [pts.sort((a, b) => b.d - a.d)[0]];
-    const s = cand[(Math.random() * cand.length) | 0].s;
-    const z = new Zombie(this.scene, s.x + (Math.random() - 0.5) * 1.2, s.z + (Math.random() - 0.5) * 1.2, this.round, s.y);
-    this.zombies.push(z);
-    this.toSpawn--;
-  }
-
-  endRound() {
-    this.phase = 'collecting';
-    this.ui.banner(`第 ${this.round} 回合結束`, '收集金幣中…', 3000);
-    sfx.roundEnd();
-    sfx.setMood('break');
-    this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
-    this.ui.setHP(this.player.hp, this.player.maxHp);
-    const after = () => {
-      if (this.state !== 'playing') return;
-      if (this.round % 5 === 0) {
-        this.phase = 'shop';
-        this.shop.setOpen(true); // 捲門拉起、霓虹點亮
-        this.ui.banner('武器商店開放', '前往一樓便利商店（金水商行）購買武器', 5000);
-        sfx.setMood('shop');
-      } else {
-        this.phase = 'break';
-        this.breakTimer = 6;
-      }
-    };
-    if (this.coins.piles.length) {
-      this.coins.collectAll();
-      this.coins.pendingDone = after;
-    } else setTimeout(after, 1500);
-  }
-
-  openShop() {
-    this.shopUIOpen = true;
-    this.ui.renderShop(this.player, this.weapons, (id, price) => this.buy(id, price));
-    this.ui.overlay('shop', true);
-    document.exitPointerLock();
-    this.input.fireHeld = false;
-  }
-
-  closeShop(relock = true) {
-    this.shopUIOpen = false;
-    this.ui.overlay('shop', false);
-    if (relock && this.state === 'playing') this.canvas.requestPointerLock();
-  }
-
-  buy(id, price) {
-    if (this.player.coins < price) { sfx.deny(); return; }
-    this.player.coins -= price;
-    if (id === 'ammo') this.weapons.refillAll();
-    else {
-      const owned = this.weapons.has(id);
-      this.weapons.give(id);
-      if (!owned) this.weapons.switchTo(id);
-    }
-    sfx.buy();
-    this.ui.setCoins(this.player.coins);
-    this.updateAmmoHud();
-    this.ui.renderShop(this.player, this.weapons, (i, p) => this.buy(i, p));
-  }
-
-  nextRound() {
-    if (this.shopUIOpen) this.closeShop();
-    this.startRound(this.round + 1);
-  }
-
-  updateAmmoHud() {
-    const w = this.weapons;
-    this.ui.setAmmo(w.def.name, w.ammo.mag, w.ammo.reserve, w.reloading > 0);
-  }
-
-  die() {
-    this.state = 'dead';
-    sfx.setMood('dead');
-    this.ui.map.close();
-    document.exitPointerLock();
-    this.input.fireHeld = false;
-    document.getElementById('deadinfo').innerHTML = `你撐到了第 <b>${this.round}</b> 回合<br />累積金幣 ${this.player.coins}`;
-    this.ui.overlay('dead', true);
+  // 導航場的目標:所有活著且未倒地的玩家(重複使用同一個陣列,不每幀配置)
+  flowTargets() {
+    const out = this._flowT || (this._flowT = []);
+    out.length = 0;
+    for (let i = 0; i < this.players.length; i++) { const p = this.players[i]; if (p.alive !== false && !p.downed) out.push(p.pos); }
+    return out;
   }
 
   // ---------- 主更新 ----------
   update(dt) {
     this.time += dt;
-    this.hospital.update(this.time, dt, this.player); // 樓層可見性、PVS、燈光、氛圍、門扇;天氣也掛在這裡
+    if (this.net) this.net.update(dt); // [net] 多人連線:殭屍快照、遠端玩家、回合同步、多人 HUD(src/net/session.js)
+    this.hospital.update(this.time, dt, this.player);
+    this.horror?.update(dt); // [ghost] 靈異導演、耳語、幻影(src/horror)
     this.post.uniforms.time.value = this.time % 100;
-    this.grade?.update(dt); // 分區 LUT 權重(src/gfx/grade.js)
-    this.shop.update(dt, this.time, this.player); // 捲門、霓虹、價格牌
-    const p0 = this.player;
-    sfx.listener(p0.pos.x, p0.pos.y + 1.65, p0.pos.z, p0.yaw);
+    this.grade?.update(dt); // [gpu] 分區 LUT 權重、驚嚇色差脈衝(src/gfx/grade.js)
     this.updateParticles(dt);
-    ZU.uTime.value = this.time; // 殭屍材質:焦屍裂縫的餘燼閃爍
-    ZU.uFlash.value = this.player.flashOn ? 1 : 0; // 手電筒照到殭屍眼睛的反光
-    // 選單與回合間:繼續預建殭屍模型;全部類型都有變體後預先編譯殭屍 shader(第一隻出現時才不會卡)
-    if (this.state !== 'playing' || this.phase !== 'fighting') prewarm();
-    if (!this.zWarm && LOOK_TYPES.every(variantReady)) { this.zWarm = true; warmZombies(this.renderer, this.scene, this.camera); }
+    this.updateCombat(dt); // 武器:開鏡視野、準心/狙擊鏡、手榴彈、彈殼與彈孔等特效(src/game/combat.js)
 
     if (this.state !== 'playing') {
-      // 選單/死亡:鏡頭保持,只更新場景動畫
+      // 選單/死亡:只更新場景動畫與鏡頭飄移;順便預先建好殭屍模型
       this.coins.update(dt, this.player);
+      this.updateIdle(dt);
+      prewarm();
       return;
     }
 
     const paused = this.paused || this.shopUIOpen;
-    if (paused) return;
+    if (paused && !this.net) return; // [net] 多人模式世界不暫停,只是本機玩家不能操作
 
     const p = this.player;
-    p.update(dt, true);
-    this.world.updateFlow([p.pos]);
-    this.interact.update(dt); // 門(看著門按 E 開關;殭屍會推開關著的門)
-    this.ui.map.track(this); // 地圖迷霧:記錄走過的格子
-    if (this.ui.map.isOpen) this.ui.map.update(this);
+    p.update(dt, !paused && !p.downed && p.alive !== false); // [net] 倒地/陣亡/多人暫停選單時不能移動
+    this.physics.begin(dt); // 物理:送出上一幀的命令,Worker 與下面的遊戲邏輯平行步進
+    if (this.net) this.net.afterPlayer(dt); // [net] 倒地/觀戰鏡頭、遠端角色動畫、送出本機狀態
+    const targets = this.flowTargets();
+    if (targets.length) this.world.updateFlow(targets);
+    sfx.listener(p.pos.x, p.pos.y + (p.eyeH || 1.65), p.pos.z, p.yaw);
+    sfx.setHealth(p.hp / p.maxHp);
 
+    if (this.phase !== 'fighting') prewarm(); // 回合間的空檔繼續預建殭屍模型
     const w = this.weapons;
     w.update(dt, this.input, p.speedNorm, p.sprinting, this.look);
     this.updateAmmoHud();
 
-    // 殭屍生成
-    if (this.phase === 'fighting') {
-      const alive = this.zombies.filter((z) => z.alive).length;
-      this.spawnTimer -= dt;
-      if (this.toSpawn > 0 && alive < this.maxAlive && this.spawnTimer <= 0) {
-        this.spawnZombie();
-        this.spawnTimer = Math.max(0.6, 1.8 - this.round * 0.08);
-      }
-    }
+    // 出怪、回合結束、休息倒數(src/game/flow.js)
+    this.updateRound(dt);
 
-    // 殭屍更新
+    // 殭屍更新(傷害套用到牠攻擊的那位玩家)
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
-      const dmg = z.update(dt, p, this.world, this.zombies);
-      if (dmg > 0 && p.hp > 0) {
-        p.hurt(dmg, this.time);
-        this.ui.damageFlash();
-        this.ui.setHP(p.hp, p.maxHp);
-        if (p.hp <= 0) { this.die(); return; }
+      const dmg = z.update(dt, this.zctx);
+      if (dmg > 0) {
+        this.damagePlayer(z.target || p, dmg, z.pos);
+        if (this.state !== 'playing') return;
       }
       if (!z.alive) {
         z.corpse -= dt;
@@ -493,119 +213,34 @@ export class Game {
       }
     }
 
-    this.coins.update(dt, p);
-    this.ui.setZombies(this.phase === 'fighting' ? this.zombiesLeft() : 0);
+    this.physics.update(dt); // 物理:套用剛體姿態(布娃娃、道具、碎片)
 
-    // 配樂:最近的殭屍越近越緊張、低血量心跳
-    let near = 99;
-    for (const z of this.zombies) if (z.alive) near = Math.min(near, Math.hypot(z.pos.x - p.pos.x, (z.pos.y - p.pos.y) * 2, z.pos.z - p.pos.z));
-    sfx.setTension(Math.max(0, Math.min(1, 1 - (near - 1.5) / 12)));
-    sfx.setHealth(p.hp / p.maxHp);
-
-    // 回合狀態
-    if (this.phase === 'fighting' && this.toSpawn === 0 && !this.zombies.some((z) => z.alive)) this.endRound();
-    // 提示列:看著門時是門的提示,否則依回合階段
-    let prompt = null;
-    if (this.phase === 'break') {
-      this.breakTimer -= dt;
-      prompt = `下一回合 ${Math.ceil(this.breakTimer)} 秒後開始(按 N 立即開始)`;
-      if (this.breakTimer <= 0) this.nextRound();
+    const hz = this.hazards.update(dt, p, this.world);
+    if (hz > 0) {
+      this.damagePlayer(p, hz, null);
+      if (this.state !== 'playing') return;
     }
-    const shopNear = this.phase === 'shop' && this.shop.near(p);
-    if (this.phase === 'shop') prompt = shopNear ? '按 E 開啟商店 · 按 N 開始下一回合' : '前往一樓便利商店（金水商行）購買武器 · 按 N 開始下一回合';
-    const ix = shopNear ? null : this.interact.pick();
-    if (ix) prompt = typeof ix.text === 'string' ? ix.text : ix.text?.text || null;
-    this.ui.prompt(prompt);
 
-    // 低血量心跳暗角
-    this.post.uniforms.hurt.value = p.hp < 35 ? (1 - p.hp / 35) * 0.7 + Math.sin(this.time * 6) * 0.1 : Math.max(0, 1 - (this.time - p.lastHurt) * 2) * 0.5;
+    // 配樂氣氛:最近的殭屍越近越緊張;巨屍在場時切換 boss 配樂
+    let near = 99, boss = false;
+    for (const z of this.zombies) if (z.alive) { near = Math.min(near, z.dist); boss ||= z.type === 'brute'; }
+    sfx.setTension(Math.max(0, Math.min(1, 1 - (near - 1.5) / 12)));
+    if (this.phase === 'fighting') this.setMood(boss ? 'boss' : 'fight');
+
+    this.coins.update(dt, p);
+    // 商店、掉落物、補給點、醫療包、HUD(src/game/flow.js)
+    this.updateGameplay(dt);
+
+    // 低血量心跳暗角([motion] 有 game.motion 時由它合成:邊緣壓紅 + 跟著真正的心跳聲)
+    if (!this.motion) this.post.uniforms.hurt.value = p.hp < 35 ? (1 - p.hp / 35) * 0.7 + Math.sin(this.time * 6) * 0.1 : Math.max(0, 1 - (this.time - p.lastHurt) * 2) * 0.5;
   }
 
   render() {
     this._dsort?.tick();
+    const prof = this.quality?.gpu;
+    if (prof?.ext && this.composer.passes.length !== this._profN) { instrument(this, prof); this._profN = this.composer.passes.length; } // 新插入的 pass(鏡頭雨滴)也包進分段計時
     this.composer.render();
   }
-
-  // ---------- 輸入 ----------
-  bindInput() {
-    const canvas = this.canvas;
-    document.addEventListener('pointerlockchange', () => {
-      const locked = document.pointerLockElement === canvas;
-      if (!locked && this.ui.map.isOpen) this.ui.map.close();
-      if (!locked && this.state === 'playing' && !this.shopUIOpen) {
-        this.paused = true;
-        this.ui.overlay('pause', true);
-      }
-      if (locked) {
-        this.paused = false;
-        this.ui.overlay('pause', false);
-        this.ui.overlay('menu', false);
-      }
-    });
-    document.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement !== canvas || this.state !== 'playing' || this.ui.map.isOpen) return;
-      this.player.look(e.movementX, e.movementY);
-      this.look.x += e.movementX;
-      this.look.y += e.movementY;
-    });
-    document.addEventListener('mousedown', (e) => {
-      if (document.pointerLockElement !== canvas || e.button !== 0 || this.ui.map.isOpen) return;
-      this.input.fireHeld = true;
-      this.input.firePressed = true;
-    });
-    document.addEventListener('mouseup', (e) => { if (e.button === 0) this.input.fireHeld = false; });
-    document.addEventListener('wheel', (e) => {
-      if (this.state === 'playing' && !this.paused && !this.shopUIOpen) this.weapons.cycle(e.deltaY > 0 ? 1 : -1);
-    });
-    document.addEventListener('keydown', (e) => {
-      this.player.keys[e.code] = true;
-      if (this.state !== 'playing') return;
-      // 地圖(M):PgUp/PgDn 翻樓層,M/Esc/Tab 收起
-      if (this.ui.map.isOpen && ['KeyM', 'Escape', 'PageUp', 'PageDown', 'Tab'].includes(e.code)) {
-        e.preventDefault();
-        if (e.code === 'PageUp') this.ui.map.floor(1);
-        else if (e.code === 'PageDown') this.ui.map.floor(-1);
-        else this.ui.map.close();
-        return;
-      }
-      if (e.code === 'KeyE' && !e.repeat) {
-        if (this.shopUIOpen) this.closeShop();
-        else if (this.phase === 'shop' && this.shop.near(this.player)) this.openShop();
-        else this.interact.press(); // 看著的門:開/關
-      }
-      if (e.code === 'KeyM' && !e.repeat && !this.paused && !this.shopUIOpen) { e.preventDefault(); this.ui.map.open(this); }
-      if (e.code === 'Escape' && this.shopUIOpen) this.closeShop(false), this.ui.overlay('pause', true), (this.paused = true);
-      if (this.paused || this.shopUIOpen) {
-        if (e.code === 'KeyN' && this.phase === 'shop') this.nextRound();
-        return;
-      }
-      if (e.code === 'KeyR') { this.weapons.startReload(); }
-      if (e.code === 'KeyF') this.player.toggleFlashlight();
-      if (e.code === 'KeyN' && this.phase === 'shop') this.nextRound();
-      if (e.code === 'KeyN' && this.phase === 'break') this.nextRound();
-      const m = /^Digit([1-4])$/.exec(e.code);
-      if (m) {
-        const id = ORDER[Number(m[1]) - 1];
-        if (this.weapons.has(id)) this.weapons.switchTo(id);
-      }
-    });
-    document.addEventListener('keyup', (e) => { this.player.keys[e.code] = false; });
-    window.addEventListener('blur', () => { this.player.keys = {}; this.input.fireHeld = false; });
-
-    const lock = () => { resumeAudio(); canvas.requestPointerLock(); };
-    document.getElementById('startBtn').onclick = () => {
-      document.getElementById('menu').classList.remove('on');
-      this.ui.showHud(true);
-      this.begin();
-      lock();
-    };
-    document.getElementById('resumeBtn').onclick = lock;
-    document.getElementById('pause').onclick = lock;
-    document.getElementById('restartBtn').onclick = () => {
-      this.ui.overlay('dead', false);
-      this.begin();
-      lock();
-    };
-    document.getElementById('shopNext').onclick = () => this.nextRound();
-  }
 }
+
+Object.assign(Game.prototype, fxMethods, combatMethods, flowMethods, inputMethods);
