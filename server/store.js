@@ -15,7 +15,7 @@ export const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(HERE, '..
 export const LIMIT = { save: 128 * 1024, slots: 10, name: 40, session: 30 * 24 * 3600 * 1000, cache: 300 };
 const DELAY = 1000; // 寫入節流(毫秒)
 const ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
-const SLOT_RE = /^[a-z0-9][a-z0-9:._-]{0,95}$/;
+const SLOT_RE = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,95}$/;
 export const validId = (id) => typeof id === 'string' && ID_RE.test(id);
 export const validSlot = (s) => typeof s === 'string' && SLOT_RE.test(s);
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('base64url');
