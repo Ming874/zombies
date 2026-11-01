@@ -1,4 +1,4 @@
-import { LINES, LINE_BY_ID, GHOSTS } from './lines.js';
+import { LINES, LINE_BY_ID, GHOSTS, STORY3 } from './lines.js';
 import { ghost, _internal } from '../audio.js';
 import { syllabify } from '../audio/ghost.js';
 import { captions } from '../ui/captions.js';
@@ -9,16 +9,23 @@ import { captions } from '../ui/captions.js';
 const A = _internal.A;
 const TAG = { phone: '電話', radio: '收音機', pa: '醫院廣播' }; // STORY.md §11.1 的字幕標籤
 // 玩家暱稱(大廳設定的;沒有就用「阿孫」)
+// 真的隨機的觸發(阿嬤的這些只剩聲音);劇情回報(story3)與劇情呼叫(script)不在裡面
+const RANDOM = new Set(['zone', 'prop', 'idle', 'dark', 'streak', 'cue', 'lowhp', 'medkit', 'guide', 'radio', 'phone']);
+// 阿嬤一定要有字幕的劇情句:M2 的球、頭七、禁忌的教學與後果,以及線索卡引用的那幾句(STORY3 有 card 的)
+const ESS = new Set(['s3.ball', 's3.touqi', 's3.name.ok', 's3.name.bad', 's3.tap', 'h.w02', 'h.w07', ...Object.values(STORY3).flat().filter((v) => v.card && v.line).map((v) => v.line)]);
+const AMA_W = 8; // 其他的劇情回報:一局最多幾句有字幕(R9 阿嬤 ≤ 15 句;劇情的 seq 另外算)
+const restOf = (g) => g?.story?.radio?.run?.rests ?? g?.horror?.quiet ?? 0; // 第幾次休息
 const nick = () => { try { const n = localStorage.getItem('hz.nick'); return n && n.trim() ? n.trim().slice(0, 12) : '阿孫'; } catch { return '阿孫'; } };
 export class Whispers {
   constructor(h) {
     this.h = h;
     this.used = new Set();
+    this.shown = new Set(); // 阿嬤這一局出過字幕的劇情句
     this.cur = null; // { prio, end(秒,performance 時鐘) }
     this.count = 0;
     this.log = [];
   }
-  reset() { this.used.clear(); this.cur = null; this.h.subs.clear(); }
+  reset() { this.used.clear(); this.shown.clear(); this.cur = null; this.h.subs.clear(); }
   // 說到哪裡用遊戲時間(和聲音的鎖、字幕區同一個鐘;暫停時不走)
   now() { const g = this.h.game; return g && Number.isFinite(g.time) ? g.time : performance.now() / 1000; }
   get busy() { return !!this.cur && this.now() < this.cur.end; }
@@ -61,14 +68,21 @@ export class Whispers {
     // 字幕標籤:電話/收音機 → 來源;鬼 → 「？？？」,認出之後才顯示名字(STORY.md §11.1)
     const tag = o.tag ?? (filter ? TAG[filter] : (L.ghost && this.h.known.has(L.ghost) && GHOSTS[L.ghost]?.name ? GHOSTS[L.ghost].name : '？？？'));
     // 一個字幕區(src/ui/captions.js):劇情/接起的電話/回憶(critical)不會被擋;其他的,別人還在講就不出聲也不出字
-    const crit = o.critical ?? (!!o.force && prio >= 9);
-    // 阿嬤的話只走劇情(收音機安靜 → 哼聲 → 一句;src/story/voice.js);隨機的只剩聽不清的聲音、不出字。其他的鬼一局最多 3 句有字幕(REDESIGN §2.8、R9)
+    let crit = o.critical ?? (!!o.force && prio >= 9);
+    // 阿嬤:真的隨機的觸發(第一次進某區、靠近道具、暗處、連殺、配合事件…)只剩聽不清的聲音、不出字;
+    // 劇情回報(STORY3)、劇情呼叫(script)一律有字幕:重要的(M2 的球、頭七、禁忌的後果、線索卡引用的那句)一定出,
+    // 其他的用預算控制(一局 AMA_W 句、一次休息一句;超過了才喃喃)。其他的鬼一局最多 3 句有字幕(REDESIGN §2.8、R9)
     let sub = o.subtitle !== false, murmur = false;
-    if (!o.lockOk && !crit && !filter && L.trig !== 'script') {
-      if (L.ghost === 'zheng') { sub = false; murmur = true; }
-      else if (sub) { const V = this.h.game?.story?.voice; if (V) { V.count.ghost = (V.count.ghost || 0) + 1; if (V.count.ghost > 3) { sub = false; murmur = true; } } }
+    const zh = L.ghost === 'zheng', V1 = this.h.game?.story?.voice;
+    if (!o.lockOk && !crit && !filter) {
+      if (zh && RANDOM.has(L.trig) && !ESS.has(L.id)) { sub = false; murmur = true; }
+      else if (zh && sub) {
+        if (ESS.has(L.id) && !this.shown.has(L.id)) crit = true; // 一定要聽得到的那幾句:不被別人的字擋掉
+        else if (this.shown.has(L.id) || !V1 || (V1.count.amaW || 0) >= AMA_W || (V1.amaW === restOf(this.h.game) && restOf(this.h.game) > 0)) { sub = false; murmur = true; } // 重複的(「……這邊。」)、超過預算、這次休息已經說過一句
+      } else if (!zh && L.trig !== 'script' && sub) { if (V1) { V1.count.ghost = (V1.count.ghost || 0) + 1; if (V1.count.ghost > 3) { sub = false; murmur = true; } } }
     }
-    if (sub && !crit && !captions.can(tag)) return null;
+    if (sub && !crit && !captions.can(tag)) { if (!zh || murmur) return null; sub = false; murmur = true; } // 阿嬤的劇情句被別人的字擋住:聲音照播、不出字
+    if (zh && sub && !o.lockOk && !filter && L.id) { this.shown.add(L.id); if (V1 && !ESS.has(L.id)) { V1.count.amaW = (V1.count.amaW || 0) + 1; V1.amaW = restOf(this.h.game); } }
     if (!crit && !o.lockOk && !filter && L.trig !== 'warn' && captions.combat()) return null; // 戰鬥中(15 m 內有活屍、被追):隨機的鬼先不講(伏擊的警告除外)
     let ear = o.ear ?? L.ear ?? 'auto';
     if (filter === 'phone' && (ear === 'auto' || ear === 'both')) ear = 'right'; // 聽筒貼在右耳
