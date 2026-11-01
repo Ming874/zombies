@@ -155,21 +155,23 @@ export function installLamp(game) {
 
   // ---------- 台詞(一次一個人說話:都走 voice.js 的 seq) ----------
   const say = (lines, o) => { try { return seq(game, lines, o); } catch (e) { console.warn('[lamp] say', e); return null; } };
-  const atRest = (fn, maxWait = 240) => { // 金水伯的對講機只在休息時響
+  const note = (k, text) => { try { game.story?.notes?.add?.(k, text); } catch { /* 略 */ } }; // 筆記本〈到目前為止〉(沒聽到台詞也查得到)
+  const atRest = (fn, maxWait = 240) => { // 金水伯的對講機只在休息時響;等太久(或這一局結束)就放棄:fn(false)
     const t0 = game.time;
     X.tick(() => {
-      if (game.state !== 'playing' || game.time - t0 > maxWait) return false;
+      if (game.state !== 'playing' || game.time - t0 > maxWait) { fn(false); return false; }
       if (game.phase === 'fighting' || game.story?.ending?.active) return true;
-      X.after(5, fn);
+      X.after(5, () => fn(true));
       return false;
     });
   };
   function onLow() {
+    note('lamp.low', '207 的燈在閃：後巷的發電機快沒油了。去 B1 鍋爐房扛柴油過去加。');
     if (game.time - run.lowSaid < 120 || run.lowPend) return;
     run.lowPend = true;
-    atRest(() => {
+    atRest((ok) => {
       run.lowPend = false;
-      if (run.level <= 0 || run.level > FLICK + 0.05) return;
+      if (!ok || run.level <= 0 || run.level > FLICK + 0.05) return;
       run.lowSaid = game.time;
       say([['ks', run.fillN || run.lowN ? '207 的燈又在閃了。' : '少年仔，207 的燈在閃。\n鍋爐房有柴油，扛去後巷加。']]);
       run.lowN = (run.lowN || 0) + 1;
@@ -178,6 +180,7 @@ export function installLamp(game) {
   function onOut() {
     run.state = 'dying'; run.stT = 0;
     genOff = true;
+    note('lamp.out', '207 的燈熄了。替發電機加油，燈還點得回來。');
     try { sfx.loopStop?.(GEN_LOOP); } catch { /* 略 */ }
     if (!run.outSaid) {
       run.outSaid = true;
@@ -185,7 +188,7 @@ export function installLamp(game) {
     }
     if (!run.outPend) {
       run.outPend = true;
-      atRest(() => { run.outPend = false; if (run.level <= 0) say([['ks', '207 的燈熄了？\n去後巷加油，還點得回來。']]); });
+      atRest((ok) => { run.outPend = false; if (ok && run.level <= 0) say([['ks', '207 的燈熄了？\n去後巷加油，還點得回來。']]); });
     }
   }
   function onRelight() {
@@ -203,6 +206,7 @@ export function installLamp(game) {
   function onFill() {
     const first = !run.fillN;
     run.fillN++;
+    note('lamp.fill', '你替 207 的燈加了油。一桶大約撐兩波。');
     if (!first && game.time - run.fillT < 90) return;
     const wasOut = run.state === 'start';
     run.fillT = game.time;

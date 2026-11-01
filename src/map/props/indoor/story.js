@@ -110,10 +110,25 @@ export function stairMark(R, zone) {
   const lv = R.L.levels[R.li].id, side = /_w$/.test(zone.id) ? 'w' : 'e';
   const runs = R.walls.filter((r) => r.len >= 1.6).sort((a, b) => b.len - a.len);
   const t = tpl(`story:floornum:${lv}:${side}`, (b) => b.plane(D(floorNum(lv, side)), 1.3, 0.975, 0, 0.49, 0.003));
-  for (const run of runs.slice(0, 2)) {
+  for (const run of runs.slice(0, 3)) {
     const tt = run.len > 3.4 ? run.t1 - 1.0 : (run.t0 + run.t1) / 2 + 0.9; // 避開牆中央的小樓層牌(signs.js)
     if (R.isWindow(run, tt - 0.7, tt + 0.7) || tt > run.t1 - 0.6) continue;
-    R.atWall(t, run, tt, { mount: 1.15 });
+    R.atWall(t, run, tt, { mount: 1.3 });
+  }
+  // [w4 scene] 平台地上也漆一個大字(從樓梯口一落地就在腳前;字頭朝離開樓梯的方向)
+  const st = R.L.stairs.find((s) => s.zone === zone.id) || R.L.stairs.find((s) => (s.lower === R.li || s.upper === R.li) && s.x0 >= R.c0 * 2 - 2.1 && s.x1 <= (R.c1 + 1) * 2 + 2.1 && s.z0 >= R.r0 * 2 - 2.1 && s.z1 <= (R.r1 + 1) * 2 + 2.1);
+  const cells = [...R.plain];
+  if (st && cells.length) {
+    const sx = (st.x0 + st.x1) / 2, sz = (st.z0 + st.z1) / 2;
+    let best = null, bd = 1e9;
+    for (const key of cells) {
+      const x = ((key % R.L.W) + 0.5) * 2, z = (((key / R.L.W) | 0) + 0.5) * 2, d = Math.abs(Math.hypot(x - sx, z - sz) - 2.6);
+      if (d < bd) { bd = d; best = [x, z]; }
+    }
+    if (best) {
+      const ft = tpl(`story:floornum:floor:${lv}:${side}`, (b) => b.plane(D(floorNum(lv, side)), 1.4, 1.05, 0, 0.006, 0, { rx: -Math.PI / 2 }));
+      R.put(ft, best[0], best[1], Math.atan2(-(best[0] - sx), -(best[1] - sz)));
+    }
   }
 }
 

@@ -261,7 +261,7 @@ export const MOODS = {
   delivery: { fog: 0x0d0808, density: 0.036, ambient: 0.12, tint: 0xb08a8a }, // [scene6] 產房:暗、偏粉灰,保溫台紅光
   psych: { fog: 0x0c0d10, density: 0.03, ambient: 0.3, tint: 0xd8e0f0 },
   office: { fog: 0x0e0c0a, density: 0.03, ambient: 0.22, tint: 0xc0a080 },
-  stair: { fog: 0x0a0606, density: 0.04, ambient: 0.16, tint: 0xa05050 },
+  stair: { fog: 0x070908, density: 0.04, ambient: 0.2, tint: 0x8a9488 }, // [w4 scene] 中性灰綠:紅色只留在緊急燈附近(整間紅 = 什麼都讀不出來)
   outdoor: { fog: 0x1a2230, density: 0.03, ambient: 0.45, tint: 0x8090b0 }, // 月光 + 霧
   outdoor_fog: { fog: 0x1c232c, density: 0.05, ambient: 0.4, tint: 0x7a8aa0 }, // 濃霧(墓園、停車場邊緣)
   roof: { fog: 0x1a2232, density: 0.022, ambient: 0.5, tint: 0x8a9ac0 },

@@ -8,8 +8,9 @@ import { F, NONE } from './protocol.js';
 // 金幣、擊殺獎勵、掉落物(彈匣/醫療包/手榴彈)、補給點都是「各人各自」:只在擊殺者的畫面生成、只有他撿得到,不需同步。
 // 血量歸零先倒地 30 秒(坐地持手槍、可以開槍),隊友靠近按住 E 3 秒救起;流血至死則觀戰到下一回合重生;全員倒地才結束。
 const REST_MP = 45, READY_LEFT = 3, BLEED = 30, REVIVE_TIME = 3, REVIVE_DIST = 1.8;
-const QCODE = { walker: 'W', runner: 'R', crawler: 'C', bloater: 'B', brute: 'X' };
-const QTYPE = { W: 'walker', R: 'runner', C: 'crawler', B: 'bloater', X: 'brute' };
+// 出怪表的類型代碼(房主轉移時接手剩下的佇列;以前沒有第三波的新類型 → 轉移後全部變成行屍)
+const QCODE = { walker: 'W', runner: 'R', crawler: 'C', bloater: 'B', brute: 'X', screamer: 'S', stalker: 'K', surgeon: 'U', burned: 'F', hazmat: 'H', straitjacket: 'J' };
+const QTYPE = Object.fromEntries(Object.entries(QCODE).map(([t, c]) => [c, t]));
 const isRest = (ph) => ph === 'shop' || ph === 'break';
 const _v = new THREE.Vector3();
 

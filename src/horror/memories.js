@@ -144,7 +144,9 @@ export function createMemories(h) {
     }
     if (b.say) {
       const pa = b.from === 'pa', ph = b.from === 'phone';
-      h.whispers.say(b.say, { priority: 9, force: true, filter: pa ? 'pa' : ph ? 'phone' : null, pos: pa || ph ? undefined : posOf(run, b.from), tag: pa ? '醫院廣播 · 2003' : b.who || '', style: 'past', mode: 'syllabic' });
+      // 回憶裡的話一定要出來(不被劇情的聲音鎖擋掉);講的時候佔住鎖,排隊的劇情句等它講完
+      const r = h.whispers.say(b.say, { priority: 9, force: true, lockOk: true, filter: pa ? 'pa' : ph ? 'phone' : null, pos: pa || ph ? undefined : posOf(run, b.from), tag: pa ? '醫院廣播 · 2003' : b.who || '', style: 'past', mode: 'syllabic' });
+      if (r) game.story?.voice?.claim?.(r.dur, 9, 'memory');
     }
   }
   function giveCard(run) {

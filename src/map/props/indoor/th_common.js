@@ -74,7 +74,7 @@ export function dressStairwell(R, zone) {
   // 樓梯口旁的輪椅(可推動):放在最靠近樓梯的可放格
   const st = R.L.stairs.find((s) => s.zone === zone.id || (s.lower === R.li && s.x0 >= R.c0 * 2 - 0.1 && s.x1 <= (R.c1 + 1) * 2 + 0.1 && s.z0 >= R.r0 * 2 - 2.1 && s.z1 <= (R.r1 + 1) * 2 + 2.1));
   const cells = [...R.plain];
-  if (cells.length && (lv === '1F' || lv === '2F' || lv === 'B1')) {
+  if (cells.length && lv === 'B1') { // [w4 scene] 輪椅是可推動的獨立物件(不能合併):只留 B1 一座,樓梯間每層省幾個 draw
     let best = null, bd = 1e9;
     for (const key of cells) {
       const x = ((key % R.L.W) + 0.5) * 2, z = (((key / R.L.W) | 0) + 0.5) * 2;

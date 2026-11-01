@@ -2,6 +2,9 @@
 // 原則:
 //  - 安靜的時間累積「恐懼值」(dread),累積夠了才放事件;戰鬥中只允許極輕的東西(耳語、聲音)。
 //  - 大場面(停電、燈一盞盞熄滅、身後的人影)保留給回合間休息與探索,不在打鬥中;大場面進行中拒絕所有其他驚嚇。
+//  - 兩個相位不再完全分開(GAMEPLAY_AUDIT §4.1):打鬥中的空檔(張力低、回合開始 20 秒後)可以有少數幾個「小」鬼事件
+//    (FIGHT_GHOST,每一波 FIGHT_BUDGET 個、間隔 35 秒);休息中有少數幾個跟殭屍有關的節拍(習慣群醒來、禁忌的伏擊、
+//    裝死的那邊傳來動靜;KINDS 的 rest:true,每次休息 REST_BEATS 個)。戰鬥還是讀得清楚:不遮聲音、不關燈、不改門。
 //  - 跳嚇(jump)之間有全域冷卻,不連發;大場面之後有一段「喘息」。
 //  - 開局 60 秒內不閃燈、不放大場面(只有耳語與環境音)。
 //
@@ -29,6 +32,7 @@ export const KINDS = {
   // 休息時的「習慣群」醒來(src/zombies/ambush.js):玩家自己的行為造成的(背對、開槍、太大聲),不看恐懼值與層級間隔,
   // 只看大場面鎖、跳嚇間隔與每次休息的預算(REST_BEATS)
   habit: { tier: 'medium', cd: 10, jump: true, ext: true, act: 1, cat: 'host', rest: true },
+  zbeat: { tier: 'small', cd: 25, ext: true, act: 1, cat: 'host', rest: true }, // 休息時:裝死的那邊傳來一點動靜(腳步、悶響)
   // ---- small ----
   whisper: { tier: 'small', cd: 14, act: 1, cat: 'voice', w: 1.1 },
   ambient: { tier: 'small', cd: 35, act: 1, cat: 'sound', w: 0.8 },
@@ -125,7 +129,10 @@ export const INTENSITY = {
 };
 export const LEVELS = ['off', 'low', 'normal', 'high'];
 const CALM_START = 60; // 開局多少秒內不放 medium/big 與閃燈
-const REST_BEATS = { off: 0, low: 1, normal: 3, high: 4 }; // 每次休息最多幾個「跟殭屍有關」的節拍(習慣群醒來)
+const REST_BEATS = { off: 0, low: 1, normal: 3, high: 4 }; // 每次休息最多幾個「跟殭屍有關」的節拍(習慣群醒來、禁忌的伏擊、動靜)
+// 打鬥中可以有的小鬼事件:只出聲音、裝置、一閃的燈或邊緣的霜,不遮戰鬥的聲音(不放 silence、runBehind)、不關燈、不動門
+export const FIGHT_GHOST = new Set(['whisper', 'flicker', 'lullaby', 'phoneRing', 'nurseCall', 'paHijack', 'frostEdge', 'flatline', 'pace', 'knockFollow']);
+const FIGHT_BUDGET = { off: 0, low: 1, normal: 2, high: 3 }; // 每一波最多幾個
 const LIGHT_KINDS = new Set(['flicker', 'signal', 'lightsDie', 'blackout', 'blackoutChange', 'swingBulb', 'darkFollow', 'corridorOut']);
 // 誘集期間(回合進行中)也可以有的:不是鬼的東西(宿主、伏擊、殭屍靠近的閃燈、天花板裡的爬行)。
 // 其他全部是「鬼」:只在靜默期(回合之間的休息)出現(STORY.md §1.9、§4.2、§12)
@@ -154,6 +161,8 @@ export class Director {
     this.calmUntil = 0; // 追逐結束後的喘息(這段時間不放鬼)
     this.chaseUntil = 0;
     this.restBeats = 0; // 這次休息用掉幾個殭屍節拍
+    this.fightGhosts = 0; // 這一波用掉幾個小鬼事件
+    this.lastFightGhost = -1e9;
   }
   // 第幾幕:第 1~2 回合 = 1(有人在)、3~5 = 2(看得見的痕跡)、6 以後 = 3(正面遭遇);靜默期拖很久也會往後推
   get act() {
@@ -184,13 +193,13 @@ export class Director {
   reset() {
     this.t = 0; this.dread = 0; this.tension = 0; this.calm = 0; this.bigUntil = 0; this.roundT = 0;
     this.last = {}; this.lastTier = { small: -1e9, medium: -1e9, big: -1e9 }; this.lastJump = -1e9; this.log.length = 0; this.uses = {}; this.recent.length = 0; this.lastAny = -1e9;
-    this.bigJumps = {}; this.calmUntil = 0; this.chaseUntil = 0; this.restBeats = 0;
+    this.bigJumps = {}; this.calmUntil = 0; this.chaseUntil = 0; this.restBeats = 0; this.fightGhosts = 0; this.lastFightGhost = -1e9;
   }
   // 每幀(遊戲中、非暫停):張力與恐懼值
   update(dt, game) {
     this.t += dt;
     const p = game.player;
-    if (game.phase !== this.phase) { this.phase = game.phase; this.roundT = 0; this.restBeats = 0; } else this.roundT += dt;
+    if (game.phase !== this.phase) { this.phase = game.phase; this.roundT = 0; this.restBeats = 0; if (game.phase === 'fighting') this.fightGhosts = 0; } else this.roundT += dt;
     let near = 99, alive = 0;
     for (const z of game.zombies) if (z.alive) { alive++; if (z.dist < near) near = z.dist; }
     const hp = p.hp / (p.maxHp || 100), hurt = Math.max(0, 1 - (game.time - (p.lastHurt ?? -99)) / 3);
@@ -238,7 +247,7 @@ export class Director {
     if (K.jump && this.t - this.lastTier.big < 40 * I.cd) return deny(); // 大場面之後的喘息
     if (this.phase === 'fighting' && this.roundT < 6) return deny(); // 回合剛開始
     if (!K.ext && kind !== 'whisper' && kind !== 'call' && this.t - this.lastAny < (K.tier === 'small' ? 7 : 12) * I.cd) return deny(); // 任兩個驚嚇之間至少隔幾秒(不疊在一起)
-    if (!this.silent && !FIGHT_OK.has(kind)) return deny(); // 鬼只在靜默期
+    if (!this.silent && !FIGHT_OK.has(kind) && !this.fightGhostOk(kind)) return deny(); // 鬼只在靜默期(打鬥中的空檔例外:少數小事件)
     if (!K.ext && kind !== 'whisper' && kind !== 'call' && this.t < this.calmUntil) return deny(); // 追逐剛結束:喘口氣
     if (K.bj && this.level !== 'high' && (this.bigJumps[this.act] || 0) >= 1 && !o.force) return deny(); // 大跳嚇一幕一個
     if (!K.ext && !o.force && (K.act || 1) > this.act) return deny(); // 還沒到那一幕
@@ -248,9 +257,20 @@ export class Director {
     if (this.dread < need && !o.force) return deny();
     return true;
   }
+  // 打鬥中的空檔可不可以放這個小鬼事件:回合開始 20 秒後、張力低(附近沒有活屍)、沒在追逐、這一波還有預算、上一個 35 秒前。
+  // flow 有波內節奏(game._pace:高峰之後暫停出怪 8~15 秒)時,只排在暫停的那一段(那時張力門檻放寬到 0.5)
+  fightGhostOk(kind) {
+    if (!FIGHT_GHOST.has(kind) || this.phase !== 'fighting') return false;
+    const pace = this.h.game?._pace, relax = !!pace && pace.relax > 0;
+    if (pace && typeof pace.relax === 'number' && !relax) return false;
+    if (this.roundT < 20 || this.tension > (relax ? 0.5 : 0.35) || this.chasing) return false;
+    if (this.fightGhosts >= (FIGHT_BUDGET[this.level] ?? 1)) return false;
+    return this.t - this.lastFightGhost >= 35 * this.I.cd;
+  }
   notify(kind, o = {}) {
     if (kind === 'chaseEnd') return this.chaseEnd(o);
     const K = KINDS[kind] || { tier: 'medium', jump: true };
+    if (!this.silent && !FIGHT_OK.has(kind) && FIGHT_GHOST.has(kind)) { this.fightGhosts++; this.lastFightGhost = this.t; }
     if (kind === 'chase') { this.chaseUntil = this.t + (o.dur ?? 30); this.hold(o.dur ?? 30); }
     if (K.bj) this.bigJumps[this.act] = (this.bigJumps[this.act] || 0) + 1;
     if (K.rest) this.restBeats++;
@@ -279,5 +299,5 @@ export class Director {
     return true;
   }
   get chasing() { return this.t < this.chaseUntil; }
-  stats() { return { level: this.level, act: this.act, t: +this.t.toFixed(1), dread: +this.dread.toFixed(1), tension: +this.tension.toFixed(2), calm: +this.calm.toFixed(1), big: this.bigActive, chase: this.chasing, bigJumps: { ...this.bigJumps }, restBeats: this.restBeats, fired: this.fired, denied: this.denied, log: this.log.slice(-10) }; }
+  stats() { return { level: this.level, act: this.act, t: +this.t.toFixed(1), dread: +this.dread.toFixed(1), tension: +this.tension.toFixed(2), calm: +this.calm.toFixed(1), big: this.bigActive, chase: this.chasing, bigJumps: { ...this.bigJumps }, restBeats: this.restBeats, fightGhosts: this.fightGhosts, fired: this.fired, denied: this.denied, log: this.log.slice(-10) }; }
 }

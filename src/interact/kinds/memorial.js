@@ -187,7 +187,7 @@ export const memorial = {
   },
 };
 
-// 3F 監控室的錄影機:2003/5/5 23:40～23:55 的 CAM-07(hc.05);要監控室有電
+// 3F 監控室的錄影機:封院第 7 天 23:40～23:55 的 CAM-07(hc.05);要監控室有電
 export const cctv = {
   build(api, s, spec = {}) {
     const { kit, M, ix } = api;
@@ -202,13 +202,13 @@ export const cctv = {
     kit.static(m, L, s.li);
     const v = new THREE.Vector3(0, 0.12, 0.13).applyMatrix4(L), pos = { x: v.x, y: v.y, z: v.z };
     return ix.register(pos, {
-      id: spec.id || 'h.ix.cctv', kind: 'cctv', name: '錄影帶 2003/5/5', reach: 1.9, radius: 0.18, scope: 'map', hold: 1.0, holdText: '播放', prompt: '播放錄影帶 2003/5/5', cooldown: 2,
+      id: spec.id || 'h.ix.cctv', kind: 'cctv', name: '錄影帶（封院第 7 天）', reach: 1.9, radius: 0.18, scope: 'map', hold: 1.0, holdText: '播放', prompt: '播放錄影帶（封院第 7 天）', cooldown: 2,
       when: () => (spec.power && !ix.flags.has(spec.power) ? '錄影機 · 沒有電' : true),
       onUse: () => {
         api.ixs.switchClick?.(pos, true);
         api.note('h.c05');
         ix.flags.set('h.cctv.seen', true);
-        ix.after(6, () => api.game.deduce?.talk?.([['收音機 · 小美', '……快轉。我不想看人打架。', 2.8]]));
+        ix.after(6, () => api.game.deduce?.talk?.([['收音機 · 小美', '……那是什麼聲音？有人在拉扯？', 3.0]]));
       },
     });
   },

@@ -417,7 +417,7 @@ lcell('plaque', 0, 512, 512, 256); lcell('poster', 512, 512, 256, 384); lcell('p
 lcell('pay', 1024, 512, 256, 256); lcell('hv', 1280, 512, 256, 128); lcell('bio', 1280, 640, 256, 128);
 lcell('exit', 1536, 512, 256, 128); lcell('staff', 1536, 640, 256, 128); lcell('ambonly', 1792, 512, 256, 128); lcell('nopark', 1792, 640, 256, 128);
 lcell('gauge', 1024, 768, 128, 128); lcell('gauge2', 1152, 768, 128, 128); lcell('panel', 1280, 768, 256, 256); lcell('valvetag', 1536, 768, 128, 128); lcell('fire', 1664, 768, 128, 128);
-lcell('busstop', 1792, 768, 256, 128); lcell('flamm', 1792, 896, 256, 128); lcell('gen_plate', 1536, 896, 256, 128);
+lcell('busstop', 1792, 768, 256, 128); lcell('bento', 1024, 896, 256, 128); lcell('flamm', 1792, 896, 256, 128); lcell('gen_plate', 1536, 896, 256, 128);
 lcell('vent', 0, 768, 256, 256); lcell('wastebin', 256, 896, 256, 128); lcell('taxi', 256, 768, 256, 128); lcell('monitor', 512, 896, 128, 128); lcell('cabinet', 640, 896, 128, 128); lcell('o2', 768, 896, 128, 128); lcell('wreath', 896, 896, 128, 128);
 const PLATES = ['ABK-3317', 'RDX-0921', 'BEM-5582', 'APN-7106', 'RBF-2240', 'AJQ-8873', 'BKV-5532', 'RCL-0457', 'AXT-9015', 'BHN-1268', 'ATE-6649', 'RGY-3380', 'BCW-7721', 'AMK-0094', 'RNE-4436', 'BLT-2187'];
 const LABEL_TEX = lazy(() => {
@@ -499,6 +499,13 @@ const LABEL_TEX = lazy(() => {
   inR('monitor', (w, h) => { ctx.fillStyle = '#0a1210'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = '#2a8a4a'; ctx.lineWidth = 2; ctx.beginPath(); for (let x = 0; x < w; x += 2) ctx.lineTo(x, 64 + (x % 40 < 4 ? -30 : 0) + Math.sin(x) * 2); ctx.stroke(); text(ctx, '0', 100, 24, 20, { color: '#3aaa5a', font: 'monospace' }); });
   inR('cabinet', (w, h) => { ctx.fillStyle = '#d8dcd8'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = '#8a8e8a'; ctx.lineWidth = 3; ctx.strokeRect(4, 4, w - 8, h - 8); ctx.fillStyle = '#c01818'; ctx.fillRect(54, 30, 20, 60); ctx.fillRect(34, 50, 60, 20); });
   inR('o2', (w, h) => { ctx.fillStyle = '#2a6a3a'; ctx.fillRect(0, 0, w, h); text(ctx, 'O₂', w / 2, 50, 44, { color: '#fff', font: 'Arial Black' }); text(ctx, '醫用氧氣', w / 2, 100, 22, { color: '#fff' }); });
+  inR('bento', (w, h) => { // [w4 scene] 便當紙盒蓋:紅綠帶 + 排骨飯(2003 年的免洗紙盒)
+    ctx.fillStyle = '#efe9da'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#b8241c'; ctx.fillRect(0, 10, w, 14); ctx.fillStyle = '#2f7a3a'; ctx.fillRect(0, h - 24, w, 14);
+    text(ctx, '排骨飯', w / 2, h / 2 + 2, 46, { color: '#a01810', weight: '900' });
+    text(ctx, '金水 · 免洗', w - 40, h - 34, 13, { color: '#555' });
+    grime(w, h, 0.2);
+  });
   inR('wreath', (w, h) => { ctx.fillStyle = '#f0ece0'; ctx.fillRect(0, 0, w, h); text(ctx, '安息', w / 2, 46, 40, { color: '#111', font: FONT_KAI }); text(ctx, '主懷', w / 2, 96, 40, { color: '#111', font: FONT_KAI }); });
   inR('wastebin', (w, h) => { ctx.fillStyle = '#d8b020'; ctx.fillRect(0, 0, w, h); text(ctx, '☣ 感染性廢棄物', w / 2, 50, 30, { color: '#a01010' }); text(ctx, 'INFECTIOUS WASTE', w / 2, 96, 20, { color: '#111', font: 'Arial' }); });
   return tex(c, { repeat: false });
@@ -563,7 +570,7 @@ export function initMats() {
   const pl = (k, c, r = 0.55, m = 0, o = {}) => registerMat(k, o.raw ? std({ color: c, roughness: r, metalness: m, ...o.raw }) : [c, r, m, o.opacity ?? 1, o.em ?? 0, o.ei ?? 0]);
   pl('po_hedge', 0x2c3a22, 1); pl('po_moss', 0x34442a, 1); pl('po_sand', 0x8a7a5e, 1); pl('po_ash', 0x48464a, 1); pl('po_coal', 0x161618, 0.45, 0.2);
   pl('po_granite', 0x2c2c2e, 0.35); pl('po_firebrick', 0x8a5a3e, 0.95); pl('po_soot', 0x0e0c0a, 1); pl('po_orange', 0xd85a12, 0.5); pl('po_reflect', 0xe8e8e0, 0.3);
-  pl('po_bag_black', 0x0e0e10, 0.35, 0.1); pl('po_bag_red', 0x9a1410, 0.4); pl('po_bag_yellow', 0xc8a418, 0.45); pl('po_bodybag', 0x14161c, 0.3, 0.1);
+  pl('po_bag_black', 0x0e0e10, 0.35, 0.1); pl('po_bag_red', 0x7c1c16, 0.78); pl('po_bag_yellow', 0xa88c30, 0.8); // [w4 scene] 霧面、降飽和(原本 0.4 的亮面像充氣玩具) pl('po_bodybag', 0x14161c, 0.3, 0.1);
   pl('po_fabric_dirty', 0x8a8270, 1); pl('po_fabric_pink', 0xa87a80, 1); pl('po_suitcase', 0x2a3a4a, 0.5); pl('po_suitcase2', 0x5a2a2a, 0.5);
   pl('po_cable', 0x0c0c0c, 0.6); pl('po_mattress', 0x9aa8a0, 0.95); pl('po_line_white', 0xc8c8c0, 0.85); pl('po_line_yellow', 0xb8962a, 0.85);
   pl('po_skin_doll', 0xd8c0b0, 0.6); pl('po_hair', 0x2a1a10, 0.9); pl('po_pole', 0x2e3432, 0.55, 0.6); pl('po_green_paint', 0x2a4a3a, 0.6, 0.4);

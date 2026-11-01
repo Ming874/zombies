@@ -18,6 +18,7 @@
 //   game.horror.director.request(kind, { weight, pos }) / notify(kind)   (見 director.js)
 //   game.horror.ringing → { pos, anchor, until } | null  正在響的電話(interact 可以讓玩家接起來)
 //   game.horror.stats()
+//   game.soul(src/horror/soul.js)                      三把火與收驚:fires() / lose(why) / restore(n, why) / lost()(大場面自己熄火)
 import * as THREE from 'three';
 import { Director, KINDS as DK } from './director.js';
 import { settings } from '../ui/settings.js';
@@ -31,6 +32,7 @@ import { paranormalKinds } from './paranormal.js';
 import { scareKinds } from './scares.js';
 import { createCalls } from './calls.js';
 import { hauntKinds, HauntFx } from './haunts.js';
+import { installSoul } from './soul.js';
 import { createMemories } from './memories.js';
 import { LINES, CAPTIONS } from './lines.js';
 import { precompile as warmCompile, initPrograms } from '../sys/warmup.js';
@@ -146,13 +148,14 @@ export function installHorror(game) {
       for (let i = watchers.length - 1; i >= 0; i--) { let keep = false; try { keep = watchers[i](dt); } catch (e) { console.warn('[horror]', e); } if (!keep) watchers.splice(i, 1); }
       if (H.ringing && game.time > H.ringing.until) H.ringing = null;
       H.director.update(dt, game);
+      H.soul?.update(dt);
       tick(dt);
     },
     resetRun() {
       H.director.reset(); H.whispers.reset(); H.app?.clear(); H.marks?.clear(); H.fx?.clear();
       later.length = 0; watchers.length = 0; H.usedWrit.clear(); H.ringing = null; H.coldK = H.coldT = 0; H.coldUntil = 0;
       H.calls?.reset(); T.spots.clear(); H._pace = false;
-      H.memories?.reset(); H.hfx?.reset(); H.seenLog.length = 0; H.storyUsed.clear(); H.quiet = 0; T.touqi = false; T.quietPh = null;
+      H.memories?.reset(); H.hfx?.reset(); H.soul?.reset(); H.seenLog.length = 0; H.storyUsed.clear(); H.quiet = 0; T.touqi = false; T.quietPh = null;
       T.zones.clear(); T.props.clear(); T.still = 0; T.streak = 0; T.lastKill = 0; T.zonePend = null; T.next = 0;
       for (const d of H.events?.doors || []) d.primed = false;
       if (performance.now() > 40000) models.warm();
@@ -181,6 +184,7 @@ export function installHorror(game) {
   H.whispers = new Whispers(H);
   H.calls = createCalls(H);
   game.horror = H;
+  H.soul = installSoul(game, H); // 三把火與收驚(本機)
 
   // ---- 場景相關(灰盒地圖沒有 hospital.events 時只剩耳語) ----
   const E = game.hospital?.events;

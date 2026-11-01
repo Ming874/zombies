@@ -209,7 +209,7 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
       }
     }
     // 稀疏的壞天花燈(螢幕光/夜燈/檯燈的房間)
-    const sparse = SPARSE[lt] || (lt === 'emergency' ? (zone.theme === 'stairwell' ? [0.5, 0, 0.5] : [0.4, 0, 0.6]) : null);
+    const sparse = SPARSE[lt] || (lt === 'emergency' ? (zone.theme === 'stairwell' ? [0.55, 0.45, 0] : [0.4, 0, 0.6]) : null);
     if (sparse) {
       for (const [c0, r0, c1, r1] of zone.rects) {
         const w = (c1 - c0 + 1) * 2, h = (r1 - r0 + 1) * 2;
@@ -231,8 +231,8 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
     const wl = lt === 'candle' ? 'sconce' : lt === 'fire' ? 'sodium' : lt;
     if (wl === 'emergency' || wl === 'sodium' || wl === 'nightlight' || wl === 'sconce') {
       const faces = K.faces.filter((f) => f.zone === zone && f.kind === 'room' && f.li === li && f.a1 - f.a0 >= 1.9);
-      const step = wl === 'nightlight' ? 7 : wl === 'emergency' ? (zone.theme === 'stairwell' ? 5 : 7.5) : wl === 'sconce' ? (zone.theme === 'ossuary' ? 3.5 : 6.5) : 8.5;
-      let acc = R() * step;
+      const step = wl === 'nightlight' ? 7 : wl === 'emergency' ? (zone.theme === 'stairwell' ? 13 : 7.5) : wl === 'sconce' ? (zone.theme === 'ossuary' ? 3.5 : 6.5) : 8.5;
+      let acc = R() * step, white = zone.theme === 'stairwell' && wl === 'emergency'; // [w4 scene] 樓梯間每層第一盞壁燈改成壞掉但還亮的白燈(紅色以外的對比光)
       for (const f of faces) {
         for (let a = f.a0 + 0.8; a < f.a1 - 0.6; a += 0.5) {
           acc += 0.5;
@@ -242,6 +242,7 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
           const x = isH ? a : f.fixed + f.nx * off, z = isH ? f.fixed + f.nz * off : a;
           const yy = f.y + (wl === 'nightlight' ? 0.32 : wl === 'emergency' ? 2.45 : wl === 'sconce' ? 1.95 : 2.75);
           if (yy > f.y + f.top - 0.15) continue;
+          if (white) { white = false; add({ x, y: yy + 0.15, z, li, zone, kind: 'fluoro_dying', R, axis: isH ? 'x' : 'z', wall: f, shape: 'lens', color: 0xe4eee2, states: [0.55, 0.45, 0], dim: 0.9 }); continue; }
           add({ x, y: yy, z, li, zone, kind: wl, R, axis: isH ? 'x' : 'z', wall: f, color: wl === 'nightlight' && R() < 0.4 ? 0x9ab4ff : undefined });
         }
       }
@@ -319,6 +320,8 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
     const f = add({ x: p.x, y: p.y, z: p.z, li, zone: p.zone ? L.zones.find((z) => z.id === p.zone) || null : L.zoneAt(li, Math.floor(p.x / 2), Math.floor(p.z / 2)), kind, color: p.color, cd: p.intensity, dist: p.distance, shape: null, state: 0, mode: p.flicker > 0.5 ? 'candle' : MODE[kind] || 'steady', prop: true });
     f.glow = p.glow ?? (kind === 'candle' ? 0.3 : kind === 'street' ? 2.0 : 0.5);
     if (p.w207) f.w207 = p.w207;
+    if (p.pri) f.pri = p.pri; // [w4 scene] 挑燈的加權(劇情地標的燈:遠處也要亮)
+    if (p.far) f.far = p.far;
   }
   // ---- 道具沒放燈的燭光/檯燈/爐火/螢幕區:補一盞 ----
   for (const zone of L.zones) {
@@ -439,6 +442,7 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
   makePool(poolSize);
 
   const nF = fixtures.length;
+  const followers = fixtures.filter((f) => f.follow);
   const score = new Float32Array(nF), want = new Int32Array(64);
   const tmpC = new THREE.Color();
   const _m4 = new THREE.Matrix4();
@@ -475,6 +479,8 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
         f.cur = v;
         if (f.sway) { f.ox = Math.sin(t * 1.3 + f.phase) * f.sway; f.oz = Math.cos(t * 1.1 + f.phase * 0.7) * f.sway * 0.7; }
       }
+      for (let i = 0; i < followers.length; i++) { const f = followers[i]; f.cur = f.follow.cur * f.fk; } // [w4 scene] 跟著別的燈具走(207 窗外的暖光跟著檯燈)
+      story.beacon?.tick(t, dt);
       // 2) 發光件與光暈
       for (let i = 0; i < nF; i++) {
         const f = fixtures[i];
@@ -499,15 +505,17 @@ export function buildLights(K, { root, propLights = [], poolSize = 8 }) {
         const f = fixtures[i];
         score[i] = 0;
         if (f.cur < 0.02 || !visibleLevels[f.li]) continue;
+        if (f.onlyLi !== undefined && f.onlyLi !== playerLi) continue;
         const dx = f.x - px, dz = f.z - pz, dy = f.y - py;
         const d2 = dx * dx + dz * dz + dy * dy * 2.5;
-        if (d2 > 900) continue;
+        if (d2 > (f.far || 900)) continue;
         let s = (f.cd * f.cur) / (d2 + 6);
         const dl = Math.abs(f.li - playerLi);
         if (dl === 1) s *= 0.3; else if (dl > 1) s *= 0.05;
         const dot = (dx * fx + dz * fz) / (Math.sqrt(dx * dx + dz * dz) + 0.01);
         s *= dot > 0.25 ? 1.3 : dot < -0.3 ? 0.7 : 1;
         if (f.pooled) s *= 1.35;
+        if (f.pri) s *= f.pri;
         score[i] = s;
         cnt++;
       }
@@ -622,19 +630,26 @@ function storyLights(K, fixtures, add, root) {
     root.add(mesh);
     lamp.link = [{ mat: glowMat, base: new THREE.Color(0xffd4a0), k0: 0.0, k1: 2.3 }];
     linked.push(lamp);
-    // 窗外的光暈(加法混合的柔光片,朝外):從後巷遠遠就看得到「那一扇亮著的窗」
+    // [w4 scene] 窗外的光暈:面向相機的 sprite(不吃霧)。舊版是和牆平行的板子,後巷和北牆平行,從巷子兩端看都是側面
+    // (巷子西段視線和牆只有約 9°,31 m 外完全看不到)。亮度跟著檯燈這個燈具(lamp 代理的 gate/閃爍/熄燈結局都會一起暗)
     const hc = document.createElement('canvas'); hc.width = 64; hc.height = 64;
-    const h2 = hc.getContext('2d'); const hg = h2.createRadialGradient(32, 34, 2, 32, 34, 31);
-    hg.addColorStop(0, 'rgba(255,255,255,1)'); hg.addColorStop(0.35, 'rgba(255,255,255,0.35)'); hg.addColorStop(1, 'rgba(255,255,255,0)');
+    const h2 = hc.getContext('2d'); const hg = h2.createRadialGradient(32, 32, 1, 32, 32, 31);
+    hg.addColorStop(0, 'rgba(255,255,255,1)'); hg.addColorStop(0.18, 'rgba(255,255,255,0.55)'); hg.addColorStop(0.5, 'rgba(255,255,255,0.14)'); hg.addColorStop(1, 'rgba(255,255,255,0)');
     h2.fillStyle = hg; h2.fillRect(0, 0, 64, 64);
     const htex = new THREE.CanvasTexture(hc); htex.colorSpace = THREE.SRGBColorSpace;
-    const haloMat = new THREE.MeshBasicMaterial({ map: htex, color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: true });
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 2.9), haloMat);
-    halo.position.copy(mesh.position); halo.rotation.copy(mesh.rotation);
-    if (win.axis === 'z') halo.position.z -= win.inDir * 0.45; else halo.position.x -= win.inDir * 0.45;
+    const haloMat = new THREE.SpriteMaterial({ map: htex, color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const halo = new THREE.Sprite(haloMat);
+    const nx0 = win.axis === 'z' ? 0 : win.inDir, nz0 = win.axis === 'z' ? win.inDir : 0;
+    halo.position.set(mesh.position.x - nx0 * 0.95, ly + 1.62, mesh.position.z - nz0 * 0.95);
+    halo.scale.set(5.6, 4.4, 1);
     halo.name = 'w207-window-halo'; halo.raycast = () => {}; halo.renderOrder = 5;
     root.add(halo);
-    lamp.link.push({ mat: haloMat, base: new THREE.Color(0xffb878), k0: 0, k1: 0.55 });
+    lamp.link.push({ mat: haloMat, base: new THREE.Color(0xffb070), k0: 0, k1: 0.85 });
+    // 窗外一盞跟著檯燈走的暖光(光源池的燈具,不是新燈):被選到時把暖光灑在窗下的濕柏油和對面牆上。
+    // 只在玩家位於地面層時參與挑選(onlyLi),遠到 40 m 也算(far);不走 ext,所以室內隔牆時照常被牆擋掉
+    const gli = L.levels.findIndex((l) => Math.abs(l.y) < 0.05);
+    const spill = add({ x: win.x - nx0 * 1.7, y: ly + 0.5, z: win.z - nz0 * 1.7, li: gli >= 0 ? gli : win.li, zone: null, kind: 'lamp', color: 0xffa860, cd: 34, dist: 16, glow: 0, shape: null, state: 0, mode: 'steady' });
+    spill.prop = true; spill.follow = lamp; spill.fk = 1; spill.far = 1700; spill.onlyLi = spill.li;
     // ---- 天亮時從窗戶照進 207 的冷光(平常 ov = 0,不會被燈池選到)+ 一道淡淡的光柱 ----
     const nx = win.axis === 'z' ? 0 : win.inDir, nz = win.axis === 'z' ? win.inDir : 0;
     dawnF = add({ x: win.x + nx * 2.3, y: ly + 1.9, z: win.z + nz * 2.3, li: win.li, zone: null, kind: 'lamp', color: 0xc0c8f4, cd: 24, dist: 11, glow: 0, shape: null, state: 0, mode: 'steady' });
@@ -662,7 +677,7 @@ function storyLights(K, fixtures, add, root) {
     lastT = t;
     for (const f of outF) f.gate = 1 - 0.55 * t;
     if (dawnF) dawnF.gate = t;
-    if (lamp?.link) { lamp.link[0].k1 = 2.3 + 0.8 * t; if (lamp.link[1]) lamp.link[1].k1 = 0.55 * (1 - 0.4 * t); } // 天亮了窗還是要看得出亮著
+    if (lamp?.link) { lamp.link[0].k1 = 2.3 + 0.8 * t; if (lamp.link[1]) lamp.link[1].k1 = 0.85 * (1 - 0.4 * t); } // 天亮了窗還是要看得出亮著
     if (shaft) { shaft.visible = t > 0.02; shaft.material.opacity = 0.3 * t; }
     K.atmo?.setDawn?.(t);
   };

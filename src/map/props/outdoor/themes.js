@@ -17,6 +17,8 @@ import { BASEMENT } from './basement.js';
 import { alley207 } from './alley207.js';
 import { GENERIC, zrng, freeRect, freeAt, edgeDress, scatter, finish } from './generic.js';
 import { windify } from './env.js';
+import { registerMat } from '../../materials.js';
+import { canvas, tex, text } from './mats.js';
 
 // 各主題擺設(dressOutdoor 依 zone.theme 呼叫)。戶外區域以世界座標手工構圖(故事場景),
 // 每個會擋路的物件先檢查格子(可走、未佔用、不靠門);共用的「邊緣處理」替每個靠牆/圍籬的格子加上
@@ -181,10 +183,48 @@ function checkpoint(ctx, zone, R, P) {
 // ======================================================================
 // 前廣場
 // ======================================================================
+// [w4 scene] 立面直式燈箱「十 聖心醫院」:白底紅字的日光燈箱(自發光),從停車場 30 m 外比霧亮、讀得出這是醫院。
+// 雨遮下的嵌燈片也用這張貼圖的白色區(同一個材質 → 同一個批次,不多 draw)
+let VSIGN = false;
+const VS_WHITE = [0.5, 0.012]; // 貼圖最下緣的白色區(嵌燈用)
+function vsignKey() {
+  if (VSIGN) return 'po_vsign';
+  VSIGN = true;
+  const W = 128, H = 640;
+  const [c, x] = canvas(W, H);
+  x.fillStyle = '#f6f3ea'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#c41a12'; x.lineWidth = 5; x.strokeRect(6, 6, W - 12, H - 22);
+  x.fillStyle = '#c41a12'; x.fillRect(W / 2 - 13, 22, 26, 84); x.fillRect(W / 2 - 42, 51, 84, 26); // 紅十字
+  ['聖', '心', '醫', '院'].forEach((ch, i) => text(x, ch, W / 2, 168 + i * 112, 96, { color: '#b8160f', weight: '900' }));
+  for (let k = 0; k < 14; k++) { x.fillStyle = `rgba(70,60,40,${0.03 + ((k * 0.37) % 1) * 0.05})`; x.fillRect(((k * 53) % 100), 20 + ((k * 211) % 580), 20 + (k % 3) * 14, 6 + (k % 4) * 8); } // 燈箱內的灰塵與死蟲影
+  x.fillStyle = '#ffffff'; x.fillRect(0, H - 14, W, 14);
+  const t = tex(c, { repeat: false });
+  registerMat('po_vsign', new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 1.7, roughness: 0.45 }));
+  return 'po_vsign';
+}
+const uvAll = (g, u, v) => { const a = g.attributes.uv; for (let i = 0; i < a.count; i++) a.setXY(i, u, v); return keepUV(g); };
+function facadeLightbox(ctx, P, zone) {
+  const key = vsignKey(), zf = 68.0;
+  // 直式燈箱:貼在 2F 外牆(x 69,入口右側),鐵框 + 發光面
+  const sx = 69.2, y0 = 4.5, y1 = 8.15, w = 1.02, d = 0.24, so = 0.14;
+  P.add('metal_gray', box(w + 0.1, y1 - y0 + 0.1, d), M(sx, (y0 + y1) / 2, zf + so + d / 2));
+  P.add(key, keepUV(new THREE.PlaneGeometry(w - 0.06, y1 - y0 - 0.06)), M(sx, (y0 + y1) / 2, zf + so + d + 0.003));
+  for (const yy of [y0 + 0.4, y1 - 0.4]) P.add('steel', box(0.06, 0.06, so), M(sx, yy, zf + so / 2)); // 支架
+  ctx.light({ x: sx, y: (y0 + y1) / 2 - 0.4, z: zf + 1.3, color: 0xffe2dc, intensity: 3.2, distance: 7, kind: 'lamp', flicker: 0, zone: zone?.id, glow: 1.1 });
+  // 入口雨遮:薄水泥板 + 前緣收邊,底下三盞嵌燈(光照在台階和雕像底座上)
+  const cx0 = 56.2, cx1 = 63.8, cz1 = zf + 1.9, cy = 3.0;
+  P.add('concrete', box(cx1 - cx0, 0.14, cz1 - zf), M((cx0 + cx1) / 2, cy, (zf + cz1) / 2));
+  P.add('steel', box(cx1 - cx0 + 0.04, 0.22, 0.05), M((cx0 + cx1) / 2, cy - 0.03, cz1));
+  for (const s of [-1, 1]) P.add('steel', rod(new V3(60 + s * 3.2, cy + 0.05, cz1 - 0.05), new V3(60 + s * 3.2, cy + 1.1, zf + 0.02), 0.018, 5)); // 拉桿
+  for (const xx of [57.6, 60, 62.4]) P.add(key, uvAll(new THREE.CircleGeometry(0.11, 12).rotateX(HALF), ...VS_WHITE), M(xx, cy - 0.072, zf + 1.0));
+  ctx.light({ x: 60, y: cy - 0.35, z: zf + 1.2, color: 0xfff0d8, intensity: 5.5, distance: 9, kind: 'lamp', flicker: 0, zone: zone?.id, glow: 0 });
+}
+
 function dressPlaza(ctx, zone) {
   // [scene r4] 立面識別:屋頂女兒牆上的「聖心醫院」霓虹(心不亮、醫在閃),從停車場一眼認得出這棟醫院
   neonSign(ctx, 60, 10.45, 67.55, 0, '聖心醫院', { size: 1.75, modes: ['on', 'dead', 'flicker', 'on'], zone });
   const R = zrng(zone), P = new Parts(), li = zone.levelIndex;
+  facadeLightbox(ctx, P, zone);
   // 醫院霓虹招牌(大門上方):心字熄滅、醫字閃爍
   neonSign(ctx, 60, 3.55, 68.02, 0, '聖心醫院', { color: '#ff3020', hex: 0xff3020, size: 0.85, modes: ['on', 'dead', 'flicker', 'on'], zone });
   // 院名石碑 + 旗桿

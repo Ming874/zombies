@@ -127,6 +127,7 @@ export function setupPost(game) {
   const san = new ShaderPass(SanitizeShader);
   san.hzName = 'sanitize';
   composer.addPass(san);
+  game.sanitizePass = san; // 有 GPU 效果時停用(GfxPass 的輸出 blit 已經清過,src/gfx/shaders.js BLIT)
   game.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.32, 0.6, 0.92);
   composer.addPass(game.bloom);
   game.post = new ShaderPass(PostShader);

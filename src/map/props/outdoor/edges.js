@@ -36,14 +36,14 @@ const FACADE = lazy(() => {
       const ox = i * 128 + 28, oy = j * 128 + 30, ww = 72, hh = 66;
       const kind = R();
       x.fillStyle = '#1a1c1e'; x.fillRect(ox - 6, oy - 6, ww + 12, hh + 14); // 窗框陰影
-      const lit = kind > 0.93, broken = kind < 0.12, boarded = kind > 0.12 && kind < 0.2;
+      const lit = false && kind > 0.93, broken = kind < 0.12, boarded = kind > 0.12 && kind < 0.2; // [w4 scene] 封鎖停電:整個街區沒有亮窗(後巷裡只剩 207 那一扇)
       x.fillStyle = lit ? '#d8b070' : broken ? '#050505' : '#1e2428'; x.fillRect(ox, oy, ww, hh);
       if (!lit && !broken) { const g = x.createLinearGradient(ox, oy, ox + ww, oy + hh); g.addColorStop(0, 'rgba(90,100,110,0.35)'); g.addColorStop(1, 'rgba(20,24,28,0)'); x.fillStyle = g; x.fillRect(ox, oy, ww, hh); }
       if (boarded) { x.fillStyle = '#5a4a36'; for (let b = 0; b < 3; b++) x.fillRect(ox - 4, oy + 8 + b * 22, ww + 8, 14); }
       x.strokeStyle = '#2a2c2c'; x.lineWidth = 3; x.beginPath(); x.moveTo(ox + ww / 2, oy); x.lineTo(ox + ww / 2, oy + hh); x.stroke(); // 窗櫺
       if (R() < 0.45) { x.strokeStyle = '#3a3a38'; x.lineWidth = 2; for (let b = 0; b <= 6; b++) { x.beginPath(); x.moveTo(ox - 4 + b * (ww + 8) / 6, oy - 4); x.lineTo(ox - 4 + b * (ww + 8) / 6, oy + hh + 6); x.stroke(); } } // 鐵窗
       x.fillStyle = '#6a6660'; x.fillRect(ox - 8, oy + hh + 6, ww + 16, 6); // 窗台
-      if (lit) { xe.fillStyle = R() < 0.7 ? '#ffb860' : '#8ab0ff'; xe.fillRect(ox, oy, ww, hh); if (R() < 0.5) { xe.fillStyle = '#000'; xe.fillRect(ox + rr(5, 40), oy + 10, 22, hh - 10); } } // 亮窗(偶爾有人影)
+      if (kind > 0.93) { R(); R(); } // 原本亮窗用掉的亂數(保持其他窗的樣子不變)
       if (R() < 0.25) { x.fillStyle = '#d8d8d0'; x.fillRect(ox + ww * 0.6, oy + hh * 0.3, 26, 18); x.fillStyle = '#555'; x.beginPath(); x.arc(ox + ww * 0.6 + 13, oy + hh * 0.3 + 9, 6, 0, TAU); x.fill(); } // 冷氣
     }
     out.push({ map: tex(c), em: tex(ce) });

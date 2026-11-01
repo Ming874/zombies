@@ -60,7 +60,9 @@ function wallBox(P, s, y, R) {
 function boiler(ctx, P, x, y, z, yaw, R) {
   const T = new Parts(), L = 3.6, r = 1.0;
   (ctx.__b1 || (ctx.__b1 = { boilers: [] })).boilers.push({ x, y, z, yaw }); // [scene8] 燃燒機、儀表、安全閥、立管在 indoor/scene8.js
-  T.add('metal_gray', cyl(r, r, L, 24).rotateZ(HALF), M(0, r + 0.35, 0));
+  T.add('rust', cyl(r, r, L, 24).rotateZ(HALF), M(0, r + 0.35, 0)); // [w4 scene] 爐身是髒的(鏽斑、水痕),不是乾淨的灰圓筒
+  flatDecal(T, 'soot', 0, r * 2 + 0.36, 0, 2.6, 1.4, 'y+');
+  for (const s of [-1, 1]) for (const [dx, w] of [[-0.9, 1.2], [0.7, 1.5]]) flatDecal(T, 'rustrun', dx, r + 0.35 - 0.05, s * (r + 0.012), w, 0.5, s > 0 ? 'z+' : 'z-'); // 鏽水痕
   for (let k = 0; k <= 6; k++) T.add('steel', tor(r + 0.01, 0.015, 4, 28).rotateY(HALF), M(-L / 2 + k * L / 6, r + 0.35, 0));
   T.add('cast_iron', cyl(r * 0.95, r * 0.95, 0.12, 24).rotateZ(HALF), M(L / 2 + 0.06, r + 0.35, 0));
   T.add('cast_iron', cyl(0.3, 0.3, 0.1, 16).rotateZ(HALF), M(L / 2 + 0.14, r + 0.1, 0)); // 爐門
@@ -237,19 +239,22 @@ function dressIncinerator(ctx, zone) {
   const R = zrng(zone), P = new Parts(), li = zone.levelIndex, y = ctx.L.levels[li].y;
   for (const s of ctx.wallSpots(zone, { allowNearDoor: true })) if (R() < 0.6) wallPipes(P, s, y, R, { h: 2.8, n: 1, key: 'rust' });
   // 焚化爐爐口(嵌在南牆:鐵門 + 火光)
-  const fx = 92, fz = 65.4;
-  if (freeAt(ctx, li, fx, fz - 1.0, 0.8)) {
-    P.add('po_firebrick', box(3.0, 2.6, 1.0), M(fx, y + 1.3, fz));
-    P.add('cast_iron', box(1.2, 0.9, 0.08), M(fx, y + 1.1, fz - 0.52));
-    P.add('po_ember', box(0.9, 0.18, 0.02), M(fx, y + 0.72, fz - 0.565));
-    P.add('cast_iron', box(1.6, 0.12, 0.1), M(fx, y + 1.62, fz - 0.55));
-    flatDecal(P, 'soot', fx, y + 1.9, fz - 0.505, 2.6, 1.6, 'z-');
-    groundDecal(P, 'ashes', fx, fz - 1.6, 2.6, 1.6, 0, y + 0.006);
-    P.add('po_ash', new THREE.SphereGeometry(0.6, 10, 6, 0, TAU, 0, HALF).scale(1.3, 0.3, 0.7), M(fx + 0.3, y, fz - 1.4));
-    ctx.light({ x: fx, y: y + 0.9, z: fz - 0.9, color: 0xff5a18, intensity: 6, distance: 9, kind: 'fire', flicker: 0.3, zone: zone.id, glow: 0.6 });
-    solid(ctx, fx, y, fz, 3.0, 2.6, 1.0, 'stone');
-    (ctx.__b1 || (ctx.__b1 = { boilers: [] })).furnace = { x: fx, z: fz }; // [scene8] 爐口周邊在 indoor/scene8.js
-    P.add('wood_old', rod(new V3(fx + 1.9, y + 0.1, fz - 0.7), new V3(fx + 2.0, y + 1.3, fz - 0.5), 0.02, 6));
+  // [w4 scene] 爐子嵌在東牆、正對隧道門(從門口一進來就在視線盡頭;原本在南牆,門口看不到)。爐口朝 -x
+  const fx = 101.5, fz = 59.0, fyaw = -HALF;
+  if (freeAt(ctx, li, fx - 1.0, fz, 0.8)) {
+    const F = new Parts();
+    F.add('po_firebrick', box(3.0, 2.6, 1.0), M(0, 1.3, 0));
+    F.add('cast_iron', box(1.2, 0.9, 0.08), M(0, 1.1, 0.52));
+    F.add('po_ember', box(0.9, 0.18, 0.02), M(0, 0.72, 0.565));
+    F.add('cast_iron', box(1.6, 0.12, 0.1), M(0, 1.62, 0.55));
+    flatDecal(F, 'soot', 0, 1.9, 0.505, 2.6, 1.6, 'z+');
+    groundDecal(F, 'ashes', 0, 1.6, 2.6, 1.6, 0, 0.006);
+    F.add('po_ash', new THREE.SphereGeometry(0.6, 10, 6, 0, TAU, 0, HALF).scale(1.3, 0.3, 0.7), M(-0.3, 0, 1.4));
+    F.add('wood_old', rod(new V3(-1.9, 0.1, 0.7), new V3(-2.0, 1.3, 0.5), 0.02, 6));
+    P.merge(F, M(fx, y, fz, 0, fyaw, 0));
+    ctx.light({ x: fx - 0.9, y: y + 0.9, z: fz, color: 0xff5a18, intensity: 7, distance: 11, kind: 'fire', flicker: 0.3, zone: zone.id, glow: 0.6, pri: 3 });
+    solid(ctx, fx, y, fz, 1.0, 2.6, 3.0, 'stone');
+    (ctx.__b1 || (ctx.__b1 = { boilers: [] })).furnace = { x: fx, z: fz, yaw: fyaw }; // [scene8] 爐口周邊在 indoor/scene8.js(yaw:模板 +Z 朝房間)
   }
   for (const [x, z] of [[98.6, 36.4], [99.6, 40.8], [86.2, 56.2], [88.6, 56.0]]) if (freeAt(ctx, li, x, z, 0.6)) { wasteCart(P, x, y, z, R.range(-0.3, 0.3)); solid(ctx, x, y, z, 1.0, 1.1, 0.7, 'metal'); }
   for (const [x, z] of [[97.2, 44.8], [97.8, 45.6], [84.6, 60.4]]) bioBin(ctx, x, y, z, R() * TAU);
@@ -265,7 +270,45 @@ function dressPump(ctx, zone) {
   for (const [x, z] of [[40, 59.4], [43.4, 59.4], [56, 64.6]]) if (freeAt(ctx, li, x, z, 0.9)) pump(ctx, P, x, y, z, R() < 0.5 ? 0 : Math.PI);
   if (freeAt(ctx, li, 56.4, 59.6, 0.8)) { P.add('po_green_paint', cyl(0.6, 0.6, 2.2, 18), M(56.4, y + 1.2, 59.6)); P.add('po_green_paint', new THREE.SphereGeometry(0.6, 18, 8, 0, TAU, 0, HALF), M(56.4, y + 2.3, 59.6)); P.add('po_label', labelQuad('gauge', 0.2, 0.2), M(56.4, y + 1.5, 60.22)); solid(ctx, 56.4, y, 59.6, 1.3, 2.9, 1.3, 'heavy'); }
   wetSign(ctx, 47.5, y, 60.2, 0.6);
+  pumpCentre(ctx, P, y, zone, li);
   finish(ctx, P);
+}
+// [w4 scene] 水泵房中央:橫過視線的集水主管(2.5 m 高)+ 閥門、有格柵和欄杆的集水坑、水位控制箱(指示燈)、沙包與抽水軟管、一盞工作燈
+function pumpCentre(ctx, P, y, zone, li) {
+  const hy = y + 2.5, z0 = 61.8;
+  P.add('po_green_paint', cyl(0.17, 0.17, 18.4, 14).rotateZ(HALF), M(48.6, hy, z0));
+  for (let x = 40.4; x < 57.5; x += 2.8) { P.add('cast_iron', cyl(0.24, 0.24, 0.06, 14).rotateZ(HALF), M(x, hy, z0)); P.add('steel', box(0.06, 1.2, 0.06), M(x + 0.15, hy + 0.75, z0)); }
+  for (const x of [40, 43.4]) { P.add('po_green_paint', cyl(0.11, 0.11, 2.4, 10).rotateX(HALF), M(x, hy, z0 - 1.2)); P.add('po_green_paint', cyl(0.11, 0.11, 1.4, 10), M(x, hy - 0.7, 59.4 + 0.0)); }
+  P.add('cast_iron', cyl(0.08, 0.08, 0.5, 8), M(50.2, hy - 0.42, z0)); P.add('plastic_red', tor(0.2, 0.02, 4, 16), M(50.2, hy - 0.7, z0, HALF, 0, 0)); // 閘閥 + 紅手輪
+  P.add('po_label', labelQuad('valvetag', 0.14, 0.14), M(50.2, hy - 0.95, z0 + 0.02));
+  // 集水坑:黑水面 + 格柵 + 黃色欄杆
+  const sx = 47.6, sz = 63.4, sw = 2.0;
+  if (freeAt(ctx, li, sx, sz, 1.2)) {
+    P.add('po_soot', box(sw, 0.02, sw), M(sx, y + 0.005, sz));
+    for (let k = -4; k <= 4; k++) P.add('steel', box(0.03, 0.04, sw), M(sx + k * 0.22, y + 0.03, sz));
+    P.add('steel', box(sw, 0.05, 0.05), M(sx, y + 0.03, sz - sw / 2)); P.add('steel', box(sw, 0.05, 0.05), M(sx, y + 0.03, sz + sw / 2));
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) P.add('po_line_yellow', cyl(0.025, 0.025, 1.05, 6), M(sx + a * (sw / 2 + 0.08), y + 0.52, sz + b * (sw / 2 + 0.08)));
+    for (const hh of [0.55, 1.03]) {
+      for (const b of [-1, 1]) P.add('po_line_yellow', cyl(0.022, 0.022, sw + 0.16, 6).rotateZ(HALF), M(sx, y + hh, sz + b * (sw / 2 + 0.08)));
+      for (const a of [-1, 1]) P.add('po_line_yellow', cyl(0.022, 0.022, sw + 0.16, 6).rotateX(HALF), M(sx + a * (sw / 2 + 0.08), y + hh, sz));
+    }
+    solid(ctx, sx, y, sz, sw + 0.3, 1.1, sw + 0.3, 'metal');
+    // 抽水軟管:坑裡 → 地上 → 泵
+    P.add('rubber', tube([new V3(sx - 0.4, y - 0.05, sz), new V3(sx - 0.9, y + 0.12, sz - 0.6), new V3(sx - 2.6, y + 0.06, sz - 1.4), new V3(43.4, y + 0.3, 60.2)], 0.045, { radial: 6 }));
+  }
+  // 水位控制箱(南牆):指示燈一紅一綠、水位刻度
+  const cx = 51.8, cz = 65.6;
+  P.add('metal_gray', box(0.8, 1.3, 0.3), M(cx, y + 1.25, cz));
+  P.add('po_label', labelQuad('panel', 0.5, 0.5), M(cx, y + 1.35, cz - 0.155).multiply(M(0, 0, 0, 0, Math.PI, 0)));
+  P.add('glow_red', sph(0.025, 6, 4), M(cx - 0.2, y + 1.75, cz - 0.16)); P.add('glow_warm', sph(0.025, 6, 4), M(cx + 0.2, y + 1.75, cz - 0.16));
+  P.add('steel', box(0.06, 1.0, 0.04), M(cx + 0.55, y + 1.3, cz - 0.02)); for (let k = 0; k < 6; k++) P.add('po_line_yellow', box(0.08, 0.012, 0.01), M(cx + 0.55, y + 0.9 + k * 0.16, cz - 0.045));
+  solid(ctx, cx, y, cz, 0.85, 1.9, 0.35, 'metal');
+  // 沙包(門口內側擋水)
+  for (let k = 0; k < 5; k++) for (let j = 0; j < (k < 3 ? 2 : 1); j++) P.add('po_sand', box(0.55, 0.16, 0.32).translate(0, 0.08, 0), M(53.8 + k * 0.5 + j * 0.25, y + j * 0.16, 59.0 + (k % 2) * 0.06, 0, 0.05 * (k - 2), 0));
+  solid(ctx, 54.8, y, 59.0, 2.6, 0.32, 0.4, 'fabric');
+  // 工作燈(籠燈 + 電線),照著集水坑
+  P.add('steel', tor(0.08, 0.006, 4, 12), M(sx + 1.0, hy - 0.3, sz - 1.2, HALF, 0, 0)); P.add('glow_warm', sph(0.045, 8, 6), M(sx + 1.0, hy - 0.32, sz - 1.2)); P.add('po_cable', cyl(0.006, 0.006, 0.3, 4), M(sx + 1.0, hy - 0.15, sz - 1.2));
+  ctx.light({ x: sx + 1.0, y: hy - 0.5, z: sz - 1.2, color: 0xffc078, intensity: 5, distance: 9, kind: 'bare_bulb', flicker: 0, zone: zone?.id, glow: 0.5, pri: 2 });
 }
 function dressMachine(ctx, zone) {
   const R = zrng(zone), P = new Parts(), li = zone.levelIndex, y = ctx.L.levels[li].y;
@@ -346,7 +389,12 @@ function dockHandoff(ctx, P, y, zone) {
     const bx = tx - 0.3 + k * 0.28, bz = tz - 0.05 + k * 0.06, by = y + 0.765 + i * 0.05;
     P.add('paper', box(0.21, 0.048, 0.16), M(bx, by, bz, 0, (i % 2 ? 0.08 : -0.05) + k * 0.2, 0));
     P.add('plastic_red', box(0.006, 0.05, 0.165), M(bx + 0.03, by, bz, 0, (i % 2 ? 0.08 : -0.05) + k * 0.2, 0));
+    if (i === 3 - k) P.add('po_label', labelQuad('bento', 0.2, 0.1).rotateX(-HALF), M(bx, by + 0.0245, bz, 0, (i % 2 ? 0.08 : -0.05) + k * 0.2, 0)); // 最上面那盒的紙蓋印字
   }
+  // 網外一張紅色塑膠凳(金水伯坐著等人來拿)、網門上的掛鎖和鐵鍊
+  { const sx = 109.0, sz = Z + 0.9; P.add('plastic_red', cyl(0.16, 0.14, 0.03, 14), M(sx, y + 0.44, sz)); for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) P.add('plastic_red', rod(new V3(sx + a * 0.1, y + 0.43, sz + b * 0.1), new V3(sx + a * 0.15, y, sz + b * 0.15), 0.015, 5)); solid(ctx, sx, y, sz, 0.36, 0.45, 0.36, 'wood'); }
+  P.add('steel', box(0.07, 0.09, 0.03), M(107.6, y + 1.05, Z - 0.02)); P.add('steel', tor(0.025, 0.006, 4, 10), M(107.6, y + 1.12, Z - 0.02));
+  for (let k = 0; k < 7; k++) P.add('steel', tor(0.02, 0.005, 4, 8), M(107.6, y + 1.18 + k * 0.035, Z - 0.02, k % 2 ? HALF : 0, 0, 0));
   P.add('plastic_red', cyl(0.05, 0.05, 0.27, 12), M(tx + 0.35, y + 0.875, tz + 0.05));
   P.add('plastic_white', cyl(0.04, 0.04, 0.05, 10), M(tx + 0.35, y + 1.035, tz + 0.05));
   P.add('wood_light', box(0.23, 0.01, 0.31), M(tx + 0.05, y + 0.745, tz + 0.12, 0, 0.3, 0));
@@ -356,7 +404,7 @@ function dockHandoff(ctx, P, y, zone) {
   P.add('cast_iron', box(0.12, 0.1, 0.08), M(107.3, y + 2.55, Z - 0.04));
   P.add('steel', tor(0.07, 0.006, 4, 12), M(107.3, y + 2.43, Z - 0.13, HALF, 0, 0));
   P.add('glow_warm', sph(0.04, 8, 6), M(107.3, y + 2.42, Z - 0.13));
-  ctx.light({ x: 107.3, y: y + 2.3, z: Z - 0.4, color: 0xffb468, intensity: 4.5, distance: 7, kind: 'bare_bulb', flicker: 0, zone: zone?.id, glow: 0.55 });
+  ctx.light({ x: 107.3, y: y + 2.3, z: Z - 0.4, color: 0xffb468, intensity: 6, distance: 9, kind: 'bare_bulb', flicker: 0, zone: zone?.id, glow: 0.55, pri: 4 }); // [w4 scene] 光圈落在桌面上、從倉庫門口就看得到
 }
 
 // [scene r5] 鍋爐房:一角是給 207 專用發電機加油的地方 —— 油桶、手搖泵、漏斗、紅色油桶、牆上粉筆記的加油日期;一盞暖色工作燈
@@ -373,7 +421,8 @@ function boilerFuel(ctx, P, y, zone) {
   for (const [dx, dz] of [[0.9, 0.35], [1.15, 0.0]]) { P.add('plastic_red', box(0.32, 0.42, 0.18), M(x + dx, y + 0.21, z + dz, 0, 0.3, 0)); P.add('plastic_black', cyl(0.025, 0.025, 0.05, 8), M(x + dx + 0.1, y + 0.45, z + dz)); }
   P.add('steel', cyl(0.12, 0.02, 0.18, 10, true), M(x + 0.6, y + 0.09, z + 0.6, Math.PI, 0, 0));
   solid(ctx, x, y, z, 1.6, 1.0, 1.6, 'metal');
-  ctx.light({ x: x + 0.3, y: y + 2.3, z: z + 0.2, color: 0xffb468, intensity: 3.6, distance: 6.5, kind: 'bare_bulb', flicker: 0, zone: zone?.id, glow: 0.5 });
+  ctx.light({ x: x + 0.3, y: y + 2.3, z: z + 0.2, color: 0xffb468, intensity: 5.2, distance: 8, kind: 'bare_bulb', flicker: 0, zone: zone?.id, glow: 0.5, pri: 4 }); // [w4 scene] 油桶角要亮(lamp 代理會用到那個油桶)
+  P.add('steel', tor(0.07, 0.006, 4, 12), M(x + 0.3, y + 2.42, z + 0.2, HALF, 0, 0)); P.add('glow_warm', sph(0.04, 8, 6), M(x + 0.3, y + 2.4, z + 0.2)); P.add('po_cable', cyl(0.006, 0.006, 1.2, 4), M(x + 0.3, y + 3.0, z + 0.2));
 }
 // [scene r5] 焚化爐:2003 的醫療廢棄物在這裡燒;爐門縫透出的暗紅餘燼光(看得到焚化爐在哪)
 function incinGlow(ctx, P, y, zone) {

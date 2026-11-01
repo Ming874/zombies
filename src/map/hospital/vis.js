@@ -30,6 +30,21 @@ export function createVis(L) {
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const ch = L.charAt(li, c, r); a[r * W + c] = ch === 'o' || ch === '%' ? 1 : 0; }
     return a;
   });
+  // [w4] 垂直遮擋(樓板):看得到其他樓層的地方 = 這格沒有樓板(挑空/樓梯/建築外)或上一層這格沒有樓板(含頂樓、戶外)。
+  // 視線經過這種格子之後(到了戶外、天井、樓梯口),後面的格子在其他樓層才可能看得到;還在有樓板的室內時,
+  // 正上方/正下方的房間(例如遊戲室樓下的金水商行)被樓板擋住 → 不放進 col。
+  const hasFloor = (li, c, r) => { const ch = L.charAt(li, c, r); return ch !== '_' && ch !== 'o' && ch !== '%'; };
+  // expoDn:這格沒有樓板(看得到下面的樓層);expoUp:上一層這格沒有樓板(看得到上面的樓層;頂樓沒有更上面)
+  const expoDn = L.levels.map((lv, li) => {
+    const a = new Uint8Array(N);
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) a[r * W + c] = hasFloor(li, c, r) ? 0 : 1;
+    return a;
+  });
+  const expoUp = L.levels.map((lv, li) => {
+    const a = new Uint8Array(N);
+    if (li + 1 < nL) for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) a[r * W + c] = hasFloor(li + 1, c, r) ? 0 : 1;
+    return a;
+  });
   // ---- 區塊:樓層 × 區域(沒有區域的格子 = 牆/戶外,依方塊)× 12m 方塊 ----
   const zoneIdx = new Map(L.zones.map((z, i) => [z, i]));
   const keyToId = new Map(), regions = []; // regions[id] = { li, zi, tx, tz }
@@ -56,13 +71,18 @@ export function createVis(L) {
   const RAYS = 256; // 1.4°:80m 外約 2m 一條,再加上外擴一格
   const cosT = new Float32Array(RAYS), sinT = new Float32Array(RAYS);
   for (let i = 0; i < RAYS; i++) { const a = ((i + 0.5) / RAYS) * Math.PI * 2; cosT[i] = Math.cos(a); sinT[i] = Math.sin(a); }
-  function cast(op, mask, px, pz, maxD) {
+  // exD/exU(可省略):同一條視線上,經過「看得到下面/上面樓層」的格子之後的格子 → mD/mU
+  function cast(op, mask, px, pz, maxD, exD = null, mD = null, exU = null, mU = null) {
     const c0 = Math.floor(px), r0 = Math.floor(pz);
     if (c0 < 0 || r0 < 0 || c0 >= W || r0 >= H) return;
-    mask[r0 * W + c0] = 1;
+    const k0 = r0 * W + c0;
+    mask[k0] = 1;
+    const d0 = exD ? exD[k0] : 0, u0 = exU ? exU[k0] : 0;
+    if (d0) mD[k0] = 1;
+    if (u0) mU[k0] = 1;
     for (let i = 0; i < RAYS; i++) {
       const dx = cosT[i], dz = sinT[i];
-      let c = c0, r = r0;
+      let c = c0, r = r0, xd = d0, xu = u0;
       const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
       const tdx = dx !== 0 ? Math.abs(1 / dx) : 1e9, tdz = dz !== 0 ? Math.abs(1 / dz) : 1e9;
       let tx = dx !== 0 ? (dx > 0 ? c + 1 - px : px - c) * tdx : 1e9;
@@ -73,6 +93,7 @@ export function createVis(L) {
         if (t > maxD || c < 0 || r < 0 || c >= W || r >= H) break;
         const k = r * W + c;
         mask[k] = 1;
+        if (exD) { if (exD[k]) xd = 1; if (xd) mD[k] = 1; if (exU[k]) xu = 1; if (xu) mU[k] = 1; }
         if (op[k]) break;
       }
     }
@@ -80,7 +101,21 @@ export function createVis(L) {
   // 9 個取樣點(玩家在格子裡任何位置都涵蓋)或只用格心(種子)
   const SAMPLES9 = [[0.5, 0.5], [0.04, 0.04], [0.96, 0.04], [0.04, 0.96], [0.96, 0.96]]; // 格心 + 四角
   const SAMPLES1 = [[0.5, 0.5]];
-  const raw = new Uint8Array(N), dil = new Uint8Array(N);
+  const raw = new Uint8Array(N), dil = new Uint8Array(N), rawD = new Uint8Array(N), dilD = new Uint8Array(N), rawU = new Uint8Array(N), dilU = new Uint8Array(N);
+  // 外擴一格(開放格只擴 4 鄰;牆面(不透明格)8 鄰都算 → 不會穿過牆)
+  const dilate = (src, dst, op) => {
+    dst.set(src);
+    for (let rr = 0; rr < H; rr++) for (let cc = 0; cc < W; cc++) {
+      const k = rr * W + cc;
+      if (!src[k] || op[k]) continue;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const c2 = cc + dc, r2 = rr + dr;
+        if ((!dc && !dr) || c2 < 0 || r2 < 0 || c2 >= W || r2 >= H) continue;
+        const k2 = r2 * W + c2;
+        if (op[k2] || (dc === 0 || dr === 0)) dst[k2] = 1;
+      }
+    }
+  };
   const stamp = new Int32Array(nR);
   let stampN = 1;
   const cache = new Map();
@@ -91,26 +126,18 @@ export function createVis(L) {
     const key = ((li * H + r) * W + c) * 2 + (fine ? 1 + doorVer[li] * 65536 : 0);
     let res = cache.get(key);
     if (res) return res;
-    raw.fill(0);
+    raw.fill(0); rawD.fill(0); rawU.fill(0);
     const op = fine ? opFine[li] : opaque[li];
-    for (const [ox, oz] of fine ? SAMPLES9 : SAMPLES1) cast(op, raw, c + ox, r + oz, maxCells);
-    dil.set(raw);
-    for (let rr = 0; rr < H; rr++) for (let cc = 0; cc < W; cc++) {
-      const k = rr * W + cc;
-      if (!raw[k] || op[k]) continue;
-      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-        const c2 = cc + dc, r2 = rr + dr;
-        if ((!dc && !dr) || c2 < 0 || r2 < 0 || c2 >= W || r2 >= H) continue;
-        const k2 = r2 * W + c2;
-        if (op[k2] || (dc === 0 || dr === 0)) dil[k2] = 1; // 開放格只擴 4 鄰;牆面(不透明格)8 鄰都算
-      }
-    }
+    for (const [ox, oz] of fine ? SAMPLES9 : SAMPLES1) cast(op, raw, c + ox, r + oz, maxCells, expoDn[li], rawD, expoUp[li], rawU);
+    dilate(raw, dil, op);
+    dilate(rawD, dilD, op);
+    dilate(rawU, dilU, op);
     const lists = [];
     for (let j = 0; j < nL; j++) {
-      const out = [];
+      const out = [], m = j === li ? dil : j < li ? dilD : dilU; // 其他樓層:只算視線到了戶外/天井/樓梯口之後的格子(樓板擋住正上下方)
       stampN++;
       const cr = cellReg[j];
-      for (let k = 0; k < N; k++) if (dil[k] && stamp[cr[k]] !== stampN) { stamp[cr[k]] = stampN; out.push(cr[k]); }
+      for (let k = 0; k < N; k++) if (m[k] && stamp[cr[k]] !== stampN) { stamp[cr[k]] = stampN; out.push(cr[k]); }
       lists.push(Int32Array.from(out));
     }
     const up = [], down = [];
