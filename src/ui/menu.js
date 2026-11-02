@@ -90,9 +90,9 @@ export class Menu {
     m.classList.add('mn', 'mo-boot'); // [motion] 世界建好之前只顯示開機字樣(src/ui/motion.js 拿掉 mo-boot 並依序淡入)
     setTimeout(() => m.classList.remove('mo-boot'), 30000); // 保險:轉場模組不在時
     m.innerHTML = `
-      <div class="mn-bootmark">等天光<small>暖機中</small></div>
+      <div class="mn-bootmark">等天光<small>暖機中</small><div class="mn-bootin" id="menuBootIn"></div></div>
       <div class="mn-nosig" aria-hidden="true">CH 03<small>無訊號</small></div>
-      <div class="mn-osd" aria-hidden="true"><span class="rec"><i></i>REC</span><span class="clk">2003/05/12 (一) 23:59:13</span><span class="cam">CAM 03 · 1F 大廳</span></div>
+      <div class="mn-osd" aria-hidden="true"><span class="rec"><i></i>REC</span><span class="clk">封院第 7 天 23:59:13</span><span class="cam">CAM 03 · 1F 大廳</span></div>
       <div class="mn-acct" id="menuAcct"></div>
       <div class="mn-wrap">
         <div class="mn-over">${HEART}BEFORE DAYBREAK · SACRED HEART HOSPITAL</div>
@@ -100,6 +100,12 @@ export class Menu {
         <div class="mn-sub mn-chap">第一章〈第七暝〉聖心醫院</div>
         <div class="mn-sub">阿嬤死在 207 號房。今晚，<b>她打電話叫你回來</b>。</div>
         <div class="mn-rule"></div>
+        <div class="mn-hello" id="menuHello"></div>
+        <div class="mn-gate" id="menuGate">
+          <button class="mn-gbtn" data-a="in">${GOOGLE_G}<span>用 Google 登入</span></button>
+          <ul class="mn-gwhy"><li>登入後才能開始這一夜</li><li>每一波打完自動存檔，下次從存檔點繼續</li><li>雙人合作的進度也會一起記下</li></ul>
+          <div class="mn-gnote" id="menuGateNote" role="status"></div>
+        </div>
         <div class="mn-btns">
           <button class="mn-btn primary" id="startBtn">單人<small>撐過一波波活屍 · 查出阿嬤在 207 守著什麼</small></button>
           <button class="mn-btn" data-mode="coop">合作生存<small>2–4 人連線 · 倒地可互相救援</small></button>
@@ -117,8 +123,15 @@ export class Menu {
       </div>
       <div class="mn-stage" id="menuStage"></div>
       <div class="mn-side"><div class="mn-sideh">操作</div>${keyGrid(KEYS, 'compact')}</div>
-      <div class="mn-foot">建議戴上耳機並全螢幕遊玩 · 設定與最佳紀錄存在這台電腦的瀏覽器；登入後，存檔點存在你的帳號<br />等天光 Before Daybreak · 一款網頁 3D 恐怖射擊遊戲</div>`;
+      <div class="mn-foot">建議戴上耳機、全螢幕遊玩 · 存檔點存在你的帳號，設定存在這台電腦<br />等天光 Before Daybreak · 一款網頁 3D 恐怖射擊遊戲</div>`;
+    // [w6] 要登入才能玩:還沒登入時,開始/繼續/合作/對戰都擋下來,改提示登入(按鈕也用 CSS 藏起來;這裡是保險)
     m.addEventListener('click', (e) => {
+      if (!account.gated || !e.target.closest('#startBtn, #continueBtn, [data-mode]')) return;
+      e.stopPropagation(); e.preventDefault();
+      this.needLogin();
+    }, true);
+    m.addEventListener('click', (e) => {
+      if (e.target.closest('[data-a="in"]')) return; // 登入按鈕(_account 處理)
       const b = e.target.closest('[data-p]');
       if (b) { sfx.uiClick(); this.openPanel(b.dataset.p); return; }
       const md = e.target.closest('[data-mode]');
@@ -149,6 +162,7 @@ export class Menu {
 
   // 多人大廳(src/net/lobby.js):選好模式後開啟;連線模組不在時退回它自己的入口按鈕
   openLobby(mode) {
+    if (account.gated) { this.needLogin(); return; }
     const L = window.__net;
     if (L && typeof L.open === 'function') {
       if (!L.room) L.mode = mode;
@@ -166,43 +180,63 @@ export class Menu {
     if (!row) return;
     const paint = () => {
       const cur = settings.get('difficulty') || 'normal';
-      for (const b of row.children) { const on = b.dataset.d === cur; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }
+      for (const b of row.querySelectorAll('[data-d]')) { const on = b.dataset.d === cur; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }
       if (sub) sub.textContent = DIFF[cur]?.sub || '';
     };
-    row.innerHTML = DIFF_ORDER.map((d) => `<button class="mn-mini" role="radio" data-d="${d}">${esc(DIFF[d].name)}</button>`).join('');
+    row.innerHTML = '<span class="mn-dlab">難度</span>' + DIFF_ORDER.map((d) => `<button class="mn-mini" role="radio" data-d="${d}">${esc(DIFF[d].name)}</button>`).join('');
     row.addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (!b) return; e.stopPropagation(); sfx.uiClick(); settings.set('difficulty', b.dataset.d); paint(); });
     settings.on((k) => { if (!k || k === 'difficulty') paint(); });
     paint();
   }
 
   // [w5] 帳號列:登入後顯示頭像和名字;伺服器沒有設定 Google 登入時整列隱藏
+  // [w6] 要登入才能玩(account.required):沒登入時 #menu 加 mn-locked → 只顯示登入卡(開機畫面也有登入鈕,暖機時就能先登入);
+  //      還沒問到 /api/me 時加 mn-wait(按鈕先不能按,不會閃一下)
   _account() {
-    const el = $('menuAcct');
+    const el = $('menuAcct'), m = $('menu'), hello = $('menuHello'), note = $('menuGateNote'), bootIn = $('menuBootIn');
     if (!el) return;
     const paint = () => {
-      const u = account.user;
-      el.classList.toggle('on', !!u || account.enabled);
+      const u = account.user, locked = account.ready && account.gated;
+      m.classList.toggle('mn-wait', !account.ready);
+      m.classList.toggle('mn-locked', locked);
+      el.classList.toggle('on', !!u || (account.enabled && !locked));
       if (u) {
         const ini = esc(Array.from(u.name || '?')[0] || '?');
         el.innerHTML = `<span class="mn-av"><b>${ini}</b>${u.pic ? `<img src="${esc(u.pic)}" alt="" referrerpolicy="no-referrer" />` : ''}</span><span class="mn-who"><b>${esc(u.name)}</b><small>${u.dev ? '測試帳號 · ' : ''}存檔點存在你的帳號</small></span><button class="mn-link" data-a="out">登出</button>`;
         el.querySelector('img')?.addEventListener('error', (e) => e.target.remove());
-      } else if (account.enabled) {
-        el.innerHTML = `<button class="mn-mini mn-google" data-a="in">${GOOGLE_G}用 Google 登入</button><small>記錄進度，下次從存檔點繼續（也支援雙人）</small>`;
+      } else if (account.enabled && !locked) {
+        el.innerHTML = `<button class="mn-mini mn-google" data-a="in">${GOOGLE_G}<span>用 Google 登入</span></button><small>記錄進度，下次從存檔點繼續（也支援雙人）</small>`;
       } else el.innerHTML = '';
-      if (this._flash) { const f = document.createElement('div'); f.className = 'mn-flash'; f.textContent = this._flash; el.appendChild(f); }
+      if (hello) hello.textContent = u ? `歡迎回來，${Array.from(u.name || '').slice(0, 16).join('')}。` : '';
+      if (bootIn) bootIn.innerHTML = locked ? `<button class="mn-gbtn" data-a="in">${GOOGLE_G}<span>用 Google 登入</span></button><small>先登入，暖機完就能開始</small>` : '';
+      const msg = this._flash || (locked ? this._needWhy : '');
+      if (note) { note.textContent = msg || ''; note.classList.toggle('bad', !!this._flash); }
+      if (this._flash && !locked) { const f = document.createElement('div'); f.className = 'mn-flash'; f.textContent = this._flash; el.appendChild(f); }
     };
-    el.addEventListener('click', (e) => {
+    this._paintAcct = paint;
+    m.addEventListener('click', (e) => { // 帳號列、登入卡、開機畫面的登入鈕都在 #menu 裡
       const b = e.target.closest('[data-a]');
       if (!b) return;
+      e.stopPropagation();
       sfx.uiClick();
-      if (b.dataset.a === 'in') { b.disabled = true; b.lastChild.textContent = '前往 Google…'; account.login(); }
+      if (b.dataset.a === 'in') { b.disabled = true; const s = b.querySelector('span'); if (s) s.textContent = '前往 Google…'; account.login(); }
       else if (b.dataset.a === 'out') { b.disabled = true; account.logout(); }
     });
+    // 加入房間的連結(?room=)要先登入:大廳(src/net/lobby.js)發 hz:needlogin;登入流程會帶著網址回來
+    document.addEventListener('hz:needlogin', (e) => this.needLogin(e.detail?.room ? `登入後就會加入房間 ${e.detail.room}` : ''));
     const f = account.flash;
     if (f) { this._flash = f === 'cancel' ? '已取消登入' : '登入失敗，請再試一次'; setTimeout(() => { this._flash = null; paint(); }, 8000); }
     account.on(paint);
     paint();
     account.refresh();
+  }
+
+  // [w6] 還沒登入卻按了開始:登入卡閃一下,說明為什麼
+  needLogin(why = '') {
+    this._needWhy = why || '先登入，才能開始這一夜。';
+    this._paintAcct?.();
+    const g = $('menuGate');
+    if (g) { g.classList.remove('mn-nudge'); void g.offsetWidth; g.classList.add('mn-nudge'); }
   }
 
   // [w5] 存檔點(src/sys/save.js):info = { sub } 有存檔 → 主選單多一個「繼續」(放在最上面)、「單人」改成「新的一夜」;

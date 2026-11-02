@@ -5,7 +5,8 @@
 //                                → 解 id_token(伺服器之間透過 TLS 直接拿到的:檢查 iss、aud、exp,不驗簽章)
 //                                → 建帳號(以 Google 的 sub 為鍵)與 session → cookie hz_sid(HttpOnly、SameSite=Lax、HTTPS 加 Secure、30 天)→ 302 回 /
 //   POST /auth/logout            登出(刪 session、清 cookie)
-//   GET  /api/me                 { enabled, dev, user }(沒有設定 GOOGLE_CLIENT_ID / SECRET 時 enabled:false,前端隱藏登入按鈕)
+//   GET  /api/me                 { enabled, required, dev, user }(沒有設定 GOOGLE_CLIENT_ID / SECRET 時 enabled:false,前端隱藏登入按鈕)
+//                                required:要登入才能玩(有設定 Google 登入時預設開;REQUIRE_LOGIN=0 關掉,訪客也能玩)
 //   GET  /api/avatar/<id>        頭像(代為抓取 Google 的頭像網址,同源回應:COEP 下跨來源圖片會被擋)
 //   GET  /auth/dev?name=xxx      測試用的假登入:只有 AUTH_DEV=1 時才開(預設關閉,正式環境不要設)
 // 重新導向 URI = <協定>://<Host>/auth/google/callback(協定看 x-forwarded-proto);PUBLIC_URL 可以覆蓋前半段。
@@ -24,6 +25,7 @@ const cfg = () => ({
   dev: process.env.AUTH_DEV === '1',
 });
 export const googleEnabled = () => { const c = cfg(); return !!(c.id && c.secret); };
+export const loginRequired = () => googleEnabled() && process.env.REQUIRE_LOGIN !== '0';
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), '[auth]', ...a);
 // 登入後回到哪裡:只接受站內路徑(「/」或「/?room=ABC123」之類),防開放式重新導向
@@ -59,7 +61,7 @@ export function handleAuth(req, res, p, q) {
   if (p === '/api/me') {
     if (req.method !== 'GET') return plain(res, 405, 'Method Not Allowed'), true;
     const a = accountOf(req), on = googleEnabled();
-    const out = on ? { enabled: true, dev: cfg().dev, user: publicUser(a) } : { enabled: false, ...(cfg().dev ? { dev: true } : {}), ...(a ? { user: publicUser(a) } : {}) };
+    const out = on ? { enabled: true, required: loginRequired(), dev: cfg().dev, user: publicUser(a) } : { enabled: false, ...(cfg().dev ? { dev: true } : {}), ...(a ? { user: publicUser(a) } : {}) };
     json(res, 200, out);
     return true;
   }

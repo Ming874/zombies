@@ -180,3 +180,54 @@
 .mn-confirm h2 { margin: 0 0 10px; font-size: 26px; letter-spacing: 8px; }
 .mn-confirm p { margin: 0 0 6px; font-size: 14.5px; line-height: 1.7; color: #cfc8b8; letter-spacing: 1px; }
 #deadCont small { display: block; font-size: 11px; letter-spacing: 3px; color: rgba(243, 234, 214, .7); font-weight: 400; margin-top: 2px; }
+/* [w6] 要登入才能玩:登入卡(#menu.mn-locked 時取代開始按鈕)、開機畫面的登入鈕、問 /api/me 時按鈕先暗著(mn-wait) */
+.mn-gate { display: none; }
+#menu.mn-locked .mn-gate { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin: 0 0 18px 4px; }
+#menu.mn-locked .mn-btns > .mn-btn, #menu.mn-locked #menuDiff, #menu.mn-locked #menuDiffSub, #menu.mn-locked .mn-wrap .mn-best { display: none; }
+#menu.mn-locked .mn-btns .mn-row { margin-left: 4px; }
+#menu.mn-wait .mn-btns > .mn-btn, #menu.mn-wait #menuDiff { opacity: .35; pointer-events: none; }
+#menu.mo-reveal .mn-gate, #menu.mo-reveal .mn-hello { animation: mo-rise .55s var(--mo-out) 1s backwards; }
+.mn-gbtn { display: inline-flex; align-items: center; gap: 14px; font: 700 20px "Microsoft JhengHei", sans-serif; letter-spacing: 4px; color: #1f1f1f; background: #f4f1ea;
+  border: 0; border-radius: 3px; padding: 14px 26px 14px 20px; cursor: pointer; box-shadow: 0 0 0 1px rgba(255, 255, 255, .25), 0 10px 30px rgba(0, 0, 0, .55), 0 0 26px rgba(224, 71, 58, .25);
+  transition: transform .15s, box-shadow .15s, background .15s; }
+.mn-gbtn svg { width: 24px; height: 24px; flex: none; }
+.mn-gbtn:hover, .mn-gbtn:focus-visible { background: #fff; transform: translateY(-1px); box-shadow: 0 0 0 2px var(--mn-red2), 0 14px 34px rgba(0, 0, 0, .6), 0 0 32px rgba(224, 71, 58, .4); outline: none; }
+.mn-gbtn:disabled { opacity: .7; cursor: default; transform: none; }
+.mn-gwhy { margin: 0; padding: 0; list-style: none; font-size: 14px; letter-spacing: 2px; line-height: 1.9; color: rgba(227, 220, 203, .66); }
+.mn-gwhy li::before { content: ""; display: inline-block; width: 8px; height: 2px; margin: 0 10px 4px 0; background: var(--mn-red2); vertical-align: middle; }
+.mn-gnote { min-height: 1.3em; font-size: 14px; letter-spacing: 2px; color: var(--mn-amber); }
+.mn-gnote.bad { color: #e8a090; }
+.mn-gnote:empty { min-height: 0; }
+.mn-gate.mn-nudge { animation: mn-nudge .45s ease-in-out; }
+@keyframes mn-nudge { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.mo-reduced .mn-gate.mn-nudge { animation: none; }
+#menu .mn-bootmark .mn-bootin { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 26px; letter-spacing: 0; }
+#menu .mn-bootmark .mn-bootin:empty { display: none; }
+#menu .mn-bootmark .mn-bootin small { animation: none; opacity: .55; }
+.mn-hello { margin: 0 0 14px 4px; font-size: 15px; letter-spacing: 3px; color: rgba(227, 220, 203, .72); }
+.mn-hello:empty { display: none; }
+.mn-dlab { align-self: center; margin-right: 6px; font-size: 12px; letter-spacing: 5px; color: var(--mn-amber); }
+/* 窄螢幕(手機、小視窗):左邊留 16px,標題縮小,帳號列移到上方 */
+@media (max-width: 640px) {
+  #menu.mn { padding: 0 16px; background: rgba(0, 0, 0, .78); }
+  #menu .mn-title { font-size: 64px; }
+  #menu .mn-sub { font-size: 14px; letter-spacing: 3px; }
+  .mn-over { letter-spacing: 4px; font-size: 11px; }
+  .mn-acct { top: 14px; right: 16px; max-width: calc(100vw - 32px); }
+  .mn-osd { display: none; }
+  .mn-foot { left: 16px; right: 16px; bottom: 14px; font-size: 11px; }
+  .mn-gbtn { font-size: 17px; padding: 12px 18px; }
+}
+/* 矮螢幕(720p 筆電):標題、間距縮一點,頁尾收起來,按鈕不會壓到頁尾 */
+.mn-over { white-space: nowrap; }
+@media (max-height: 800px) {
+  #menu .mn-title { font-size: clamp(56px, 7.2vw, 96px); }
+  .mn-over { letter-spacing: 6px; }
+  .mn-rule { margin: 16px 0 16px; }
+  #menu .mn-sub { margin-top: 10px; }
+  .mn-hello { margin-bottom: 4px; }
+  .mn-btn { padding-top: 6px; padding-bottom: 6px; }
+  .mn-btn.primary { font-size: 26px; }
+  .mn-row { margin-top: 10px; }
+  .mn-foot { display: none; }
+}

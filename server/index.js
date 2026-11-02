@@ -15,7 +15,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { ISOLATION, json, plain } from './http.js';
-import { handleAuth, googleEnabled, accountOf } from './auth.js';
+import { handleAuth, googleEnabled, loginRequired, accountOf } from './auth.js';
 import { handleSaves } from './saves.js';
 import { flushAll, DATA_DIR, teamKey, teamInfo } from './store.js';
 
@@ -701,6 +701,7 @@ server.on('upgrade', (req, socket, head) => {
   socket.setNoDelay(true);
   const a = accountOf(req); // 升級請求帶著 cookie:這條連線是哪個帳號
   const acct = a ? { id: a.id, name: a.name } : null;
+  if (!a && loginRequired()) { socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); return socket.destroy(); } // 要登入才能玩:沒登入不給連線
   wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, ip, acct));
 });
 

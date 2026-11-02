@@ -82,6 +82,11 @@ class Lobby {
   }
   openJoin(code) { this.show(String(code || '')); }
   show(code) {
+    if (account.gated && !this.room) { // [w6] 要登入才能玩:先登入(?room= 會跟著登入流程回來,伺服器也不給沒登入的連線)
+      if (!account.ready) { account.refresh().then(() => this.show(code)); return; }
+      document.dispatchEvent(new CustomEvent('hz:needlogin', { detail: { room: code || '' } }));
+      return;
+    }
     resumeAudio();
     this.el.classList.add('on');
     if (!this.room) this.view = 'home';

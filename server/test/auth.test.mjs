@@ -196,6 +196,28 @@ test('登出要同源(Origin 不對 → 403)', async () => {
   assert.equal(r.status, 403);
 });
 
+// WebSocket 升級請求:回傳 HTTP 狀態碼(101 = 升級成功)
+const upgrade = (headers = {}) => new Promise((resolve, reject) => {
+  const req = http.request(base + '/ws', { headers: { Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': crypto.randomBytes(16).toString('base64'), ...headers } });
+  req.on('upgrade', (res, socket) => { socket.destroy(); resolve(res.statusCode); });
+  req.on('response', (res) => { res.resume(); resolve(res.statusCode); });
+  req.on('error', reject);
+  req.end();
+});
+
+test('要登入才能玩:預設 required,沒登入的 WebSocket 401,登入後可以連;REQUIRE_LOGIN=0 關掉', async () => {
+  const m = await (await fetch(base + '/api/me')).json();
+  assert.equal(m.required, true);
+  assert.equal(await upgrade(), 401);
+  claims = good({ sub: 'ws-user-1' });
+  const { sid } = await flow({});
+  assert.equal(await upgrade({ cookie: 'hz_sid=' + sid }), 101);
+  await stopServer();
+  await startServer({ REQUIRE_LOGIN: '0' });
+  assert.equal((await (await fetch(base + '/api/me')).json()).required, false);
+  assert.equal(await upgrade(), 101);
+});
+
 test('PUBLIC_URL 覆蓋 redirect_uri;沒有設定 Google → enabled:false、/auth/google 404;AUTH_DEV=1 才有假登入', async () => {
   await stopServer();
   await startServer({ PUBLIC_URL: 'https://play.example.org/' });

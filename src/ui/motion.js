@@ -496,7 +496,7 @@ export function installMotion(game) {
     setTimeout(power, 9000); // 保險:畫面一直沒開始畫
   }
 
-  // ---------- 選單的錄影機時鐘:2003/05/12 23:59:13 往上走,走到 00:00:00 就跳格、退回去(永遠到不了早上) ----------
+  // ---------- 選單的錄影機時鐘:封院第 7 天 23:59:13 往上走,走到第 8 天 00:00:00 就跳格、退回去(永遠到不了第八天) ----------
   {
     const START = 23 * 3600 + 59 * 60 + 13, END = 24 * 3600;
     let sec = START, hold = 0;
@@ -504,16 +504,16 @@ export function installMotion(game) {
     setInterval(() => {
       const menu = $('menu'), clk = menu?.querySelector('.mn-osd .clk');
       if (!clk || !menu.classList.contains('on') || document.hidden) return;
-      if (hold > 0) { if (--hold === 0) { sec = START; clk.textContent = `2003/05/12 (一) ${fmt(sec)}`; } return; }
+      if (hold > 0) { if (--hold === 0) { sec = START; clk.textContent = `封院第 7 天 ${fmt(sec)}`; } return; }
       sec++;
       if (sec >= END) { // 午夜:日期跳一下,畫面捲一格,時間退回 23:59:13
-        clk.textContent = '2003/05/13 (二) 00:00:00';
+        clk.textContent = '封院第 8 天 00:00:00';
         clk.classList.remove('mid'); void clk.offsetWidth; clk.classList.add('mid');
         hold = 2;
         M.menuGlitch();
         return;
       }
-      clk.textContent = `2003/05/12 (一) ${fmt(sec)}`;
+      clk.textContent = `封院第 7 天 ${fmt(sec)}`;
     }, 1000);
   }
   // 監視器跳格:畫面往上捲一格(0.7 秒)+ 很短的雜訊;減少動態時只暗一下

@@ -26,6 +26,7 @@ import { loadUI } from './sys/loadui.js';
 import { pools } from './sys/workers.js';
 import { uploads } from './sys/uploads.js';
 import { initGpuHint, gpuLabel } from './ui/gpuhint.js';
+import { account } from './sys/account.js';
 
 performance.mark('hz:boot');
 let game = null;
@@ -69,7 +70,7 @@ const loading = loadUI(() => {
 // 建構中按「開始」:先記下,建好後再開始(spawn 仍等 hz:warm)
 game = new Game(document.getElementById('game'), { deferred: true });
 let earlyStart = false;
-const onEarlyStart = (e) => { if (!built && e.target?.closest?.('#startBtn')) { earlyStart = true; e.stopPropagation(); const b = e.target.closest('#startBtn'); b.classList.add('loading'); b.dataset.label ||= b.firstChild?.textContent || ''; if (b.firstChild) b.firstChild.textContent = '載入中…'; } };
+const onEarlyStart = (e) => { if (!built && !account.gated && e.target?.closest?.('#startBtn')) { earlyStart = true; e.stopPropagation(); const b = e.target.closest('#startBtn'); b.classList.add('loading'); b.dataset.label ||= b.firstChild?.textContent || ''; if (b.firstChild) b.firstChild.textContent = '載入中…'; } };
 document.addEventListener('click', onEarlyStart, true);
 await runSliced(game.buildSteps(), { budget: 12, onStep: (n) => { buildSteps = n; } });
 built = true;
@@ -83,7 +84,7 @@ installObjectives(game); // [story] 目標鏈、區域解鎖、提示(src/story/
 installMotion(game); // [motion] 轉場與手感:開機、開場、燈篙節拍、受傷、倒下、暫停(src/ui/motion.js;全部是 post 的 uniform)
 installConsole(game); // F8 控制面板:/give 等指令(src/ui/console.js)
 window.__game = game; // 除錯用:在瀏覽器 console 操作 __game
-if (earlyStart) { // 建構途中按過開始:現在照常開始(按鈕的處理在 bindInput 才綁上)
+if (earlyStart && !account.gated) { // 建構途中按過開始:現在照常開始(按鈕的處理在 bindInput 才綁上);[w6] 要登入才能玩時不算
   const b = document.getElementById('startBtn');
   if (b) { b.classList.remove('loading'); if (b.firstChild && b.dataset.label) b.firstChild.textContent = b.dataset.label; setTimeout(() => b.onclick?.(), 0); }
   // 不是在使用者手勢裡開局 → 瀏覽器不給滑鼠鎖定:開局後(開場演出結束)還沒鎖定就顯示暫停層,玩家點一下即鎖定繼續
