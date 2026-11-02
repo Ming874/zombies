@@ -10,6 +10,7 @@ import { createAmbush } from '../zombies/ambush.js';
 import { createChase } from '../zombies/chase.js'; // [zombies-w3] 追逐戰
 import { createNoise } from './noise.js'; // [w4] 噪音:出生點偏向最近的大噪音(game.noise)
 import { roundTail } from './roundtail.js'; // [zombies-w3] 回合收尾:卡住/走不到的搬近、最後幾隻獵殺、伏擊預留放回
+import { waveGuard } from './watchdog.js'; // [w6] 一波絕對不會卡住(沒有進度就逐步加碼)
 import { waveRoster, wavePace, waveKind, hpMul, diffOf, COOP, scaleRoster, SPECIAL, restTime, roundBonus, cleanBonus, POINTS, HOW_MUL, streakMul, streakTier, roundScore, saveBest } from './waves.js';
 
 // 回合流程:重開、開始/結束回合、出怪、休息與商店、補給、醫療包、擊殺獎勵、計分、死亡結算。以 mixin 方式掛到 Game 上
@@ -119,6 +120,10 @@ export const flowMethods = {
     this.weaponScene.visible = false; // 標題畫面不顯示手持武器
     this.chase = createChase(this); // [zombies-w3] 追逐戰(src/zombies/chase.js)
     this.ambush = createAmbush(this); // [ambush] 埋伏/天花板掉落(src/zombies/ambush.js;場景物件在開機預編譯前就建好)
+    // [w6] 導航場的目標:玩家站在導航孤島上(長椅與牆之間、被門扇隔開的房間角落)時,整張地圖的殭屍都「走不到」→ 一隻都不會來。
+    //      偵測到(場算完、幾乎沒有出生點走得到)就在玩家周圍 1.5~4m 補幾個目標點,讓殭屍走到最近的那一點、再直線過去
+    const ft = this.flowTargets;
+    if (typeof ft === 'function') this.flowTargets = () => this._flowRescue(ft.call(this));
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement !== this.canvas && this.ui.map.isOpen) this.ui.map.close();
     });
@@ -179,6 +184,30 @@ export const flowMethods = {
     sfx.setMood(m);
   },
 
+  // [w6] 導航孤島救援(flowTargets 的包裝;out 是 game.flowTargets 重複使用的陣列)
+  _flowRescue(out) {
+    const W = this.world, R = this._rescue || (this._rescue = { t: 0, runs: -1, on: false, ax: 0, ay: 0, az: 0, pts: Array.from({ length: 10 }, () => ({ x: 0, y: 0, z: 0 })), n: 0, hits: 0 });
+    if (!W?.flowDistance || !out.length || this.state !== 'playing') { R.on = false; return out; }
+    const p = this.player.pos;
+    if (R.on && (Math.abs(p.x - R.ax) + Math.abs(p.z - R.az) > 2.5 || Math.abs(p.y - R.ay) > 1.5)) { R.on = false; R.runs = W.flowRuns; } // 走開了:下一輪重新判斷
+    if (!R.on && W.flowRuns !== R.runs && !W._bfsOn && this.time >= R.t) {
+      R.runs = W.flowRuns; R.t = this.time + 0.5;
+      let ok = 0;
+      for (const s of W.spawns) if (!s.bad && Number.isFinite(W.flowDistance(s.x, s.y || 0, s.z)) && ++ok >= 3) break;
+      if (ok < 3) { // 孤島:在本機玩家周圍補目標點(八個方向、兩圈;要看得到,不會補到牆的另一邊)
+        R.on = true; R.ax = p.x; R.ay = p.y; R.az = p.z; R.n = 0; R.hits++;
+        const o = { x: 0, y: 0, z: 0 };
+        for (let i = 0; i < 16 && R.n < R.pts.length; i++) {
+          const a = (i % 8) * (Math.PI / 4) + (i >= 8 ? Math.PI / 8 : 0), r = i < 8 ? 1.8 : 3.6;
+          if (!W.navSnap(p.x + Math.sin(a) * r, p.y, p.z + Math.cos(a) * r, o) || Math.abs(o.y - p.y) > 1.2) continue;
+          if (W.hasLineOfSight && !W.hasLineOfSight(p.x, p.y + 0.9, p.z, o.x, o.y + 0.9, o.z)) continue;
+          const q = R.pts[R.n++]; q.x = o.x; q.y = o.y; q.z = o.z;
+        }
+      }
+    }
+    if (R.on) for (let i = 0; i < R.n && out.length < 16; i++) out.push(R.pts[i]);
+    return out;
+  },
   // [w6] 門扇不擋導航(上鎖的除外):開到門洞裡/房間窄處的門扇以前會把整間房間從導航圖切開
   //      (B1 檔案室:殭屍從走廊推開門 → 兩扇門扇轉進房間那一側 → 房間變成孤島 → 玩家在裡面時所有殭屍「走不到」,這一波停住)。
   //      關著/半開的門本來就是 nav:false(殭屍會推開);全開的門扇現在一樣,殭屍碰到就滑過去。每幀把剛重建的碰撞盒改掉
@@ -225,6 +254,7 @@ export const flowMethods = {
     this.spawnBurst = P.burst;
     this.spawnTimer = P.delay;
     this._pace = { hot: 0, relax: 0, cool: 12, n: 0, burst: P.burst + 1 }; // [w4 節奏]
+    this._wgCap = 0; // [w6] watchdog 暫時放寬的同場上限
     this.phase = 'fighting';
     this.weapons.resupply();
     this._shopCloseT = 0; // 捲門:店裡沒人才拉下(updateRound 檢查);玩家在裡面就等他出來,不會被關在店裡
@@ -257,8 +287,11 @@ export const flowMethods = {
     this.tutorial?.('round', n);
   },
 
+  // HUD 的數字 = 這一波實際還要打的:還沒出生的(含伏擊預留)+ 場上活著的(含裝死的);追逐戰的追獵者不是這一波的(殺不死、會自己退)
   zombiesLeft() {
-    return this.toSpawn + this.zombies.filter((z) => z.alive).length;
+    let n = this.toSpawn;
+    for (const z of this.zombies) if (z.alive && !z._chase) n++;
+    return n;
   },
 
   // 出生點(type:要生的殭屍種類;通風口只給爬行者):
@@ -334,6 +367,7 @@ export const flowMethods = {
     const at = this._ambAt; // [ambush] 埋伏現身:指定位置(所有玩家都看不到的掩蔽點/天花板),不加隨機偏移
     this._lastBack = false;
     const s = at || this.pickSpawn(type);
+    if (!s) { if (!arguments.length) this.queue.unshift(type); return null; } // [w6] 沒有出生點(地圖還沒好):放回佇列,下次再試
     const j = at ? 0 : s.vent ? 0.15 : 1.1; // 出生點周圍 0.6m 內保證淨空(collision.js 檢查過)
     const pos = { x: s.x + (Math.random() - 0.5) * j, y: s.y || 0, z: s.z + (Math.random() - 0.5) * j };
     const z = new Zombie(this.scene, pos, this.round, type);
@@ -379,7 +413,7 @@ export const flowMethods = {
     this.chase?.update(dt); // [zombies-w3] 追逐戰:導演觸發、逃脫/被抓判定、各端的畫面與聲音
     if (this.phase === 'fighting') {
       let alive = 0, near = Infinity, lurk = 0; // lurk:埋伏中的(不佔同場上限,但回合要等牠們)
-      for (const z of this.zombies) if (z.alive) { if (z.amb?.dormant) { lurk++; continue; } alive++; if (z.dist < near && Math.abs(z.dy || 0) < 3) near = z.dist; }
+      for (const z of this.zombies) if (z.alive && !z._chase) { if (z.amb?.dormant) { lurk++; continue; } alive++; if (z.dist < near && Math.abs(z.dy || 0) < 3) near = z.dist; } // [w6] 追獵者不算這一波(由 chase.js 管,會自己退)
       const held = this.ambush?.reserved || 0; // [ambush] 預留給虛擬埋伏點的(還沒現身、仍算在 toSpawn 裡)
       const relax = this._updatePace(dt, near, alive, held); // [w4 節奏] 山谷:暫停出怪
       this._updateCamp(dt); // [w4 反站樁]
@@ -387,12 +421,13 @@ export const flowMethods = {
       // 壓力:太久沒有殭屍接近玩家(12m 內)→ 出怪間隔減半、出生點挑近一點、遠處閒晃的殭屍移近(長回合不會冷場);山谷裡不算
       this._calmT = near < 12 || relax ? 0 : (this._calmT || 0) + dt;
       this.spawnTimer -= dt * (this._calmT > 8 ? 2 : 1);
-      if (!this.spawnHeld && !relax && this.toSpawn > held && alive < this.maxAlive && this.spawnTimer <= 0) {
+      if (!this.spawnHeld && !relax && this.toSpawn > held && alive < this.maxAlive + (this._wgCap | 0) && this.spawnTimer <= 0) {
         if (this.spawnZombie()) alive++; // 這一幀剛出的也算活著(否則最後一隻出生的那一幀會誤判清場)
         if (this.spawnBurst > 0) { this.spawnBurst--; this.spawnTimer = 0.45; } else this.spawnTimer = this.spawnEvery * (0.7 + Math.random() * 0.6);
       }
       this._relocateStragglers(dt);
       roundTail(this, dt, alive, lurk, held); // [zombies-w3]
+      waveGuard(this, dt, alive, lurk, this.ambush?.reserved || 0, relax); // [w6] 沒有進度就逐步加碼(放回預留、叫醒、搬近、最後退回黑暗)
       if (alive === 0 && this.toSpawn <= held) { if ((lurk || held) && this.ambush) this.ambush.hunt(); else this.endRound(); } // 只剩預留/裝死的:收尾(放回佇列、起身),回合不會卡住
     } else if (this.phase === 'collecting') {
       this.collectT -= dt;
