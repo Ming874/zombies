@@ -522,9 +522,10 @@ export const terminal = {
         ix.ui.keypad({
           title: H.title, sub: '輸入床號或病歷號 · [Enter] 查詢', len: 4, terminal: true,
           check: (c) => {
-            const t = H.entries?.[c] ?? H.entries?.[String(+c)] ?? null;
-            ix.flags.set('h.his.' + c, true);
-            if (t) { ix.emit('his', c); if (c === '207' || c === '0924') ix.flags.set('know.code0924.his', true); }
+            const k = H.entries?.[c] != null ? c : H.entries?.[String(+c)] != null ? String(+c) : c; // [w6] 0207 = 207(查到的是同一筆,線索也要算)
+            const t = H.entries?.[k] ?? null;
+            ix.flags.set('h.his.' + k, true);
+            if (t) { ix.emit('his', k); if (k === '207' || k === '0924') ix.flags.set('know.code0924.his', true); }
             return { ok: !!t, text: `> ${c}\n${t ? (typeof t === 'object' ? t.text : t) : H.unknown || '查無資料'}` };
           },
         });

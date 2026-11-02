@@ -261,7 +261,7 @@ export function installDeduce(game) {
   if (X0) {
     X0.on('note', (n) => { const p = (n.points || []).find((q) => String(q).startsWith('card:')); const id = p ? p.slice(5) : NOTE_CARD[n.id]; if (id) D.addCard(id, { by: 'note' }); });
     X0.on('his', (c) => {
-      if (String(c) !== '207') return;
+      if (String(c) !== '207' && String(c) !== '0924') return; // [w6] 輸入 0924 也查得到「207 的入院日」:一樣算查到了(目標「查出 207 的密碼」)
       D.addCard('hc.10', { by: 'his' });
       if (!run.xl) { run.xl = true; X0.after(3, () => talk(TALK.xiaoling, () => D.addCard('hc.25', { by: 'call' }))); }
     });
