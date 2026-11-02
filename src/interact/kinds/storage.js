@@ -34,25 +34,56 @@ function container(api, s, spec, o) {
   return e;
 }
 
+// 置物櫃打得開的那一格:左右隔板、上下框、背光的內襯、層板、掛勾與工作外套、底下的雨鞋或工具箱(v = 0..2 依位置變化,不吃種子)
+function lockerInside(m, M, c, x, w, h, yb, yt, zb, zf, v) {
+  const iw = w - 0.02, ih = yt - yb, zc = (zb + zf) / 2, dz = zf - zb, yc = (yb + yt) / 2;
+  const dk = new THREE.Color(c).multiplyScalar(0.38), dk2 = new THREE.Color(c).multiplyScalar(0.26);
+  for (const sx of [-1, 1]) m.slab(M.paint, c, x + sx * (w / 2 - 0.005), 0.08, zc, 0.01, h - 0.08, dz); // 隔板
+  m.slab(M.paint, c, x, 0.08, zc, iw, yb - 0.08, dz); // 下框
+  m.slab(M.paint, c, x, yt, zc, iw, h - yt, dz); // 上框
+  m.box(M.matte, dk2, x, yc, zb + 0.002, iw - 0.002, ih - 0.002, 0.003); // 內襯:背
+  for (const sx of [-1, 1]) m.box(M.matte, dk, x + sx * (iw / 2 - 0.002), yc, zc, 0.003, ih - 0.002, dz - 0.006); // 內襯:側
+  m.box(M.matte, dk2, x, yt - 0.002, zc, iw - 0.002, 0.003, dz - 0.006); // 內襯:頂
+  m.box(M.matte, dk, x, yb + 0.002, zc, iw - 0.002, 0.003, dz - 0.006); // 內襯:底
+  for (let k = 0; k < 3; k++) m.box(M.matte, 0x0c0d0d, x, yt - 0.06 - k * 0.025, zb + 0.004, iw - 0.1, 0.01, 0.002); // 背板上的通風孔
+  const ys = yt - 0.3; // 層板(前緣折邊)
+  m.box(M.paint, c, x, ys, zc + 0.01, iw - 0.004, 0.01, dz - 0.03); m.box(M.paint, c, x, ys - 0.015, zf - 0.025, iw - 0.004, 0.03, 0.008);
+  if (v === 0) { m.slab(M.matte, 0x9a7a50, x - 0.05, ys + 0.005, zc - 0.04, 0.17, 0.1, 0.22, 0.12); m.box(M.matte, 0xd8cfb4, x - 0.05, ys + 0.072, zc - 0.04, 0.1, 0.002, 0.06, 0, 0.12); } // 紙箱
+  else if (v === 1) { m.cyl(M.matte, 0x1a1a1a, x + 0.08, ys + 0.017, zc + 0.08, 0.07, 0.024, 12); m.slab(M.matte, 0xb8b2a0, x - 0.04, ys + 0.005, zc - 0.02, 0.2, 0.05, 0.14, -0.1); } // 膠帶、折好的毛巾
+  else { m.slab(M.matte, 0xe8e4d8, x - 0.02, ys + 0.005, zc, 0.22, 0.03, 0.15, 0.05); m.cyl(M.metal, 0x6a6e66, x + 0.11, ys + 0.115, zc + 0.04, 0.07, 0.21, 10); } // 口罩盒、保溫瓶
+  m.box(M.metal, 0x8a8a86, x, ys - 0.05, zb + 0.03, 0.012, 0.012, 0.05); m.box(M.metal, 0x8a8a86, x, ys - 0.04, zb + 0.055, 0.012, 0.03, 0.012); // 掛勾
+  const jc = [0x3e4a3a, 0x2e3a52, 0x6a5e46][v]; // 工作外套(掛在勾上)
+  m.box(M.matte, jc, x, ys - 0.37, zb + 0.07, 0.27, 0.58, 0.08, 0, 0, 0.03); m.box(M.matte, jc, x, ys - 0.08, zb + 0.07, 0.2, 0.05, 0.085, 0, 0, 0.03);
+  m.box(M.matte, new THREE.Color(jc).multiplyScalar(0.7), x + 0.11, ys - 0.39, zb + 0.08, 0.06, 0.52, 0.07, 0, 0, 0.05); m.box(M.matte, new THREE.Color(jc).multiplyScalar(0.7), x - 0.11, ys - 0.39, zb + 0.08, 0.06, 0.52, 0.07, 0, 0, 0.0);
+  m.box(M.matte, 0xd8d0b8, x - 0.06, ys - 0.2, zb + 0.112, 0.07, 0.02, 0.002, 0, 0, 0.03); // 繡名牌
+  if (v === 2) { m.slab(M.paint, 0xa8281c, x, yb + 0.004, zc + 0.04, 0.3, 0.13, 0.17); m.box(M.metal, 0x6a6a66, x, yb + 0.15, zc + 0.04, 0.12, 0.012, 0.02); } // 工具箱
+  else for (const sx of [-1, 1]) { m.cyl(M.matte, 0x1c1e1c, x + sx * 0.07, yb + 0.17, zc - 0.02, 0.1, 0.32, 10); m.slab(M.matte, 0x1c1e1c, x + sx * 0.07, yb + 0.004, zc + 0.04, 0.09, 0.07, 0.2); } // 雨鞋
+}
+
 export const locker = {
   build(api, s, spec = {}) {
     const { kit, M, ixs } = api;
     const n = 3, w = 0.38, h = 1.8, d = 0.46, c = spec.color ?? [0x5a6e78, 0x6e7a5a, 0x7a7068][(api.R() * 3) | 0];
-    const m = new Model(), x0 = -((n - 1) * w) / 2, pick = spec.slot ?? 1;
-    m.slab(M.paint, c, 0, 0.08, d / 2 + 0.02, n * w + 0.02, h - 0.08, d);
+    const m = new Model(), x0 = -((n - 1) * w) / 2, pick = spec.slot ?? 1, W = n * w + 0.02;
+    // 櫃身:背板 + 外側板 + 每格一塊實心(關著的格子看不到裡面);打得開的那一格是中空的(以前整個櫃身是實心方塊 → 門一開裡面是一片同色的面,像還有一層門)
+    const zb = 0.04, zf = d + 0.02, zc = (zb + zf) / 2, dz = zf - zb, yb = 0.2, yt = h - 0.04; // 背板前緣 / 門框面 / 門洞上下
+    m.box(M.paint, c, 0, 0.08 + (h - 0.08) / 2, 0.03, W, h - 0.08, 0.02);
+    for (const sx of [-1, 1]) m.slab(M.paint, c, sx * (W / 2 - 0.005), 0.08, zc, 0.01, h - 0.08, dz);
     m.slab(M.matte, 0x222222, 0, 0, d / 2 + 0.02, n * w, 0.08, d - 0.04);
     for (let i = 0; i < n; i++) {
       const x = x0 + i * w;
       if (i !== pick) {
+        m.slab(M.paint, c, x, 0.08, zc, w, h - 0.08, dz);
         m.box(M.paint, c, x, 0.98, d + 0.025, w - 0.02, h - 0.24, 0.012);
         for (let k = 0; k < 4; k++) m.box(M.matte, 0x2a2e30, x, 1.62 - k * 0.03, d + 0.032, w - 0.12, 0.012, 0.004);
         m.box(M.metal, 0x9a9a9a, x + w / 2 - 0.06, 1.0, d + 0.036, 0.02, 0.1, 0.02);
         if (i === 0) m.box(M.metal, 0x6a5a40, x + w / 2 - 0.06, 0.92, d + 0.05, 0.035, 0.04, 0.02); // 掛鎖
+        continue;
       }
-      m.box(M.matte, 0x1a1c1c, x, 0.98, d + 0.016, w - 0.04, h - 0.26, 0.004); // 門後的黑
+      lockerInside(m, M, c, x, w, h, yb, yt, zb, zf, ((Math.round(s.x * 7) ^ Math.round(s.z * 13)) >>> 0) % 3);
     }
     kit.static(m, api.mtx(s), s.li);
-    if (spec.label) { const t = new Model(); t.quad(nameTag(api, spec.label), x0 + pick * w, 1.74, d + 0.04, 0.12, 0.038); kit.static(t, api.mtx(s), s.li); }
+    if (spec.label) { const t = new Model(); t.quad(nameTag(api, spec.label), x0 + pick * w, (yt + h) / 2, zf + 0.003, 0.12, 0.032); kit.static(t, api.mtx(s), s.li); } // 名牌貼在門框上緣(門打開不會浮在半空)
     api.box(s, -(n * w) / 2, 0.02, (n * w) / 2, d + 0.03, h, 0, 'metal');
     const door = kit.pool('lockdoor', (q) => {
       q.box(M.paint, 0xffffff, w / 2 - 0.01, 0, 0, w - 0.02, h - 0.24, 0.012);
@@ -73,21 +104,29 @@ export const drawer = { // 床頭櫃 / 抽屜櫃(上面兩個抽屜,打開的是
     const { kit, M, ixs, R } = api;
     const metal = spec.metal ?? R() < 0.5, c = metal ? 0xb8bcb4 : 0x7a5a3e, mat = metal ? M.paint : M.wood;
     const w = 0.5, h = 0.72, d = 0.45, z0 = 0.04;
-    const m = new Model();
-    m.slab(mat, c, 0, 0.04, z0 + d / 2, w, h - 0.04, d);
+    const m = new Model(), o0 = 0.52, o1 = 0.68, oc = (o0 + o1) / 2, oh = o1 - o0; // 上面抽屜的洞(以前櫃身實心 → 抽屜拉出來後面是一片同色的面)
+    m.slab(mat, c, 0, 0.04, z0 + d / 2, w, o0 - 0.04, d);
+    m.slab(mat, c, 0, o1, z0 + d / 2, w, h - o1, d);
+    for (const sx of [-1, 1]) m.slab(mat, c, sx * (w / 2 - 0.0125), o0, z0 + d / 2, 0.025, oh, d);
+    m.box(mat, c, 0, oc, z0 + 0.015, w - 0.05, oh, 0.03);
+    m.box(M.matte, 0x141414, 0, oc, z0 + 0.0315, w - 0.052, oh - 0.002, 0.003); // 洞裡的暗
+    for (const sy of [-1, 1]) m.box(M.matte, 0x1e1e1e, 0, oc + sy * (oh / 2 - 0.0015), z0 + d / 2 + 0.015, w - 0.052, 0.003, d - 0.03);
     m.slab(M.matte, 0x222222, 0, 0, z0 + d / 2, w - 0.04, 0.04, d - 0.04);
     m.box(mat, c, 0, 0.25, z0 + d + 0.008, w - 0.04, 0.4, 0.016);
     m.box(M.metal, 0x999999, 0, 0.38, z0 + d + 0.02, 0.12, 0.02, 0.02);
-    m.box(M.matte, 0x111111, 0, 0.6, z0 + d - 0.01, w - 0.06, 0.14, 0.01);
     m.cyl(M.gloss, 0xd8d4c4, -0.12, h + 0.06, z0 + 0.15, 0.06, 0.12, 10); // 杯子 / 藥罐
     m.box(M.matte, 0xe8e2d0, 0.1, h + 0.003, z0 + 0.2, 0.14, 0.004, 0.1, 0, 0.4);
     kit.static(m, api.mtx(s), s.li);
     api.box(s, -w / 2, z0, w / 2, z0 + d, h + 0.02, 0, metal ? 'metal' : 'wood');
     const dr = kit.pool(metal ? 'drawerM' : 'drawerW', (q) => {
-      q.box(metal ? M.paint : M.wood, 0xffffff, 0, 0, -0.18, w - 0.08, 0.1, 0.36);
-      q.box(metal ? M.paint : M.wood, 0xffffff, 0, 0.0, 0.006, w - 0.04, 0.15, 0.016);
+      const tw = w - 0.08, tm = metal ? M.paint : M.wood; // 抽屜本體是開口的盒子(底 + 三面),不是實心塊
+      q.box(tm, 0xd8d8d8, 0, -0.045, -0.18, tw, 0.008, 0.36);
+      for (const sx of [-1, 1]) q.box(tm, 0xffffff, sx * (tw / 2 - 0.004), 0, -0.18, 0.008, 0.09, 0.36);
+      q.box(tm, 0xffffff, 0, 0, -0.356, tw - 0.016, 0.09, 0.008);
+      q.box(tm, 0xffffff, 0, 0.0, 0.006, w - 0.04, 0.15, 0.016);
       q.box(M.metal, 0x999999, 0, 0.01, 0.02, 0.12, 0.02, 0.02);
-      q.box(M.matte, 0xd8d0b8, 0.05, -0.04, -0.15, 0.2, 0.004, 0.15, 0, 0.2);
+      q.box(M.matte, 0xd8d0b8, 0.05, -0.039, -0.15, 0.2, 0.004, 0.15, 0, 0.2);
+      q.box(M.matte, 0x8a8678, -0.1, -0.03, -0.24, 0.07, 0.022, 0.1, 0, -0.3); // 一盒火柴/藥盒
     }, metal ? M.paint : M.wood);
     const base = api.mtx(s, 0, 0.6, z0 + d + 0.002);
     const di = dr.add(s.li, base, c);
@@ -102,11 +141,13 @@ export const medcab = { // 牆上的鏡面藥櫃
   build(api, s, spec = {}) {
     const { kit, M, ixs } = api;
     const w = 0.5, h = 0.62, d = 0.14, y = 1.55;
-    const m = new Model();
-    m.box(M.paint, 0xe8e6e0, 0, y, d / 2, w, h, d);
-    m.box(M.matte, 0x2a2c2c, 0, y, d - 0.004, w - 0.04, h - 0.04, 0.004);
-    for (let i = 0; i < 2; i++) m.box(M.glass, 0xd8e0e0, 0, y - 0.12 + i * 0.22, d / 2, w - 0.05, 0.006, d - 0.02);
-    for (let i = 0; i < 5; i++) m.cyl(M.gloss, [0x8a4a20, 0xe8e8e0, 0x2a6a4a, 0xd8a040, 0x6a2020][i], -0.16 + i * 0.08, y - 0.06 + (i % 2) * 0.22, d / 2, 0.04, 0.09 - (i % 3) * 0.015, 8);
+    const m = new Model(), t = 0.015, bz = 0.012; // 中空櫃體(背板 + 側板 + 上下板);以前是實心方塊,門一開只看到一片白面,層板和藥罐都包在裡面
+    m.box(M.paint, 0xe8e6e0, 0, y, bz / 2, w, h, bz);
+    for (const sx of [-1, 1]) m.box(M.paint, 0xe8e6e0, sx * (w / 2 - t / 2), y, d / 2, t, h, d);
+    for (const sy of [-1, 1]) m.box(M.paint, 0xe8e6e0, 0, y + sy * (h / 2 - t / 2), d / 2, w - 2 * t, t, d);
+    m.box(M.matte, 0x5a5c58, 0, y, bz + 0.0015, w - 2 * t - 0.002, h - 2 * t - 0.002, 0.003); // 背光的背板
+    for (let i = 0; i < 2; i++) m.box(M.glass, 0xd8e0e0, 0, y - 0.12 + i * 0.22, (bz + d) / 2, w - 2 * t - 0.004, 0.006, d - bz - 0.006);
+    for (let i = 0; i < 5; i++) { const hb = 0.09 - (i % 3) * 0.015; m.cyl(M.gloss, [0x8a4a20, 0xe8e8e0, 0x2a6a4a, 0xd8a040, 0x6a2020][i], -0.16 + i * 0.08, y - 0.12 + (i % 2) * 0.22 + 0.003 + hb / 2, (bz + d) / 2 - 0.01, 0.04, hb, 8); }
     m.box(M.paint, 0xc82a20, 0, y + h / 2 + 0.05, 0.02, 0.1, 0.1, 0.01); // 紅十字牌
     m.box(M.paint, 0xf2f2f2, 0, y + h / 2 + 0.05, 0.026, 0.06, 0.02, 0.004); m.box(M.paint, 0xf2f2f2, 0, y + h / 2 + 0.05, 0.026, 0.02, 0.06, 0.004);
     kit.static(m, api.mtx(s), s.li);
@@ -141,7 +182,7 @@ export const morgue = {
     kit.static(m, api.mtx(s), s.li);
     api.box(s, -(cols * cw) / 2 - 0.06, 0.02, (cols * cw) / 2 + 0.06, d + 0.03, rows * rh + 0.5, 0, 'heavy');
     const tagM = (n) => texMat('mg' + n, canvasTex('mg' + n, 64, 32, (x, w, h) => { x.fillStyle = '#d8d4c4'; x.fillRect(0, 0, w, h); x.fillStyle = '#1a1a1a'; x.font = `bold 22px ${FONT}`; x.textAlign = 'center'; x.fillText(String(n).padStart(2, '0'), w / 2, 24); }), { basic: true });
-    for (const p of plates) { const t = new Model(); t.quad(tagM(p.n), p.x, p.y + 0.18, d + 0.052, 0.1, 0.05); kit.static(t, api.mtx(s), s.li); }
+    for (const p of plates) { const t = new Model(); t.quad(tagM(p.n), p.x, p.y + rh / 2, d + 0.023, 0.09, 0.045); kit.static(t, api.mtx(s), s.li); } // 門牌在門上方的框(以前貼在門面的位置,抽屜一拉就浮在洞口)
     const door = kit.pool('mdoor', (q) => {
       q.box(M.metal, 0xc8ccce, 0, 0, 0.02, cw - 0.04, rh - 0.06, 0.04);
       q.box(M.metal, 0x8a8e90, 0, -0.06, 0.05, 0.2, 0.03, 0.03);
@@ -186,10 +227,22 @@ export const morgue = {
 
 // 掉在地上/桌上的道具
 const ITEM_MODEL = {
-  fuse: (q, M) => { q.cyl(M.matte, 0xe8e0c8, 0, 0.02, 0, 0.035, 0.1, 10, 0, 0, Math.PI / 2); for (const sx of [-1, 1]) q.cyl(M.metal, 0xc8a050, sx * 0.055, 0.02, 0, 0.038, 0.02, 10, 0, 0, Math.PI / 2); },
+  // [w6] 陶瓷管保險絲(白瓷管 + 紅色規格帶,全長約 10 cm、粗 3.6 cm),躺在拆開的小紙盒旁邊;兩端銅帽在 ITEM_METAL(金屬池,手電筒照到會反光)
+  //      原本是 10 cm 的米色小圓柱,掉在地上像一顆彈殼
+  fuse: (q, M) => {
+    q.cyl(M.gloss, 0xf2eee4, 0, 0.02, 0, 0.04, 0.066, 16, 0, 0, Math.PI / 2);
+    q.cyl(M.paint, 0xb82418, 0.008, 0.02, 0, 0.0406, 0.018, 16, 0, 0, Math.PI / 2); q.cyl(M.paint, 0x1a1a1a, -0.012, 0.02, 0, 0.0406, 0.004, 16, 0, 0, Math.PI / 2);
+    q.box(M.matte, 0x9a7a4c, -0.02, 0.027, 0.085, 0.15, 0.054, 0.06, 0, 0.18); // 紙盒
+    q.box(M.matte, 0x2a2016, -0.02, 0.0545, 0.085, 0.138, 0.002, 0.05, 0, 0.18); // 盒口(裡面是暗的)
+    q.box(M.matte, 0x9a7a4c, -0.024, 0.072, 0.122, 0.15, 0.003, 0.06, -1.15, 0.18); q.box(M.paint, 0xf2efe6, -0.024, 0.073, 0.12, 0.13, 0.002, 0.05, -1.15, 0.18); // 掀開的盒蓋(內側白色說明紙,手電筒一照很亮)
+    q.box(M.paint, 0xe8e2d0, -0.02, 0.03, 0.0548, 0.09, 0.03, 0.002, 0, 0.18); q.box(M.paint, 0xb82418, -0.052, 0.03, 0.0544, 0.024, 0.03, 0.002, 0, 0.18); // 盒上的標籤
+  },
   oil: (q, M) => { q.slab(M.paint, 0xb82a1c, 0, 0, 0, 0.34, 0.44, 0.18); q.box(M.paint, 0xb82a1c, 0.0, 0.47, 0, 0.2, 0.03, 0.04); q.cyl(M.metal, 0x444444, 0.12, 0.47, 0, 0.04, 0.06, 8); },
   key: (q, M) => { q.torus(M.metal, 0xb8a060, 0, 0.004, 0, 0.04, 0.18, Math.PI / 2, 0, 0, 12); q.box(M.metal, 0xb8a060, 0.05, 0.004, 0, 0.06, 0.006, 0.012); q.box(M.metal, 0xb8a060, 0.075, 0.004, 0.008, 0.008, 0.006, 0.012); q.box(M.paint, 0xd82a20, -0.03, 0.004, 0.04, 0.05, 0.004, 0.03); },
   card: (q, M) => { q.box(M.plastic, 0xe8e8f0, 0, 0.002, 0, 0.086, 0.004, 0.054); q.box(M.plastic, 0x2a5a9a, 0, 0.0045, -0.015, 0.086, 0.001, 0.02); },
+};
+const ITEM_METAL = { // 同一個道具的金屬零件(另一個實例池,用金屬材質)
+  fuse: (q, M) => { for (const sx of [-1, 1]) { q.cyl(M.metal, 0xd8a848, sx * 0.041, 0.02, 0, 0.0436, 0.018, 16, 0, 0, Math.PI / 2); q.cyl(M.metal, 0xe0b85a, sx * 0.0515, 0.02, 0, 0.022, 0.004, 12, 0, 0, Math.PI / 2); } },
 };
 export const pickup = {
   build(api, s, spec = {}) {
@@ -200,13 +253,14 @@ export const pickup = {
     const y = s.host ? s.host.y : 0;
     const L = s.host ? api.mtx(s, s.host.x, y, s.host.z, api.R() * 6) : api.mtx(s, 0, 0, 0.45, api.R() * 6);
     const pi = pool.add(s.li, L);
+    const mm = ITEM_METAL[id] && kit.pool('item:' + id + ':metal', (q) => ITEM_METAL[id](q, M), M.metal), mi = mm ? mm.add(s.li, L) : -1;
     const v = new THREE.Vector3(0, 0.04, 0).applyMatrix4(L);
     const st = { taken: false };
     return ix.register({ x: v.x, y: v.y, z: v.z }, {
       id: spec.id || `item:${id}:${Math.round(v.x * 10)}`, kind: 'pickup', name: ix.inv.name(id), reach: 1.9, radius: 0.12, scope: 'map', once: 'run', priority: 3,
       usedText: '', prompt: () => (st.taken ? null : `撿起${ix.inv.name(id)}`),
-      onUse: () => { st.taken = true; pool.set(pi, ZERO); api.give(id, spec.n || 1, spec.label); if (spec.flag) ix.flags.set(spec.flag, true); if (spec.note) ix.after(0.5, () => api.note(spec.note)); },
-      reset: () => { st.taken = false; pool.set(pi, L); },
+      onUse: () => { st.taken = true; pool.set(pi, ZERO); mm?.set(mi, ZERO); api.give(id, spec.n || 1, spec.label); if (spec.flag) ix.flags.set(spec.flag, true); if (spec.note) ix.after(0.5, () => api.note(spec.note)); },
+      reset: () => { st.taken = false; pool.set(pi, L); mm?.set(mi, L); },
     });
   },
 };

@@ -169,10 +169,18 @@ const tapedSheet = (key, rect, w, h, rz = 0) => tpl(`r8:sheet:${key}`, (b) => {
   b.plane(L(rect), w, h, 0, h / 2, 0.003, { rz });
   for (const s of [-1, 1]) b.box('pl_cream', 0.05, 0.016, 0.002, s * (w / 2 - 0.04), h - 0.01, 0.005, { rz: s * 0.3 + rz });
 });
-const gauge = (b, x, y, z, r, o = {}) => { // 圓形壓力錶(朝 +Z;o.ry 轉向)
+// 圓形錶面(圖集的錶盤,圓形 UV;邊緣剛好對到畫出來的圓)+ 鍍鉻錶圈。z = 錶面位置(要在後面的錶殼端蓋前面幾 mm)
+const dialFace = (b, rf, z) => {
+  const g = new THREE.CircleGeometry(rf, 22), a = g.attributes.uv, k = 23 / 24;
+  for (let i = 0; i < a.count; i++) a.setXY(i, 0.5 + (a.getX(i) - 0.5) * k, 0.5 + (a.getY(i) - 0.5) * k);
+  b.raw(L(gaugeRect()), g, compose(0, 0, z), 'rect');
+  b.tor('chrome', rf * 1.04, rf * 0.085, 0, 0, z - 0.001, { rs: 4, ts: 22 });
+};
+// [w6] 以前是 8 邊形鍍鉻圓柱 + 方形錶面貼片(錶面只在端蓋前 1mm、四個角露出底色)→ 遠一點就 z-fighting、看起來像方塊
+const gauge = (b, x, y, z, r, o = {}) => { // 圓形壓力錶(朝 +Z;o.ry 轉向):黑色錶殼、圓形錶面在端蓋前 4mm、錶圈壓邊
   b.push(x, y, z, 0, o.ry || 0, 0);
-  b.cyl('chrome', r, 0.045, 0, 0, 0, { axis: 'z', seg: 8 });
-  b.plane(L(gaugeRect()), r * 1.7, r * 1.7, 0, 0, 0.0235);
+  b.cyl('iron', r, 0.045, 0, 0, 0, { axis: 'z', seg: 18 });
+  dialFace(b, r * 0.88, 0.0265);
   if (o.stem) b.rod('iron', 0.012, [0, -r, -0.01], [0, -r - o.stem, -0.01], { seg: 5 });
   b.pop();
 };
@@ -201,16 +209,73 @@ const boilerKit = (ceil) => tpl(`r8:boilerkit:${ceil.toFixed(2)}`, (b) => {
   for (const x of [-1.5, -1.12]) b.box('steel', 0.04, 2.55, 0.04, x, 1.27, 1.1);
   for (let k = 0; k < 6; k++) b.box('steel', 0.38, 0.02, 0.02, -1.31, 0.35 + k * 0.38, 1.1);
 });
-// 燃燒機(爐前,紅色機殼 + 鼓風馬達 + 火焰觀測孔的橘光 + 控制盒指示燈 + 油管)
-const burner = () => tpl('r8:burner', (b) => {
-  b.box('pl_red', 0.5, 0.44, 0.5, 0, 1.1, 0);
-  b.box('enamel_gray', 0.24, 0.24, 0.26, 0.04, 1.44, 0.08);
-  b.cyl('iron', 0.2, 0.04, 0, 1.1, -0.26, { axis: 'z', seg: 10 }); // 法蘭(貼爐門)
-  b.box('pl_dark', 0.1, 0.18, 0.22, 0.3, 1.1, 0.04);
-  b.box('po_ember', 0.012, 0.012, 0.004, 0.3, 1.14, 0.151); b.box('pl_dark', 0.012, 0.012, 0.004, 0.3, 1.08, 0.151);
-  b.plane('po_ember', 0.08, 0.055, 0, 1.0, 0.252); // 火焰觀測孔(用鍋爐爐門同一個餘燼材質:這個房間不必再多一種自發光材質)
-  b.rod('rubber', 0.011, [0.2, 0.9, -0.1], [0.5, 0.03, -0.2], { seg: 4 }); b.rod('rubber', 0.011, [0.5, 0.03, -0.2], [1.2, 0.03, -0.32], { seg: 4 });
+// 燃燒機(爐前,-Z 鎖在爐門法蘭上):圓角紅色機殼 + 爐口頸管與螺栓法蘭、鼓風馬達(散熱鰭片 + 接線盒)、進風百葉、
+// 控制盒指示燈、火焰偵測眼、油泵 + 濾杯 + 黃色球閥、油管拖到地上、底下的角鐵支架
+// [w6] 原本是紅色方塊上疊一個灰方塊(浮在半空)
+const burner = () => tpl('r8:burner2', (b) => {
+  b.box('pl_red', 0.5, 0.46, 0.5, 0, 1.1, 0, { r: 0.05 });
+  b.cyl('pl_red', 0.17, 0.1, 0, 1.1, -0.29, { axis: 'z', seg: 14 }); // 頸管
+  b.cyl('iron', 0.21, 0.035, 0, 1.1, -0.33, { axis: 'z', seg: 14 }); // 法蘭(貼爐門)
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; b.cyl('steel', 0.012, 0.03, Math.cos(a) * 0.18, 1.1 + Math.sin(a) * 0.18, -0.31, { axis: 'z', seg: 6 }); }
+  b.cyl('enamel_gray', 0.115, 0.3, 0.04, 1.45, 0.06, { axis: 'x', seg: 14 }); // 鼓風馬達
+  for (let i = 0; i < 6; i++) b.cyl('enamel_gray', 0.128, 0.01, -0.07 + i * 0.045, 1.45, 0.06, { axis: 'x', seg: 14 });
+  b.cyl('iron', 0.12, 0.05, 0.215, 1.45, 0.06, { axis: 'x', seg: 14 }); b.cyl('iron', 0.03, 0.04, 0.26, 1.45, 0.06, { axis: 'x', seg: 8 });
+  b.box('pl_dark', 0.1, 0.06, 0.08, 0.02, 1.58, 0.06); b.rod('steel', 0.01, [0.02, 1.61, 0.06], [-0.1, 1.75, -0.05], { seg: 5 }); // 接線盒 + 金屬軟管
+  b.box('iron', 0.32, 0.22, 0.02, -0.04, 1.0, 0.255); for (let i = 0; i < 6; i++) b.box('pl_dark', 0.29, 0.012, 0.02, -0.04, 0.915 + i * 0.034, 0.265, { rx: -0.5 }); // 進風百葉
+  b.box('pl_dark', 0.1, 0.2, 0.22, 0.3, 1.12, 0.04, { r: 0.01 });
+  b.box('po_ember', 0.012, 0.012, 0.004, 0.3, 1.16, 0.151); b.box('pl_dark', 0.012, 0.012, 0.004, 0.3, 1.1, 0.151); b.box('pl_green', 0.012, 0.012, 0.004, 0.3, 1.04, 0.151);
+  b.plane('po_ember', 0.07, 0.05, 0.12, 1.28, 0.252); // 火焰觀測孔(用鍋爐爐門同一個餘燼材質:這個房間不必再多一種自發光材質)
+  b.cyl('iron', 0.022, 0.08, -0.27, 1.22, -0.12, { axis: 'x', seg: 8 }); b.rod('rubber', 0.006, [-0.31, 1.22, -0.12], [-0.3, 1.5, 0.0], { seg: 4 }); // 火焰偵測眼
+  b.box('enamel_gray', 0.12, 0.11, 0.12, -0.3, 0.93, 0.04, { r: 0.01 }); // 油泵
+  b.rod('steel', 0.008, [-0.3, 0.9, 0.1], [-0.3, 0.9, 0.2], { seg: 5 }); b.cyl('chrome', 0.035, 0.1, -0.3, 0.83, 0.2, { seg: 10 }); b.cyl('iron', 0.038, 0.02, -0.3, 0.885, 0.2, { seg: 10 }); // 濾杯
+  b.rod('steel', 0.008, [-0.3, 0.78, 0.2], [-0.3, 0.05, 0.2], { seg: 5 });
+  b.box('iron', 0.036, 0.04, 0.036, -0.3, 0.5, 0.2); b.box('pl_yellow', 0.08, 0.012, 0.014, -0.27, 0.5, 0.225); // 球閥
+  b.rod('rubber', 0.011, [-0.3, 0.05, 0.2], [0.1, 0.025, 0.45], { seg: 5 }); b.rod('rubber', 0.011, [0.1, 0.025, 0.45], [1.2, 0.025, 0.4], { seg: 5 }); // 油管(往油桶那邊)
+  for (const s of [-1, 1]) { b.box('iron', 0.04, 0.86, 0.04, s * 0.18, 0.43, 0.12); b.box('iron', 0.1, 0.008, 0.1, s * 0.18, 0.004, 0.12); } // 支架
+  b.box('iron', 0.4, 0.04, 0.03, 0, 0.35, 0.12);
   b.meta.coll = Box([-0.27, 0, -0.27], [0.27, 1.5, 0.4]);
+});
+// 蒸汽集管(沿 +X,長 len):帆布保溫 + 鋁皮束帶、往天花板的吊架、(valve)中間一段拆掉保溫、一組法蘭閘閥 + 紅手輪
+const header = (len, valve, hang) => tpl(`r8:header:${len.toFixed(2)}:${valve ? 1 : 0}:${hang.toFixed(2)}`, (b) => {
+  const c = len / 2;
+  if (valve) { for (const [x0, x1] of [[0, c - 0.32], [c + 0.32, len]]) b.cyl('plaster', 0.13, x1 - x0, (x0 + x1) / 2, 0, 0, { axis: 'x', seg: 10 }); }
+  else b.cyl('plaster', 0.13, len, c, 0, 0, { axis: 'x', seg: 10 });
+  for (let x = 0.35; x < len - 0.2; x += 0.6) if (!valve || Math.abs(x - c) > 0.4) b.cyl('alu', 0.136, 0.035, x, 0, 0, { axis: 'x', seg: 10, open: true });
+  for (const x of [0.7, len - 0.7]) if (x > 0.3 && x < len - 0.3) { b.rod('steel', 0.009, [x, 0.13, 0], [x, hang, 0], { seg: 5 }); b.tor('steel', 0.142, 0.01, x, 0, 0, { ry: HALF, rs: 3, ts: 14 }); b.box('steel', 0.06, 0.02, 0.06, x, hang - 0.01, 0); }
+  if (valve) {
+    b.cyl('rust', 0.075, 0.66, c, 0, 0, { axis: 'x', seg: 10 }); // 保溫拆掉的那一段:露出來的鏽管
+    for (const s of [-1, 1]) { b.cyl('iron', 0.17, 0.035, c + s * 0.13, 0, 0, { axis: 'x', seg: 14 }); for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; b.cyl('steel', 0.011, 0.06, c + s * 0.13, Math.cos(a) * 0.14, Math.sin(a) * 0.14, { axis: 'x', seg: 5 }); } }
+    b.cyl('iron', 0.11, 0.2, c, 0, 0, { axis: 'x', seg: 10 }); b.cyl('iron', 0.065, 0.2, c, 0.17, 0, { seg: 10 }); b.cyl('iron', 0.09, 0.03, c, 0.27, 0, { seg: 10 });
+    b.cyl('steel', 0.014, 0.22, c, 0.39, 0, { seg: 6 }); b.tor('pl_red', 0.13, 0.012, c, 0.47, 0, { rx: HALF, rs: 3, ts: 14 });
+    for (let k = 0; k < 4; k++) b.rod('pl_red', 0.007, [c, 0.47, 0], [c + Math.cos(k * HALF) * 0.13, 0.47, Math.sin(k * HALF) * 0.13], { seg: 4 });
+  }
+});
+// 膨脹水箱(立式壓力桶 + 碟形封頭 + 三支腳、銘牌、壓力錶、安全閥、往牆上走的出口管、底部排水閥)
+const tankPlate = () => labRect('r8:tankplate', 96, 56, (c, w, h) => {
+  c.fillStyle = '#c4c0ae'; c.fillRect(0, 0, w, h); c.strokeStyle = '#333'; c.lineWidth = 2; c.strokeRect(2, 2, w - 4, h - 4);
+  text(c, '膨脹水箱', w / 2, 14, { size: 12, color: '#111' }); text(c, '容量 300 L', w / 2, 30, { size: 9, color: '#222', weight: 'normal' }); text(c, '最高 7 kg/cm²  1979', w / 2, 44, { size: 8, color: '#222', weight: 'normal' });
+  grime(c, w, h, 0.35);
+});
+const expTank = () => tpl('r8:exptank', (b) => {
+  const R0 = 0.3, y0 = 0.38, H = 1.15, top = y0 + H;
+  b.cyl('enamel_green', R0, H, 0, y0 + H / 2, 0, { seg: 18 });
+  b.sph('enamel_green', R0, 0, top, 0, { ws: 18, hs: 5, tl: HALF, sy: 0.42 });
+  b.sph('enamel_green', R0, 0, y0, 0, { ws: 18, hs: 5, t0: HALF, tl: HALF, sy: 0.42 });
+  for (const yy of [y0 + 0.01, top - 0.01, y0 + H / 2]) b.cyl('iron', R0 + 0.006, 0.014, 0, yy, 0, { seg: 18, open: true }); // 焊道
+  for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2 + 0.5; b.box('iron', 0.05, y0, 0.05, Math.cos(a) * 0.24, y0 / 2, Math.sin(a) * 0.24); b.box('iron', 0.1, 0.01, 0.1, Math.cos(a) * 0.24, 0.005, Math.sin(a) * 0.24); }
+  b.plane(L(tankPlate()), 0.2, 0.117, 0, y0 + 0.45, R0 + 0.004);
+  gauge(b, 0, y0 + 0.88, R0 - 0.005, 0.07);
+  b.cyl('brass', 0.032, 0.12, 0.12, top + 0.16, 0, { seg: 8 }); b.cyl('brass', 0.016, 0.07, 0.12, top + 0.25, 0, { seg: 6 }); b.box('brass', 0.07, 0.012, 0.012, 0.15, top + 0.27, 0); // 安全閥
+  b.rod('steel', 0.032, [-0.05, top + 0.08, 0], [-0.05, top + 0.42, 0], { seg: 8 }); b.cyl('iron', 0.065, 0.025, -0.05, top + 0.25, 0, { seg: 10 }); // 出口管 + 法蘭
+  b.tube('steel', [[-0.05, top + 0.42, 0], [-0.05, top + 0.5, 0], [-0.05, top + 0.5, -0.48]], 0.032, { seg: 8, bend: 0.08 });
+  b.rod('steel', 0.014, [0, y0 - 0.12, 0], [0, y0 - 0.12, 0.2], { seg: 5 }); b.box('iron', 0.03, 0.035, 0.03, 0, y0 - 0.12, 0.16); b.box('pl_red', 0.012, 0.012, 0.06, 0.025, y0 - 0.12, 0.16); // 排水閥
+  b.meta.coll = Box([-0.32, 0, -0.32], [0.32, 1.9, 0.32]);
+});
+// 地上的鑄鐵排水格柵(角鐵框 + 格條,底下黑的):w 沿 X、d 沿 Z
+const floorGrate = (w, d) => tpl(`r8:grate:${w.toFixed(2)}:${d.toFixed(2)}`, (b) => {
+  b.box('enamel_black', w - 0.03, 0.003, d - 0.03, 0, 0.0015, 0);
+  for (const s of [-1, 1]) { b.box('iron', w, 0.012, 0.022, 0, 0.006, s * (d / 2 - 0.011)); b.box('iron', 0.022, 0.012, d - 0.044, s * (w / 2 - 0.011), 0.006, 0); }
+  const n = Math.max(3, Math.round((w - 0.05) / 0.035)); for (let i = 0; i < n; i++) b.box('iron', 0.012, 0.01, d - 0.044, -(w - 0.06) / 2 + (i * (w - 0.06)) / (n - 1), 0.005, 0);
 });
 // 緊急發電機組(開放式:引擎、散熱水箱、發電機、控制盤、消音器 + 排氣管通天花板、地上的電瓶)。長邊沿 X,+Z 為操作面
 const genset = (ceil) => tpl(`r8:genset:${ceil.toFixed(2)}`, (b) => {
@@ -287,7 +352,21 @@ function boilerRoom(R) {
     R.put(burner(), bx, bz, bo.yaw + HALF, {}); R.collide(burner().meta.coll, bx, R.y, bz, bo.yaw + HALF); // 貼著鍋爐:不做網格檢查,直接登記碰撞
     floorDecal(R, 'water', bo.x + Math.cos(bo.yaw) * 1.6 + Math.sin(bo.yaw) * 0.9, bo.z - Math.sin(bo.yaw) * 1.6 + Math.cos(bo.yaw) * 0.9, 1.4);
   }
+  // [w6] 兩座鍋爐的保溫立管在天花板下接到同一根蒸汽集管(L 形,中間一組閘閥);每座鍋爐旁邊一個排污用的地上格柵 + 積水
+  const B = ctx.__b1?.boilers || [];
+  if (B.length >= 2) {
+    const rp = (bo) => [bo.x + Math.cos(bo.yaw) * 0.85, bo.z - Math.sin(bo.yaw) * 0.85];
+    const [[ax, az], [bx, bz]] = [rp(B[0]), rp(B[1])], hy = R.y + ceil - 0.42, hang = 0.37;
+    if (Math.abs(bx - ax) > 1) R.put(header(Math.abs(bx - ax), true, hang), Math.min(ax, bx), az, 0, { y: hy });
+    if (Math.abs(bz - az) > 1) R.put(header(Math.abs(bz - az), false, hang), bx, Math.min(az, bz), -HALF, { y: hy });
+    R.put(tpl('r8:elbow', (b) => b.sph('plaster', 0.15, 0, 0, 0, { ws: 10, hs: 7 })), bx, az, 0, { y: hy });
+  }
+  for (const bo of B) {
+    const gx = bo.x + Math.cos(bo.yaw) * 1.3 + Math.sin(bo.yaw) * 1.45, gz = bo.z - Math.sin(bo.yaw) * 1.3 + Math.cos(bo.yaw) * 1.45;
+    if (R.freeAt(gx, gz, 0.3)) { R.put(floorGrate(0.45, 0.45), gx, gz, bo.yaw, {}); floorDecal(R, 'water', gx + 0.2, gz + 0.1, 1.3); floorDecal(R, 'stain', gx, gz, 0.9, { yaw: bo.yaw }); }
+  }
   const S = R.run('S', (r) => r.len > 6), N = R.run('N', (r) => r.len > 6), W = R.run('W', (r) => r.len > 4), E = R.run('E', (r) => r.t1 <= 24.1 && r.len > 3);
+  if (W) { for (const t of [20.6, 21.6, 22.4]) if (R.atWall(expTank(), W, t, { gap: 0.12 })) { floorDecal(R, 'stain', 19.0, t, 1.0); break; } } // 膨脹水箱(西牆)
   if (S) { const g = R.atWall(genset(ceil - 0.05), S, 27.4, { gap: 0.2 }) || R.atWall(genset(ceil - 0.05), S, 29.6, { gap: 0.2 }); if (g) { floorDecal(R, 'stain', g.x, g.z, 2.2); R.atWall(signPlate('genst', warnSign('gen', '發電機', '運轉中勿靠近'), 0.3, 0.22, { screws: true }), S, g.tw - 1.2, { mount: 1.7 }); } }
   if (S) { R.atWall(fuelBoard(), S, 34.4, { mount: 1.15 }); R.atWall(signPlate('fire', fireSign(), 0.36, 0.22, { screws: true }), S, 32.9, { mount: 1.75 }); }
   if (N) { const m = R.atWall(mcc(), N, 28.6, { gap: 0.03 }); if (m) floorDecal(R, 'dirt', 28.6, 15.4, 1.6, { yaw: 0 }); }
@@ -295,7 +374,7 @@ function boilerRoom(R) {
   if (E) {
     const c = R.atWall(cot8(0), E, 18.9, { gap: 0.05 });
     if (c) { const q = R.local(c, 0.6, 0, 0.62); if (R.freeAt(q.x, q.z, 0.2)) R.put(nightStool(), q.x, q.z, c.yaw + 0.3, {}); }
-    R.atWall(tapedSheet('cal', calendar(), 0.26, 0.36), E, 17.4, { mount: 1.45 });
+    R.atWall(tapedSheet('cal', calendar(), 0.26, 0.36), E, 19.4, { mount: 1.45 }); // [w6] 月曆挪到行軍床上方(17.4 會跟配電盤旁的停電通知疊在一起)
   }
   // 隧道這一側、門旁的牆上:鍋爐重地 閒人勿進(從隧道走過來就看得到)
   R.put(signPlate('boil', dangerSign('boil', '鍋爐重地', '閒人勿進'), 0.42, 0.26, { screws: true }), 38.01, 27.1, HALF, { y: R.y + 1.55 });
@@ -375,18 +454,33 @@ const bioBoxes = (k) => tpl(`r8:bioboxes:${k}`, (b) => {
 const scale = () => tpl('r8:scale', (b) => {
   b.box('steel', 0.8, 0.08, 0.6, 0, 0.04, 0, { r: 0.01 });
   b.box('iron', 0.06, 1.0, 0.06, 0, 0.58, -0.32);
-  b.cyl('pl_red', 0.17, 0.09, 0, 1.15, -0.32, { axis: 'z', seg: 16 });
-  b.plane(L(gaugeRect()), 0.27, 0.27, 0, 1.15, -0.274);
+  b.cyl('pl_red', 0.17, 0.09, 0, 1.15, -0.32, { axis: 'z', seg: 18 });
+  b.push(0, 1.15, -0.27); dialFace(b, 0.145, 0); b.pop(); // [w6] 圓形錶面(原本方形貼片只在紅殼前 1mm)
   b.meta.coll = Box([-0.4, 0, -0.38], [0.4, 1.3, 0.3]);
 });
-// 丟在地上的防護衣(攤平的白色連身衣 + 一隻鞋套)
-const suitFloor = () => tpl('r8:suit', (b) => {
-  b.box('fab_white', 0.42, 0.03, 0.62, 0, 0.015, 0, { r: 0.012, ry: 0.1 });
-  b.box('fab_white', 0.14, 0.025, 0.55, -0.16, 0.012, 0.52, { r: 0.01, ry: 0.25 });
-  b.box('fab_white', 0.14, 0.025, 0.55, 0.12, 0.012, 0.55, { r: 0.01, ry: -0.15 });
-  b.box('fab_white', 0.5, 0.025, 0.14, -0.4, 0.012, -0.12, { r: 0.01, ry: 0.6 });
-  b.sph('fab_white', 0.12, 0.05, 0.03, -0.42, { ws: 8, hs: 4, sy: 0.3 });
-  b.box('pl_ltblue', 0.14, 0.05, 0.28, 0.5, 0.025, 0.3, { r: 0.02, ry: 1.0 });
+// 揉皺的布團:有起伏的球,底部壓扁(位置函數 → 接縫處重複頂點位移相同,不會裂開)
+export const rumpleGeo = (r, seed, k = 0.22, ws = 14, hs = 8) => {
+  const g = new THREE.SphereGeometry(r, ws, hs), p = g.attributes.position, q = rnd(seed), a = q() * 6, c = q() * 6, f = 1 / r;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const n = 1 + k * Math.sin(x * f * 5.3 + a) * Math.sin(z * f * 4.1 + c) + k * 0.55 * Math.sin((x + y) * f * 9.7 + c) * Math.cos(z * f * 7.9 + a);
+    x *= n; z *= n; y = y < 0 ? y * 0.12 : y * n;
+    p.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  return g;
+};
+// 丟在地上的防護衣:揉成一團的白色連身衣(帽子、一隻袖子、一條褲管拖出來)、一隻藍色鞋套、一隻手套
+// [w6] 以前是幾塊扁方塊拼成攤平的人形,遠看像粉筆畫的屍體輪廓、像玩具
+const suitFloor = () => tpl('r8:suit2', (b) => {
+  b.raw('fab_white', rumpleGeo(0.26, 3), compose(0, 0.014, 0, 0, 0.3, 0, 1.35, 0.42, 1.0));
+  b.raw('fab_white', rumpleGeo(0.18, 5), compose(0.24, 0.03, 0.1, 0, -0.4, 0, 1.2, 0.5, 0.9));
+  b.raw('fab_white', rumpleGeo(0.11, 7, 0.16), compose(-0.36, 0.01, -0.1, 0, 0.8, 0, 1.15, 0.62, 1.0)); // 帽子
+  const limb = (pts, r, k) => { for (let i = 0; i < pts.length - 1; i++) { const [x0, z0] = pts[i], [x1, z1] = pts[i + 1], L2 = Math.hypot(x1 - x0, z1 - z0); b.raw('fab_white', rumpleGeo(r, k + i, 0.16, 10, 6), compose((x0 + x1) / 2, 0.006, (z0 + z1) / 2, 0, Math.atan2(x1 - x0, z1 - z0), 0, 1.0, 0.5, (L2 / (2 * r)) * 1.6)); } };
+  limb([[-0.12, 0.16], [-0.27, 0.42], [-0.3, 0.68]], 0.06, 20); // 袖子(皺布團接成一條)
+  limb([[0.3, -0.1], [0.62, -0.24]], 0.075, 30); // 褲管
+  b.raw('pl_ltblue', rumpleGeo(0.075, 9, 0.18, 10, 6), compose(0.82, 0.008, -0.34, 0, 0.4, 0, 1.7, 0.55, 1.0)); // 鞋套
+  b.raw('pl_ltblue', rumpleGeo(0.05, 11, 0.25, 8, 5), compose(-0.36, 0.006, 0.84, 0, 1.1, 0, 1.8, 0.4, 0.9)); // 手套
 });
 
 function incinerator(R) {
@@ -486,6 +580,29 @@ function laundry(R) {
   }
   floorDecal(R, 'water', 24.6, 56.8, 2.2);
   floorDecal(R, 'drip', 25.4, 60.2, 0.8);
+  // [w6] 洗衣機前面一條長排水溝(鑄鐵格柵)+ 機器漏出來的水
+  const Sx = R.run('S', (r) => r.len > 8);
+  if (Sx) for (const d of [1.2, 1.45, 1.75, 2.1]) {
+    const q = R.at(Sx, Sx.t0 + 4.6, d);
+    if (![-2.6, -1.3, 0, 1.3, 2.6].every((dx) => R.freeAt(q.x + dx, q.z))) continue;
+    R.put(floorGrate(5.6, 0.22), q.x, q.z, 0, {});
+    for (const dx of [-2.0, 0.3, 2.1]) floorDecal(R, 'water', q.x + dx, q.z + Sx.nz * 0.25, 1.4);
+    floorDecal(R, 'stain', q.x - 1.2, q.z + Sx.nz * 0.5, 1.1);
+    break;
+  }
+}
+// [w6] 太平間:沖洗地板用的長排水溝(沿北牆冰櫃前)、牆上的水管捲盤
+const hoseReel = () => tpl('r8:hosereel', (b) => {
+  b.box('iron', 0.08, 0.12, 0.04, 0, 0, 0.02); b.cyl('iron', 0.025, 0.14, 0, 0, 0.09, { axis: 'z', seg: 8 });
+  for (let k = 0; k < 5; k++) b.tor('pl_green', 0.17 + k * 0.012, 0.016, 0, -0.02 - k * 0.006, 0.06 + k * 0.032, { rs: 5, ts: 18 });
+  b.tube('pl_green', [[0.17, -0.06, 0.12], [0.2, -0.5, 0.14], [0.12, -1.1, 0.16], [0.18, -1.45, 0.3]], 0.016, { seg: 6, bend: 0.12 });
+  b.box('brass', 0.03, 0.08, 0.03, 0.18, -1.46, 0.34, { rx: 1.2 });
+});
+function morgueFloor(R) {
+  const N = R.run('N');
+  if (N) { const q = R.at(N, N.t0 + 6.4, 1.55); if (R.freeAt(q.x, q.z, 0.1)) { R.put(floorGrate(8.0, 0.2), q.x, q.z, 0, {}); for (const dx of [-3.0, 1.2]) floorDecal(R, 'water', q.x + dx, q.z + 0.3, 1.5); } }
+  const E = R.run('E');
+  if (E) R.atWall(hoseReel(), E, E.t0 + 3.4, { mount: 1.65 });
 }
 
 // ================================================================ 3F 監控室
@@ -878,7 +995,16 @@ function playground(R) {
 }
 
 // ================================================================ 分派
-const ROOMS = { b1_boiler: boilerRoom, b1_incinerator: incinerator, f1_cemetery: cemetery, f1_playground: playground };
+// [w6] 維修隧道:沿中線每隔一段一個鑄鐵排水格柵 + 周圍的積水(隧道本身由 basement.js 佈置)
+function tunnel(R) {
+  for (const [x, z] of [[47, 26], [58, 26], [70, 26], [49, 54], [61, 54], [73, 54], [40, 35], [40, 46], [80, 35], [80, 46]]) {
+    if (!R.freeAt(x, z, 0.35)) continue;
+    const across = z === 26 || z === 54 ? HALF : 0;
+    R.put(floorGrate(0.5, 0.36), x, z, across, {});
+    floorDecal(R, 'water', x + 0.3, z - 0.2, 1.6);
+  }
+}
+const ROOMS = { b1_boiler: boilerRoom, b1_incinerator: incinerator, b1_tunnel: tunnel, f1_cemetery: cemetery, f1_playground: playground };
 export function scene8Room(ctx, zone) {
   const fn = ROOMS[zone.id];
   if (!fn) return;
@@ -901,7 +1027,7 @@ function b1Prep(R) {
   R.reach = R._bfs();
 }
 
-const INDOOR = { f3_monitor: monitorRoom, b1_laundry: laundry, f2_icu: icuWall, f1_cafeteria: cafeteria, f2_peds: peds, f3_corridor: f3Leaks,
+const INDOOR = { f3_monitor: monitorRoom, b1_laundry: laundry, b1_morgue: morgueFloor, f2_icu: icuWall, f1_cafeteria: cafeteria, f2_peds: peds, f3_corridor: f3Leaks,
   f2_playroom: (R) => leak(R, 82.6, 63.0), f2_nursery: (R) => leak(R, 27.4, 63.2, { k: 1 }), f1_rehab: rehab, f1_chapel: chapel, f1_corridor: f1Corridor };
 export function scene8Indoor(R, zone) { INDOOR[zone.id]?.(R, zone); }
 void bin;
