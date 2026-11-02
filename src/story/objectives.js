@@ -57,6 +57,8 @@ const fuseSub = (c) => {
   if (!FUSE.some((f) => f.know(c) || f.got(c))) return [{ t: '看看配電盤旁邊的公告（鍋爐房）', d: '', on: () => false }];
   return FUSE.filter((f) => f.know(c) || f.got(c)).map((f) => ({ t: f.k === 'morgue' && f.order(c) ? '太平間：冰櫃照 3、1、5 拉' : f.where, d: `${f.name}：拿到了`, on: f.got }));
 };
+// 劇情一定要讀得到的紙:鍋爐房的停電通知貼在發電機上方的牆上,人被機器擋在 2 m 外,準心對得到、E 卻按不到 → 互動距離放寬(不動模型與擺放)
+const READ_FAR = { 'h.ix.notice.power': [2.9, 1.8] }; // [互動距離, 視線放寬(losPad:前面的機器擋到一點也算看得到)]
 const fuseNext = (c) => FUSE.find((f) => !f.got(c) && f.know(c)) || FUSE.find((f) => !f.got(c)) || null;
 const fuseGlint = (c) => { const f = fuseNext(c); if (!f) return null; if (f.k === 'morgue') return f.order(c) ? c.at('h.ix.morgue:3') : c.at('h.ix.morgueboard') || c.at('h.ix.morgue:3'); return c.at(f.id, true); };
 const door207At = (c) => { const w = c.door207(); return w ? { x: w.cx, y: w.y + 1.4, z: w.cz } : null; };
@@ -172,7 +174,7 @@ export function installObjectives(game) {
     g: game, O, get X() { return X(); }, get D() { return D(); }, get run() { return run; }, get zone() { return game.hospital?.zone?.id || null; },
     door207, later,
     // 離你最近、走得到的電話(路徑距離;src/interact/kinds/phones.js);{ where:'2F 走廊（護理站電話）', at:{x,y,z} } 或 null
-    phoneNear() { const n = X()?.nearestPhone?.({ out: true }); return n ? { where: n.where, at: n.at } : null; },
+    phoneNear() { const n = X()?.nearestPhone?.({ ic: true }); return n ? { where: n.where, at: n.at } : null; },
     near(x, y, z, r) { const p = game.player.pos; return Math.abs(p.y - y) < 2.2 && Math.hypot(p.x - x, p.z - z) < r; },
     at(id, unused) { const e = X()?.get?.(id); if (!e || (unused && (e.used || e.n > 0))) return null; const q = X().where(e); return { x: q.x, y: q.y, z: q.z }; },
     talk: (lines, cb, o) => D()?.talk?.(lines, cb, o),
@@ -194,7 +196,7 @@ export function installObjectives(game) {
       const t0 = game.time;
       later(1.2, () => { const q = c.at('h.ix.pillow'); if (q && !D()?.got?.('hc.30')) { run.glint = q; run.glintT = 10; } });
       later(7, () => { if (!D()?.got?.('hc.30') && c.zone === 'f2_ward_207') c.ama('枕頭……阿嬤放在枕頭裡。'); }); // 她要你拿到那一頁(靜默期才說)
-      const go = () => { O.flag('h.callok'); later(1.2, () => { if (run.cur === 'h.s.wait' && !game.story?.busy?.()) c.talk([[XL, '金水伯在外面。\n……你自己叫他。', 3.2], [XL, '拿起電話，他聽得到。', 2.4]]); }); };
+      const go = () => { O.flag('h.callok'); const n = c.phoneNear(); if (n) O.glintAt(n.at, 12); later(1.2, () => { if (run.cur === 'h.s.wait' && !game.story?.busy?.()) c.talk([[XL, '金水伯在外面。\n……你自己叫他。', 3.2], [XL, '拿起電話，他聽得到。', 2.4]]); }); };
       let out = 0;
       X()?.tick?.((dt) => {
         if (run.evac || game.state !== 'playing') return false;
@@ -351,6 +353,7 @@ export function installObjectives(game) {
     X0.tick((dt) => {
       bindNet();
       if (game.state !== 'playing') return true;
+      for (const id in READ_FAR) { const e = X0.get(id), v = READ_FAR[id]; if (e && e.reach < v[0]) { e.reach = v[0]; e.losPad = v[1]; } } // 看得到、手搆不到的劇情紙(只放寬互動距離)
       run.t += dt; acc += dt;
       hud.glint(run.glint, run.glintT > 0, game);
       if (run.glintT > 0) run.glintT -= dt;
@@ -452,7 +455,7 @@ export function installObjectives(game) {
       else if (d < 4.5 && !fx[key + 'G'] && (f.know(c) || run.stuck > T0) && Math.abs(q.y - p.y - 0.8) < 2.4 && (game.world?.hasLineOfSight?.(p.x, p.y + 1.6, p.z, q.x, q.y + 0.05, q.z) ?? true)) {
         fx[key + 'G'] = true;
         const g = f.k === 'morgue' ? (f.order(c) ? c.at('h.ix.morgue:3') : c.at('h.ix.morgueboard')) : q;
-        if (g && run.glintT <= 0) { run.glint = g; run.glintT = 6; }
+        if (g && run.glintT <= 0) { run.glint = { x: g.x, y: g.y + (f.k === 'laundry' ? 0.12 : 0), z: g.z }; run.glintT = 6; } // 地上的那支:光點抬高一點(視線不要擦到地板)
       }
     }
     if (hum !== run.fxHum) { // 洗衣房:那支保險絲旁邊的燈管嗡嗡作響(定位的循環音,走近才建立)
@@ -484,6 +487,7 @@ export function installObjectives(game) {
   // 開場、高潮、結局(EXPERIENCE_PLAN §3)
   const S = (game.story ||= {});
   S.flag = (k, v = true) => O.flag(k, v);
+  S.callOut = () => run.cur === 'h.s.wait' && O.has('h.callok') && !run.called; // 叫車那一步:拿起電話是撥號音(打出去),不代接別支在響的(src/interact/kinds/phones.js)
   voiceLock(game); // 聲音的鎖:一次只有一個人說話(CLARITY_PLAN §7.4)
   try { installRadio(game, S); } catch (e) { console.warn('[story] radio', e); }
   try { installOpening(game, S); } catch (e) { console.warn('[story] opening', e); }
@@ -546,7 +550,7 @@ function makeHud(game, textOf) {
         prevOk = nowOk;
       }
       // 區域大標題(第一次進到一個房間)正在顯示:小項先讓開
-      const zb = game.ui?.zoneBig, busy = !!zb && zb.getAnimations?.().length > 0;
+      const zb = game.ui?.hud?.zoneBig || game.ui?.zoneBig, busy = !!zb && zb.getAnimations?.().length > 0;
       if (busy !== dimmed) { dimmed = busy; ul.classList.toggle('dim', busy); }
     },
     ok(main, sub = '', mark = '✓') {

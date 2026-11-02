@@ -67,7 +67,7 @@ const items = [
   { id: 'h.ix.morgue', kind: 'morgue', zone: 'b1_morgue', mount: 'wall', near: null, doors: 6, order: [3, 1, 5], loot: { item: 'fuse' }, wrong: 'crawler',
     why: '第三支保險絲在 5 號空冰櫃，交接單寫「三號、一號、五號，照這個順序拿」；拉到 2、4、6 號會放出裡面的人。' },
   { id: 'h.ix.fuse.laundry', kind: 'pickup', zone: 'b1_laundry', mount: 'floor', near: 'corner', item: 'fuse',
-    why: '大新工務放在洗衣房烘衣機後面的保險絲備品。' },
+    why: '大新工務的保險絲備品；推車撞翻時掉到地上，滾到洗衣房的牆邊（停電通知底下夜班補的那一行、工作單都有寫）。' },
   { id: 'h.ix.fuse.boiler', kind: 'locker', zone: 'b1_boiler', mount: 'wall', near: 'corner', loot: { item: 'fuse' }, label: '工務室備品',
     why: '鍋爐房工務室的備品櫃，夾在一堆燒壞的保險絲中間。' },
   { id: 'h.ix.notice.power', kind: 'note', zone: 'b1_boiler', mount: 'wall', near: null, note: 'h.s12', style: 'poster',
@@ -179,7 +179,7 @@ const items = [
   { id: 'h.ix.payphone', kind: 'phone', zone: 'f1_lobby', mount: 'wall', near: null, style: 'pay', ext: null, calls: ['ph.p01', 'ph.p02', 'ph.p03', 'ph.p04'], ring: 'tension', special: null,
     why: '大廳的公共電話；市話早就斷了，只有大廳的人的聲音進得來。' },
   // 金水伯的對講機:掛在店門口外面的大廳牆上(捲門拉下時也接得到)
-  { id: 'h.ix.phone.store', kind: 'phone', zone: 'f1_lobby', mount: 'wall', near: 'f1_store', style: 'wall', ext: '金水商行', calls: ['ph.shop01'], ring: 'flag:h.shop.open', special: null,
+  { id: 'h.ix.phone.store', kind: 'phone', zone: 'f1_lobby', mount: 'wall', near: 'f1_store', style: 'wall', ext: '金水商行', calls: ['ph.shop01'], ring: 'flag:h.shop.open', special: null, intercom: true, // 不在醫院的線上(別支電話不代接;phones.js)
     why: '金水商行臨時補給點的對講機；金水伯每局第一次開店會打來（第 2 次以後由 src/story/deduce.js 播 hc.21）。' },
   { id: 'h.ix.phone.pharmacy', kind: 'phone', zone: 'f1_pharmacy', mount: 'surface', near: null, style: 'desk', ext: '藥局', calls: ['ph.r01', 'ph.r02', 'ph.r05'], ring: 'tension', special: null,
     why: '藥局的內線電話；大新的總機會自動撥進來放「家屬會面」廣播。' },
@@ -241,7 +241,7 @@ export default {
 
   items_doc: {
     items: {
-      fuse: '保險絲 ×3：B1 洗衣房（烘衣機後）、鍋爐房備品櫃、太平間 5 號冰櫃。裝進 B1 配電盤。',
+      fuse: '保險絲 ×3：B1 洗衣房（地上，靠牆）、鍋爐房備品櫃、太平間 5 號冰櫃（3 → 1 → 5，寫在太平間白板與工作單）。裝進 B1 配電盤。',
       oil: '柴油桶：鍋爐房。扛到北側後勤巷的發電機（按住 E 4 秒，由劇情處理），維持 207 的燈（h.light）。',
       'card.security': '門禁卡：第 5 波首領「大新夜班組長　陳建宏」掉落，刷開 3F 監控室。',
     },
