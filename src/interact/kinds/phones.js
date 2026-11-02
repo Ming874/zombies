@@ -7,6 +7,8 @@ import { Model, T } from '../kit.js';
 // 響鈴時機:靠近(ring:'near')、緊張空檔(ring:'tension',由導演挑一支你附近但看不到的)、旗標(ring:'flag:xxx')、
 // 靈異系統正在響的電話(game.horror.ringing)也可以在這裡接起來。
 // 同時有好幾支在響 = 同一條醫院線路:接起任何一支,其他全部停;別支上的來電改由接起來的那一支接到(見 answer)。
+// 代接(w6):有電話在響的時候,拿起任何一支沒在響的電話,也會接到那一通(總機的代接);只有金水伯的對講機不在這條線上。
+// 劇情來電(有指定台詞)響在離你很遠的那一支時,離你最近的那一支也會跟著響;訊息列寫出最近的一支在哪(phoneDirector)。
 const BEIGE = 0xd8cdb4, DARK = 0x2a2b2c, GRAY = 0x8d9190, STEEL = 0xa9adae;
 const onLine = (l) => !/^對講機/.test(l?.who || ''); // 對講機的話(金水伯)只在對講機上說,不會從別支電話出來
 const RING_KIND = { wall: 'bell', desk: 'trill', nurse: 'trill', pay: 'payphone', anchor: 'bell' };
@@ -170,6 +172,9 @@ function makePhone(api, o) {
   const P = {
     key, pos, style, li: o.li, zone: o.zone, state: 'idle', ringT: 0, line: null, special: spec.special || null, cb: 0,
     ring: spec.ring || o.ring || 'tension', offT: 0, talk: null, call: null, t: 0, used: new Set(), ghost: false, _tick: null, lastRing: -1e9,
+    intercom: !!spec.intercom, mirrorOf: null, // intercom:金水伯的對講機(不在醫院的線上);mirrorOf:跟著那一支一起響(劇情來電,離你比較近)
+    // 這一支正在響的這一通,別支電話接得到嗎(醫院的線上;對講機、金水伯的話不行)
+    lineOK() { if (this.intercom) return false; const l = this.line || this.pending(); return !l || onLine(l); },
     pending() { return calls.find((l) => !this.used.has(l.id)) || null; }, // 這支電話排定、還沒接到的劇情來電
     poolLine(list = pool) {
       const free = list.filter((l) => !api.usedLines.has(l.id));
@@ -189,7 +194,7 @@ function makePhone(api, o) {
       this.run();
       return true;
     },
-    stopRing() { ixs.ringStop(key); ix.ringing.delete(P); if (P.e) { P.e.radius = P.e.r0; P.e.reach = 2.5; P.e.priority = 2; } if (hs) hs.set(hsI, hsM); for (const i of leds) led.color(i, 0x221a10); },
+    stopRing() { ixs.ringStop(key); ix.ringing.delete(P); this.mirrorOf = null; if (P.e) { P.e.radius = P.e.r0; P.e.reach = 2.5; P.e.priority = 2; } if (hs) hs.set(hsI, hsM); for (const i of leds) led.color(i, 0x221a10); },
     lift() { if (hs) hs.set(hsI, ZERO); ixs.pickup(null); },
     down() { if (hs) hs.set(hsI, hsM); ixs.hangup(pos); },
     tones() { ixs.dialTone(false); ixs.busyTone(false); ixs.offHook(false); ixs.lineNoise(false); },
@@ -199,13 +204,14 @@ function makePhone(api, o) {
       if (taken?.id) this.used.add(taken.id);
       else ix.emit('missed', P);
     },
-    answer() {
-      const wasRinging = this.state === 'ringing';
+    // pick = 這一支沒在響,是拿起來代接別支正在響的那一通(只接醫院線上的;對講機不代接)
+    answer(pick = false) {
+      const wasRinging = this.state === 'ringing' || pick;
       // 其他同時在響的電話全部停;打來的只有一個人:這一支沒有正在打來的電話時,接到別支上的(王醫師、回撥優先,再來是排定的劇情來電)
-      const others = wasRinging ? [...ix.ringing].filter((Q) => Q !== P && Q.state === 'ringing') : [];
+      const others = wasRinging ? [...ix.ringing].filter((Q) => Q !== P && Q.state === 'ringing' && (!pick || Q.lineOK())) : [];
       let from = null;
-      const take = (pick) => { for (const Q of others) { const l = pick(Q); if (l && onLine(l)) { from = Q; return l; } } return null; };
-      let ln = this.line || take((Q) => Q.line) || (wasRinging ? this.pending() : null) || take((Q) => Q.pending());
+      const take = (fn) => { for (const Q of others) { const l = fn(Q); if (l && onLine(l)) { from = Q; return l; } } return null; };
+      let ln = this.line || take((Q) => Q.line) || (wasRinging && !pick ? this.pending() : null) || take((Q) => Q.pending());
       const ghost = this.ghost || others.some((Q) => Q.ghost);
       for (const Q of others) Q.hush(Q === from ? ln : null);
       this.stopRing();
@@ -236,7 +242,10 @@ function makePhone(api, o) {
       if (!call && !talk) api.say('', '（只有沙沙的雜訊）', 2200, 'phone');
       ix.emit('call', P, ln || call || null);
     },
-    pickUp() { // 沒在響:撥號音;偶爾線上已經有人
+    pickUp() { // 沒在響:別支正在響 → 代接那一通;不然撥號音(偶爾線上已經有人)
+      const ring = [...ix.ringing].filter((Q) => Q !== P && Q.state === 'ringing');
+      if (!this.intercom && !game.story?.callOut?.() && ring.some((Q) => Q.lineOK())) { this.answer(true); return; } // 叫金水伯的車那一步:拿起來是撥號音(你要打出去)
+      if (ring.some((Q) => Q.intercom) && !this.intercom) api.toast('是店門口的對講機在響', '#d9c48a', '金水伯只從對講機說話（1F 金水商行門口）');
       this.lift();
       this.state = 'off'; this.offT = 0;
       const idle = api.lineList('PHONE.idle');
@@ -403,10 +412,12 @@ export function phoneDirector(api) {
     });
   };
   // 走不到的電話不挑:捲門拉下時金水商行裡那支、劇情還鎖著的區域裡的(玩家看得到方向卻怎麼走都進不去)
+  const zid = (P) => (P.zone && typeof P.zone === 'object' ? P.zone.id : P.zone) || '';
+  // (區域被鎖住 = 那個區域的每一個門洞都還鎖著;只鎖了其中一扇,例如走廊上 207 的門,走廊還是走得到)
   const unreachable = (P) => {
-    const z = String(P.zone || '');
+    const z = String(zid(P)), D = game.interact?.doors;
     if (/store|shop/.test(z) && game.shop && !game.shop.open) return true;
-    try { if (z && game.interact?.doors?.isLocked?.(z)) return true; } catch { /* 沒有這個區域的門 */ }
+    try { const ws = z && D?.waysOf ? D.waysOf(z) : []; if (ws.length && ws.every((w) => D.isLocked(w))) return true; } catch { /* 沒有這個區域的門 */ }
     return false;
   };
   // 依路徑距離挑一支(a~b 公尺;同層 ×3、相鄰樓層 ×1、看不到 ×1.6、有劇情來電 ×2.5、90 秒內響過的不挑)
@@ -434,6 +445,66 @@ export function phoneDirector(api) {
     for (const o of out) if ((r -= o[1]) <= 0) return o[0];
     return out[0][0];
   };
+  // ---- 離你最近的電話(w6):路徑距離(導航的距離場);距離場量到的是隊友、或沒算到 → 用直線估 ----
+  const pathDist = (P) => {
+    const W = game.world, L = W.layout, p = game.player.pos, li = L.levelOfY(p.y + 0.3), dl = Math.abs(P.li - li);
+    const straight = Math.hypot(P.pos.x - p.x, P.pos.z - p.z);
+    let d = W.flowDistance ? W.flowDistance(P.pos.x, L.levels[P.li]?.y ?? P.pos.y, P.pos.z) : Infinity;
+    if (!Number.isFinite(d) || d < straight - 1.5) d = straight * 1.4 + dl * 10;
+    return d;
+  };
+  const whereOf = (P) => { const z = game.world.layout.zones?.find?.((q) => q.id === zid(P)); return z ? `${z.level} ${z.name}` : ''; };
+  let nCache = null, nT = -1;
+  // o.ic = 店門口的對講機也算(叫金水伯的車);o.ring = 正在響的也算;o.exclude = 不算這一支
+  const nearestPhone = (o = {}) => {
+    if (!o.exclude && nCache && game.time - nT < 1 && nCache.ic === !!o.ic && nCache.ring === !!o.ring) return nCache.r;
+    let best = null, bd = Infinity;
+    for (const P of api.phones) {
+      if (P === o.exclude || (P.intercom && !o.ic) || unreachable(P)) continue;
+      if (P.state !== 'idle' && !(o.ring && P.state === 'ringing')) continue;
+      const d = pathDist(P);
+      if (d < bd) { bd = d; best = P; }
+    }
+    const r = best ? { P: best, d: bd, where: whereOf(best), name: best.e?.name || '電話', at: { x: best.pos.x, y: best.pos.y + 0.1, z: best.pos.z } } : null;
+    if (!o.exclude) { nCache = { r, ic: !!o.ic, ring: !!o.ring }; nT = game.time; }
+    return r;
+  };
+  ix.nearestPhone = nearestPhone;
+  // 劇情來電(有指定台詞,醫院線上的)響在離你很遠的那一支:最近的那一支也跟著響(同一通,接哪一支都可以;見 answer)
+  const storyLine = (P) => { const l = P.line || (P.ring.startsWith('flag:') ? P.pending() : null); return l?.id ? l : null; };
+  const mirror = (P) => {
+    if (P.mirrorOf || P.intercom) return null;
+    const l = storyLine(P);
+    if (!l || !onLine(l)) return null;
+    const n = nearestPhone({ exclude: P });
+    if (!n) return null;
+    const dP = pathDist(P);
+    if (!(dP > 12 && n.d < dP - 8)) return null; // 原本那一支就夠近了
+    if (!n.P.startRing(null, Math.max(8, P.ringT))) return null;
+    n.P.mirrorOf = P;
+    return n.P;
+  };
+  // 提示(只給自己):劇情來電響了 2.5 秒、你離每一支在響的都還很遠 → 訊息列寫出最近的一支在哪,那一支閃一下
+  const hinted = new Map();
+  const hint = (P) => {
+    const l = storyLine(P);
+    if (!l || P.mirrorOf) return;
+    ix.after(2.5, () => {
+      if (game.state !== 'playing' || P.state !== 'ringing' || game.story?.ending?.active) return;
+      if (game.time - (hinted.get(l.id) ?? -1e9) < 40) return;
+      const mates = [...ix.ringing].filter((Q) => Q.state === 'ringing' && (Q === P || Q.mirrorOf === P));
+      if (mates.some((Q) => pathDist(Q) < 9)) return; // 已經在旁邊了
+      hinted.set(l.id, game.time);
+      if (P.intercom || !onLine(l)) { game.ui?.feed?.(`店門口的對講機在響${whereOf(P) ? `（${whereOf(P)}）` : ''}。`, { color: '#e3c98a', ms: 6000 }); return; }
+      const n = nearestPhone({ ring: true });
+      if (!n) return;
+      const tag = /（/.test(n.name) || n.name === '電話' ? '' : `（${n.name}）`;
+      game.ui?.feed?.(`電話在響——最近的一支在${n.where}${tag}。`, { color: '#e3c98a', ms: 6500 });
+      game.objectives?.glintAt?.(n.at, 12);
+      try { game.ui?.tips?.show?.('phone', 1); } catch { /* 略 */ }
+    });
+  };
+  ix.on('ring', (P) => { if (P.mirrorOf) return; mirror(P); hint(P); });
   const ringNear = (a, b, { gate = true, dur = 16 } = {}) => {
     const P = pick(a, b);
     if (!P) return false;
