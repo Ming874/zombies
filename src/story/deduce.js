@@ -147,8 +147,8 @@ export function installDeduce(game) {
       if (o.by === 'memory' && pointTwin(id)) return false; // [w7] 回憶裡看到的紙本:指向那份紙本,撿到才算(不憑空收卡)
       run.got.add(id);
       // [w7] 在哪裡、怎麼拿到的(筆記本〈線索〉頁每一張都寫;跨局保留,重玩時看得出是上一夜的)
-      const at = whereOf(id, o);
-      (s.from ||= {})[id] = { at: at.label, by: o.by || null, w: game.round || 0 };
+      const at = o.by === 'save' ? { label: '' } : whereOf(id, o); // 讀檔:這一局本來就拿過了,地點照存檔前記的
+      if (o.by !== 'save') (s.from ||= {})[id] = { at: at.label, by: o.by || null, w: game.round || 0 };
       map()?.poi?.('clue.' + id, null);
       emit('got', { id, by: o.by || null });
       const old = s.cards.includes(id);
