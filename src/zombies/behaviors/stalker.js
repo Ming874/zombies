@@ -16,7 +16,15 @@ export const Q = {
 };
 (globalThis.__Z3Q ||= {}).stalker = Q; // 除錯:測試頁可直接調整姿勢參數
 
-export function init(z) { z._ceil = 0; z._ceilH = 3.3; z._ceilT = 0; z._litT = 0; z._litQ = 0; z._isLit = false; z._flee = 0; z.specialCd = rand(0.5, 2); }
+export function init(z) { z._ceil = 0; z._ceilH = 3.3; z._ceilT = 0; z._litT = 0; z._litQ = 0; z._isLit = false; z._flee = 0; z._fleeN = 0; z._fleeAt = -99; z._braveT = 0; z.specialCd = rand(0.5, 2); }
+// [w6] 一波不會因為牠卡住:被手電筒逼退 4 次(每次間隔 20 秒內)之後,接下來 8 秒不怕光(會衝過來);
+//      天花板上爬超過 8 秒、已經在 12m 內就一定落下(以前一直被盯著就永遠倒吊在頭上,子彈又打不到 → 第 9 波「打不死的那一隻」)
+const FLEE_N = 4, FLEE_GAP = 20, BRAVE_T = 8, CEIL_MAX = 8;
+function fled(z, t) {
+  z._fleeN = t - z._fleeAt < FLEE_GAP ? z._fleeN + 1 : 1;
+  z._fleeAt = t;
+  if (z._fleeN >= FLEE_N) { z._fleeN = 0; z._braveT = BRAVE_T; }
+}
 
 function ceilingHere(z, world) {
   if ((z._ceilT -= 0.016) > 0) return z._ceilH;
@@ -39,13 +47,14 @@ export function think(dt, ctx, dist, toX, toZ, w) {
   const ch = ceilingHere(this, world);
   // 手電筒:持續照到 0.2 秒就退開
   // 手電筒(視線射線較貴:每 0.1 秒判斷一次)
-  if ((this._litQ -= dt) <= 0) { this._litQ = 0.1; this._isLit = (this.state === 'chase' || this.state === 'wander') && hd < T.lit.range && lit(this, p, world); }
+  if (this._braveT > 0) this._braveT -= dt;
+  if ((this._litQ -= dt) <= 0) { this._litQ = 0.1; this._isLit = this._braveT <= 0 && (this.state === 'chase' || this.state === 'wander') && hd < T.lit.range && lit(this, p, world); }
   const isLit = this._isLit && (this.state === 'chase' || this.state === 'wander');
   this._litT = isLit ? this._litT + dt : Math.max(0, this._litT - dt * 2);
   switch (this.state) {
     case 'chase':
       w.speed = this.speed;
-      if (this._litT > 0.2) { this.go('knock'); this._flee = T.lit.flee; break; }
+      if (this._litT > 0.2) { this.go('knock'); this._flee = T.lit.flee; fled(this, this.t); break; }
       // 室內、離得遠、沒被照:翻上天花板
       if (ch && dist > 5.5 && this.specialCd <= 0 && !isLit) { this.go('wander'); this.specialCd = 1; break; }
       if (this.los && this.line === 1 && dist > Pn.min && dist < Pn.max && this.specialCd <= 0 && !watched(p, this)) { leap(this, toX, toZ, hd); break; }
@@ -54,9 +63,9 @@ export function think(dt, ctx, dist, toX, toZ, w) {
       break;
     case 'wander': // 天花板上爬:沿導航場前進;到了露天處或很近且背對牠 → 落下
       w.speed = this.speed * 0.95;
-      if (this._litT > 0.2) { this.go('hit'); this._flee = T.lit.flee; break; }
+      if (this._litT > 0.2) { this.go('hit'); this._flee = T.lit.flee; fled(this, this.t); break; }
       // 落下撲人算一次「天花板掉落」驚嚇:跟伏擊共用導演的節奏(被拒絕就繼續在頭頂上跟著,最多等 6 秒;貼到 1.5m 內一定掉)
-      if (!ch || dist < 1.5 || (dist < Pn.max && (!watched(p, this) || dist < 2.4) && this.st > 0.6 && paced(this, ctx, 'ceilingDrop', dt))) { this.go('fall'); if (ch) pacedDone(this, ctx, 'ceilingDrop'); }
+      if (!ch || dist < 1.5 || (this.st > CEIL_MAX && dist < 12) || (dist < Pn.max && (!watched(p, this) || dist < 2.4) && this.st > 0.6 && paced(this, ctx, 'ceilingDrop', dt))) { this.go('fall'); if (ch) pacedDone(this, ctx, 'ceilingDrop'); }
       break;
     case 'hit': case 'knock': { // 被照到:尖嘶、往反方向逃一陣子
       w.x = -toX / hd; w.z = -toZ / hd; w.speed = this.speed * 1.15;

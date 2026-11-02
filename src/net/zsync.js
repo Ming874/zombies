@@ -110,7 +110,7 @@ export class ZombieSync {
     const full = this.nsnap % (SNAP_HZ * 2) === 0; // 每 2 秒完整送一次
     w.u8(BIN.ZSNAP); w.u8(0); w.u16((this.seq = (this.seq + 1) & 0xffff)); w.u32(Math.round(s.client.serverNow()) >>> 0);
     let alive = 0;
-    for (const z of g.zombies) if (z.alive) alive++;
+    for (const z of g.zombies) if (z.alive && !z._chase) alive++; // [w6] 和房主 HUD(flow.zombiesLeft)一樣:追獵者不算這一波
     w.u8(Math.min(255, g.round | 0)); w.u8(code(PHASES, g.phase));
     w.u16(Math.max(0, g.toSpawn | 0));
     const timer = s.mode.hostTimer?.() ?? -1;
