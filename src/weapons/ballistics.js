@@ -66,7 +66,10 @@ function hitLocal(k, ox, oy, oz, dx, dy, dz) {
 function broad(z, ox, oy, oz, dx, dy, dz, maxD) {
   const big = z.type === 'brute', low = z.type === 'crawler';
   const R = big ? 1.75 : low ? 1.15 : 1.2;
-  const cx = z.pos.x - ox, cy = z.pos.y + (big ? 1.15 : low ? 0.35 : 0.95) - oy, cz = z.pos.z - oz;
+  // [w6] 骨架被抬高時(潛行者倒吊在天花板 rootY≈3.3 且翻過來、天花板掉落的半空中)命中盒跟著上去:粗篩的球也要跟著,
+  // 以前只看 pos.y → 天花板上的潛行者永遠打不到(第 9 波「打不死、回合卡住」)
+  const lift = z.rootY > 0.3 ? z.rootY : 0, flip = lift && Math.cos(z.rootRoll || 0) < 0;
+  const cx = z.pos.x - ox, cy = z.pos.y + (flip ? lift - 0.55 : lift + (big ? 1.15 : low ? 0.35 : 0.95)) - oy, cz = z.pos.z - oz;
   const tca = cx * dx + cy * dy + cz * dz;
   if (tca < -R || tca - R > maxD) return false;
   const d2 = cx * cx + cy * cy + cz * cz - tca * tca;
