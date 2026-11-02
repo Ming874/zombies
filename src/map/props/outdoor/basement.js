@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { rng as mkRng } from '../ctx.js';
 import { Parts, M, box, rbox, cyl, sph, tor, rod, tube, pool, put, solid, keepUV, V3, HALF, TAU } from './kit.js';
-import { labelUV } from './mats.js';
+import { labelUV, decalUV } from './mats.js';
 import { surf } from '../../hospital/surfaces.js';
 import { groundDecal, labelQuad } from './cars.js';
 import { flatDecal, trashBag, bagFallback } from './industrial.js';
@@ -78,11 +78,19 @@ function wallBox(P, s, y, R) {
   P.add('po_label', labelQuad(R() < 0.5 ? 'hv' : 'panel', 0.32, 0.2), M(x + s.nx * 0.115, y + 1.65, z + s.nz * 0.115, 0, yaw, 0));
   P.add('rubber', tube([new V3(x, y + 1.9, z), new V3(x, y + 2.4, z), new V3(x + s.nx * 0.05, y + 2.6, z + s.nz * 0.05)], 0.02, { radial: 4 }));
 }
+// 貼在臥式圓筒(軸沿 X、中心高 cy)上的彎曲貼花:side 1 = +Z 側(從頂部往下到腰線)、-1 = -Z 側;圖的上緣在筒頂
+function drumDecal(T, name, r, x, cy, w, side) {
+  const [u, v, uw, vh] = decalUV(name), th0 = side > 0 ? 0.05 : HALF, g = new THREE.CylinderGeometry(r, r, w, 10, 1, true, th0, HALF - 0.05), a = g.attributes.uv;
+  for (let i = 0; i < a.count; i++) { const t = side > 0 ? a.getX(i) : 1 - a.getX(i); a.setXY(i, u + a.getY(i) * uw, v + t * vh); }
+  g.rotateZ(HALF).translate(x, cy, 0);
+  T.add('po_decal', keepUV(g));
+}
 // 大型臥式鍋爐(保溫層 + 鞍座 + 爐門 + 煙道)
 function boiler(ctx, P, x, y, z, yaw, R) {
   const T = new Parts(), L = 3.6, r = 1.0;
   (ctx.__b1 || (ctx.__b1 = { boilers: [] })).boilers.push({ x, y, z, yaw }); // [scene8] 燃燒機、儀表、安全閥、立管在 indoor/scene8.js
-  T.add('rust', cyl(r, r, L, 24).rotateZ(HALF), M(0, r + 0.35, 0)); // [w4 scene] 爐身是髒的(鏽斑、水痕),不是乾淨的灰圓筒
+  T.add('aluminum', cyl(r, r, L, 24).rotateZ(HALF), M(0, r + 0.35, 0)); // [w6] 鋁皮保溫外殼(原本整筒 rust 是一片平的橘色,像玩具);髒污靠下面的煙燻/鏽水貼花
+  for (const [nm, dx, w, side] of [['rustrun', 0.55, 0.8, 1], ['rustrun', 1.2, 0.55, -1], ['soot', -0.9, 1.4, 1], ['soot', 0.7, 1.2, -1], ['soot', -0.6, 1.0, -1]]) drumDecal(T, nm, r + 0.011, dx, r + 0.35, w, side); // 貼著筒身彎曲的鏽水/煙燻(平面貼花在圓筒上會浮起來)
   flatDecal(T, 'soot', 0, r * 2 + 0.36, 0, 2.6, 1.4, 'y+');
   for (const s of [-1, 1]) for (const [dx, w] of [[-0.9, 1.2], [0.7, 1.5]]) flatDecal(T, 'rustrun', dx, r + 0.35 - 0.05, s * (r + 0.012), w, 0.5, s > 0 ? 'z+' : 'z-'); // 鏽水痕
   for (let k = 0; k <= 6; k++) T.add('steel', tor(r + 0.01, 0.015, 4, 28).rotateY(HALF), M(-L / 2 + k * L / 6, r + 0.35, 0));
@@ -157,12 +165,14 @@ function wasteCart(P, x, y, z, yaw) {
   P.merge(T, M(x, y, z, 0, yaw, 0));
 }
 
+// 軟邊的濕地板貼花(跟 puddle 一樣抽兩次亂數,後面的擺設不會跑掉)
+function wetPatch(P, R, x, z, r, sx, sz, y) { R(); const rot = R() * TAU; groundDecal(P, 'water2', x, z, r * sx * 2.6, r * sz * 2.6, rot, y); }
 // ======================================================================
 function dressTunnel(ctx, zone) {
   const R = zrng(zone), P = new Parts(), li = zone.levelIndex, y = ctx.L.levels[li].y;
   for (const s of ctx.wallSpots(zone, { allowNearDoor: true })) { wallPipes(P, s, y, R, { tray: R() < 0.5 }); if (R() < 0.05) wallBox(P, s, y, R); }
   for (const c of ctx.cells(zone, { allowNearDoor: true })) {
-    if (R() < 0.12) puddle(P, R, c.x + R.range(-0.4, 0.4), c.z + R.range(-0.4, 0.4), R.range(0.3, 0.7), 1.5, 0.8, y + 0.004);
+    if (R() < 0.12) wetPatch(P, R, c.x + R.range(-0.4, 0.4), c.z + R.range(-0.4, 0.4), R.range(0.3, 0.7), 1.5, 0.8, y + 0.004); // [w6] 原本是 po_puddle(暗隧道裡反射不到東西 → 一塊硬邊的黑色多邊形)
     if (R() < 0.1) litter(P, R, c.x, c.z, 0.7, R.int(1, 3), ['form', 'news', 'glove', 'mask', 'card', 'tissue'], y + 0.009);
     if (R() < 0.05) groundDecal(P, R.pick(['blood2', 'drip', 'steps', 'water2']), c.x, c.z, 1.2, 0.8, R() * TAU, y + 0.006);
   }
@@ -257,6 +267,23 @@ function dressRamp(ctx, zone) {
   for (let k = 0; k < 6; k++) leafPatch(P, R, 110 + R.range(-1.4, 1.4), 47.2 - k * 0.2, 0.5, 5, y + 0.02 + (47.5 - k) * 0.0);
   finish(ctx, P);
 }
+// 爐前的出灰坑:角鐵框 + 鑄鐵格柵,格柵底下是黑的(在地面上做,不挖洞)
+function ashPit(T, cx, cz, w, d) {
+  T.add('po_soot', box(w - 0.06, 0.004, d - 0.06), M(cx, 0.009, cz));
+  for (const s of [-1, 1]) { T.add('cast_iron', box(w, 0.028, 0.05), M(cx, 0.014, cz + s * (d / 2 - 0.025))); T.add('cast_iron', box(0.05, 0.028, d - 0.1), M(cx + s * (w / 2 - 0.025), 0.014, cz)); }
+  const n = 12; for (let i = 0; i < n; i++) T.add('cast_iron', box(0.024, 0.022, d - 0.1), M(cx - (w - 0.14) / 2 + (i * (w - 0.14)) / (n - 1), 0.017, cz));
+  for (const s of [-1, 1]) T.add('cast_iron', box(w - 0.1, 0.018, 0.022), M(cx, 0.013, cz + s * d * 0.2));
+}
+// 一小堆灰:低矮、邊緣不規則的半球(邊緣貼地)
+function ashMound(r, h, k) {
+  const g = new THREE.SphereGeometry(r, 18, 5, 0, TAU, 0, HALF), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), s = 1 + 0.16 * Math.sin(a * 2 + k * 1.7) + 0.05 * Math.sin(a * 5 + k * 3.1), t = y / r;
+    p.setXYZ(i, x * s, h * t * t * (3 - 2 * t) * (0.9 + 0.2 * Math.sin(x * 11 + z * 9 + k)), z * s); // 邊緣平緩的土丘輪廓
+  }
+  g.computeVertexNormals();
+  return g;
+}
 function dressIncinerator(ctx, zone) {
   const R = zrng(zone), P = new Parts(), li = zone.levelIndex, y = ctx.L.levels[li].y;
   for (const s of ctx.wallSpots(zone, { allowNearDoor: true })) if (R() < 0.6) wallPipes(P, s, y, R, { h: 2.8, n: 1, key: 'rust' });
@@ -271,7 +298,8 @@ function dressIncinerator(ctx, zone) {
     F.add('cast_iron', box(1.6, 0.12, 0.1), M(0, 1.62, 0.55));
     flatDecal(F, 'soot', 0, 1.9, 0.505, 2.6, 1.6, 'z+');
     groundDecal(F, 'ashes', 0, 1.6, 2.6, 1.6, 0, 0.006);
-    F.add('po_ash', new THREE.SphereGeometry(0.6, 10, 6, 0, TAU, 0, HALF).scale(1.3, 0.3, 0.7), M(-0.3, 0, 1.4));
+    ashPit(F, 0, 1.38, 1.2, 0.78); // [w6] 原本是一塊扁半球(10 邊),遠看是地上一塊黑色八角形
+    for (const [x, y, z, r, h, k] of [[0.28, 0, 0.82, 0.34, 0.12, 1], [-0.18, 0.02, 1.36, 0.2, 0.06, 2]]) F.add('po_ash', ashMound(r, h, k), M(x, y, z)); // 爐門底下掉出來的灰、格柵上的一小堆
     F.add('wood_old', rod(new V3(-1.9, 0.1, 0.7), new V3(-2.0, 1.3, 0.5), 0.02, 6));
     P.merge(F, M(fx, y, fz, 0, fyaw, 0));
     ctx.light({ x: fx - 0.9, y: y + 0.9, z: fz, color: 0xff5a18, intensity: 7, distance: 11, kind: 'fire', flicker: 0.3, zone: zone.id, glow: 0.6, pri: 3 });
