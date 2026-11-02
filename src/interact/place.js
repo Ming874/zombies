@@ -212,6 +212,13 @@ export function placeAll(game, ix, kit, pack, seed = 2077) {
     if (!s && fp.mount === 'door') s = findSpot(z, { ...fp, mount: 'wall' }, spec);
     if (!s && fp.mount === 'floor' && !fp.wide) s = freeSpot(z, fp);
     if (!s) { stats.failed.push(`${spec.id || spec.kind}@${spec.zone}`); return null; }
+    // [w6] 固定位置:上面照原本流程找過位置(抽亂數的次數不變,其他東西不會跑掉),這裡換成指定的位置
+    if (PIN[spec.id]) s = PIN[spec.id](z, s, fp) || s;
+    if (spec.id) spots.set(spec.id, s);
+    if (AFTER[spec.id]) { deferred.push({ spec, s, fp, z }); return null; } // 要等別的東西放好才知道位置(建模不抽亂數,延後蓋不影響其他擺設)
+    return buildAt(spec, s, kind);
+  }
+  function buildAt(spec, s, kind = spec.kind === 'logbook' ? 'note' : spec.kind) {
     const K = kind === 'answering' ? ANSWERING : KINDS[kind];
     if (!K) { stats.failed.push(`${spec.kind}:kind`); return null; }
     try {
@@ -222,10 +229,61 @@ export function placeAll(game, ix, kit, pack, seed = 2077) {
   }
   const ANSWERING = answering();
 
+  // ---- [w6] 指定位置 ----
+  const spots = new Map(), deferred = [];
+  // 牆上 (c, r, side) 沿牆偏移 along 的位置;along 超出這一格就換到牆線上的下一格。要同區、一般格、後面是實牆
+  const wallAt = (z, c, r, side, along) => {
+    const li = z.levelIndex, [dc, dr] = SIDES[side];
+    while (along > 0.999 || along < -0.999) { const k = Math.sign(along); along -= k * 2; if (dr !== 0) c += k; else r += k; }
+    if (!plain(li, c, r) || zoneOf(li, c, r) !== z || ch(li, c + dc, r + dr) !== '#') return null;
+    return wallSpot(z, c, r, side, along);
+  };
+  // 牆前面一段要空著(人站得到、按得到):離牆 0.15..0.9、高 0.1..1.4 沒有碰撞盒
+  const clearFront = (s, w) => {
+    const ax = s.nx === 0, y = L.levels[s.li].y, a = ax ? s.x : s.z, n0 = (ax ? s.z : s.x) + (ax ? s.nz : s.nx) * 0.15, n1 = (ax ? s.z : s.x) + (ax ? s.nz : s.nx) * 0.9;
+    const [p0, p1] = [Math.min(n0, n1), Math.max(n0, n1)];
+    return ax ? !hitBox(a - w / 2, p0, a + w / 2, p1, y + 0.1, y + 1.4) : !hitBox(p0, a - w / 2, p1, a + w / 2, y + 0.1, y + 1.4);
+  };
+  const PIN = {
+    // 洗衣房的保險絲:「滾到牆邊」→ 烘衣機旁邊、貼著洗衣機那一面牆(離牆 17 cm,旁邊有拆開的紙盒);原本是長走道隨便一面牆,10 cm 的小東西根本找不到
+    'h.ix.fuse.laundry': (z) => {
+      const ms = (W.propIndex || []).filter((p) => p.z === z.id && /^washer:/.test(p.n));
+      const tries = [];
+      if (ms.length) {
+        const a = ms.reduce((m, p) => (p.x > m.x ? p : m)), b = ms.reduce((m, p) => (p.x < m.x ? p : m)), wz = a.zz + a.d / 2;
+        tries.push([a.x + a.w / 2 + 0.45, wz], [b.x - b.w / 2 - 0.45, wz]);
+      }
+      tries.push([27.0, 66.0]);
+      for (const [x, wz] of tries) {
+        const c = Math.floor(x / 2), r = Math.floor((wz - 0.5) / 2), s = wallAt(z, c, r, 'S', x - (c + 0.5) * 2);
+        if (!s || hitBox(s.x - 0.2, s.z - 0.4, s.x + 0.2, s.z - 0.02, s.y + 0.01, s.y + 0.3)) continue;
+        mark(s, { mount: 'floor', w: 0.3 });
+        return { ...s, host: { x: 0, y: 0, z: 0.17 } };
+      }
+      return null;
+    },
+  };
+  const AFTER = {};
+  // 停電通知(唯一列出三支備品保險絲位置的紙):原本隨機貼到發電機正上方,人被機器擋在 2m 外,準星碰不到 → 貼在配電盤旁邊同一面牆、伸手可及
+  function placeDeferred() {
+    for (const { spec, s, fp, z } of deferred) {
+      let t = null;
+      const f = spots.get('h.ix.fusebox');
+      if (spec.id === 'h.ix.notice.power' && f && !f.free && !f.host) {
+        for (const d of [0.62, -0.62, 0.9, -0.9, 1.4, -1.4]) {
+          const q = wallAt(f.zone, f.c, f.r, f.side, (f.along || 0) + d);
+          if (q && fits(q, fp, `${q.li},${q.c},${q.r},${q.side}:w6`) && clearFront(q, 0.5)) { mark(q, fp); t = q; break; }
+        }
+      }
+      buildAt(spec, t || s);
+    }
+  }
+
   // ---- 1) 劇情包 ----
   const items = (pack?.items || []).filter((it) => it.kind !== 'lock' && !['elevator', 'fountain', 'carradio'].includes(it.kind));
   const order = (it) => (it.kind === 'phone' && it.style === 'nurse' ? 0 : FP[it.kind]?.mount === 'surface' || it.kind === 'logbook' || it.kind === 'answering' || (it.kind === 'note' && !['whiteboard', 'poster', 'drawing', 'clipboard'].includes(it.style)) ? 2 : 1);
   for (const it of items.slice().sort((a, b) => order(a) - order(b))) place(it);
+  placeDeferred();
   // ---- 2) 依主題補 ----
   for (const z of L.zones) for (const [kind, p, extra] of THEME[z.theme] || []) if (R() < p) place({ kind, zone: z.id, ...(extra || {}) });
   // ---- 3) 錨點 ----

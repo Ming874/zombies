@@ -227,10 +227,22 @@ export const morgue = {
 
 // 掉在地上/桌上的道具
 const ITEM_MODEL = {
-  fuse: (q, M) => { q.cyl(M.matte, 0xe8e0c8, 0, 0.02, 0, 0.035, 0.1, 10, 0, 0, Math.PI / 2); for (const sx of [-1, 1]) q.cyl(M.metal, 0xc8a050, sx * 0.055, 0.02, 0, 0.038, 0.02, 10, 0, 0, Math.PI / 2); },
+  // [w6] 陶瓷管保險絲(白瓷管 + 紅色規格帶,全長約 10 cm、粗 3.6 cm),躺在拆開的小紙盒旁邊;兩端銅帽在 ITEM_METAL(金屬池,手電筒照到會反光)
+  //      原本是 10 cm 的米色小圓柱,掉在地上像一顆彈殼
+  fuse: (q, M) => {
+    q.cyl(M.gloss, 0xf2eee4, 0, 0.02, 0, 0.04, 0.066, 16, 0, 0, Math.PI / 2);
+    q.cyl(M.paint, 0xb82418, 0.008, 0.02, 0, 0.0406, 0.018, 16, 0, 0, Math.PI / 2); q.cyl(M.paint, 0x1a1a1a, -0.012, 0.02, 0, 0.0406, 0.004, 16, 0, 0, Math.PI / 2);
+    q.box(M.matte, 0x9a7a4c, -0.02, 0.027, 0.085, 0.15, 0.054, 0.06, 0, 0.18); // 紙盒
+    q.box(M.matte, 0x2a2016, -0.02, 0.0545, 0.085, 0.138, 0.002, 0.05, 0, 0.18); // 盒口(裡面是暗的)
+    q.box(M.matte, 0x9a7a4c, -0.024, 0.072, 0.122, 0.15, 0.003, 0.06, -1.15, 0.18); q.box(M.paint, 0xf2efe6, -0.024, 0.073, 0.12, 0.13, 0.002, 0.05, -1.15, 0.18); // 掀開的盒蓋(內側白色說明紙,手電筒一照很亮)
+    q.box(M.paint, 0xe8e2d0, -0.02, 0.03, 0.0548, 0.09, 0.03, 0.002, 0, 0.18); q.box(M.paint, 0xb82418, -0.052, 0.03, 0.0544, 0.024, 0.03, 0.002, 0, 0.18); // 盒上的標籤
+  },
   oil: (q, M) => { q.slab(M.paint, 0xb82a1c, 0, 0, 0, 0.34, 0.44, 0.18); q.box(M.paint, 0xb82a1c, 0.0, 0.47, 0, 0.2, 0.03, 0.04); q.cyl(M.metal, 0x444444, 0.12, 0.47, 0, 0.04, 0.06, 8); },
   key: (q, M) => { q.torus(M.metal, 0xb8a060, 0, 0.004, 0, 0.04, 0.18, Math.PI / 2, 0, 0, 12); q.box(M.metal, 0xb8a060, 0.05, 0.004, 0, 0.06, 0.006, 0.012); q.box(M.metal, 0xb8a060, 0.075, 0.004, 0.008, 0.008, 0.006, 0.012); q.box(M.paint, 0xd82a20, -0.03, 0.004, 0.04, 0.05, 0.004, 0.03); },
   card: (q, M) => { q.box(M.plastic, 0xe8e8f0, 0, 0.002, 0, 0.086, 0.004, 0.054); q.box(M.plastic, 0x2a5a9a, 0, 0.0045, -0.015, 0.086, 0.001, 0.02); },
+};
+const ITEM_METAL = { // 同一個道具的金屬零件(另一個實例池,用金屬材質)
+  fuse: (q, M) => { for (const sx of [-1, 1]) { q.cyl(M.metal, 0xd8a848, sx * 0.041, 0.02, 0, 0.0436, 0.018, 16, 0, 0, Math.PI / 2); q.cyl(M.metal, 0xe0b85a, sx * 0.0515, 0.02, 0, 0.022, 0.004, 12, 0, 0, Math.PI / 2); } },
 };
 export const pickup = {
   build(api, s, spec = {}) {
@@ -241,13 +253,14 @@ export const pickup = {
     const y = s.host ? s.host.y : 0;
     const L = s.host ? api.mtx(s, s.host.x, y, s.host.z, api.R() * 6) : api.mtx(s, 0, 0, 0.45, api.R() * 6);
     const pi = pool.add(s.li, L);
+    const mm = ITEM_METAL[id] && kit.pool('item:' + id + ':metal', (q) => ITEM_METAL[id](q, M), M.metal), mi = mm ? mm.add(s.li, L) : -1;
     const v = new THREE.Vector3(0, 0.04, 0).applyMatrix4(L);
     const st = { taken: false };
     return ix.register({ x: v.x, y: v.y, z: v.z }, {
       id: spec.id || `item:${id}:${Math.round(v.x * 10)}`, kind: 'pickup', name: ix.inv.name(id), reach: 1.9, radius: 0.12, scope: 'map', once: 'run', priority: 3,
       usedText: '', prompt: () => (st.taken ? null : `撿起${ix.inv.name(id)}`),
-      onUse: () => { st.taken = true; pool.set(pi, ZERO); api.give(id, spec.n || 1, spec.label); if (spec.flag) ix.flags.set(spec.flag, true); if (spec.note) ix.after(0.5, () => api.note(spec.note)); },
-      reset: () => { st.taken = false; pool.set(pi, L); },
+      onUse: () => { st.taken = true; pool.set(pi, ZERO); mm?.set(mi, ZERO); api.give(id, spec.n || 1, spec.label); if (spec.flag) ix.flags.set(spec.flag, true); if (spec.note) ix.after(0.5, () => api.note(spec.note)); },
+      reset: () => { st.taken = false; pool.set(pi, L); mm?.set(mi, L); },
     });
   },
 };
