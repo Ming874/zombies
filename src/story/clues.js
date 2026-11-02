@@ -139,6 +139,57 @@ export const CARDS = [
 ];
 export const CARD = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
+// [w7] 線索在哪裡(筆記本〈線索〉頁的「還沒找到」、按 Q 問小美、地圖記號都看這張表):
+//   ix 互動物件 id(位置、區域照擺放結果算)| look 'door207' | zone 區域 id(回憶發生的地方)
+//   how 一句話:去哪裡、看什麼(不寫卡名,不爆雷);ev 不是擺在那裡的東西:'call' 電話/對講機、'story' 劇情走到才有、'ghost' 耳語、'odd' 這一夜的怪事
+//   mem 回憶看到的是一份紙本:回憶結束時不直接給卡,改成指向那份紙本(那一句就是回憶散去時的字幕)
+export const FIND = {
+  'hc.01': { ix: 'h.look.lockdown', how: '大廳布告欄上，一張泛黃的公告', mem: '那張公告，還貼在大廳的布告欄上。' },
+  'hc.02': { zone: 'f1_lobby', how: '大廳北口的柱子，走近一點看' },
+  'hc.03': { ix: 'h.ix.tapebox', how: '廣播機房桌上的紀錄簿' },
+  'hc.04': { ix: 'h.ix.logbook', how: '護理站的 207 進出登記簿' },
+  'hc.05': { ix: 'h.ix.cctv', how: '監控室錄影機裡的帶子（要先有電）' },
+  'hc.06': { ix: 'h.ix.h05', how: '院長室的保險箱（密碼和 207 有關）' },
+  'hc.07': { ix: 'h.ix.handover4', how: '護理站的板夾，護理長的字', mem: '她寫字的那塊板夾，\n還放在護理站。' },
+  'hc.08': { ix: 'h.ix.tape1998', how: '護理站收音機旁邊的錄音帶' },
+  'hc.09': { ix: 'h.ix.dock.note', how: '裝卸平台，鐵網邊的便當箱後面' },
+  'hc.10': { ix: 'h.ix.terminal', how: '掛號櫃台的病歷電腦，輸入 207' },
+  'hc.11': { ix: 'h.ix.internbook', how: '護理站桌上傳來傳去的小冊子', mem: '她們傳來傳去的那本小冊子，\n還攤在護理站桌上。' },
+  'hc.12': { ix: 'h.ix.zhenglocker', how: '護理長的置物櫃（密碼是交班時間）', mem: '她把那張單子，\n收進自己的置物櫃了。' },
+  'hc.13': { ix: 'h.ix.memorial', how: '護理站櫃台上的遺照，走近看', mem: '那張照片，後來放在護理站，\n當成她的遺照。' },
+  'hc.14': { ix: 'h.ix.dock.list', how: '裝卸平台柱子上的夾板', mem: '金水伯的便當單，\n還夾在平台的柱子上。' },
+  'hc.15': { look: 'door207', how: '207 的門玻璃，走近看' },
+  'hc.16': { ix: 'h.look.keys', how: '護理站牆上的鑰匙板' },
+  'hc.17': { ix: 'h.ix.ernote', how: '急診檢傷台上的夾板' },
+  'hc.18': { ix: 'h.ix.answering', how: '護理站的答錄機，紅燈在閃' },
+  'hc.19': { ev: 'story', how: '頭七那一夜' },
+  'hc.20': { ev: 'call', how: '207 打開以後，會有人打電話來' },
+  'hc.21': { ev: 'call', how: '休息的時候，店門口的對講機會響' },
+  'hc.22': { ev: 'ghost', how: '招魂燈熄的時候，站在 207 門口' },
+  'hc.23': { ev: 'ghost', how: '用醫療包的時候，仔細聽' },
+  'hc.25': { ev: 'call', how: '查過 207 的病歷，小美會想起來' },
+  'hc.26': { ev: 'ghost', how: '醫院的廣播自己響起來的時候' },
+  'hc.27': { ix: 'h.look.panel2f', how: '207 附近，配電箱門上的紙條' },
+  'hc.29': { ev: 'story', how: '看守 207 的保全身上' },
+  'hc.30': { ix: 'h.ix.pillow', how: '207 床上的枕頭裡' },
+  'hc.31': { ix: 'h.ix.h03', how: '207 的床頭櫃抽屜' },
+  'hc.32': { zone: 'f2_nursery', how: '新生兒室的保溫箱旁邊' },
+  'hc.33': { ix: 'h.ix.h01', how: '大廳地上被踩過的傳單' },
+  'hc.34': { ev: 'odd', how: '燈泡自己晃起來的時候' },
+  'hc.35': { ev: 'odd', how: '空病床自己動起來的時候' },
+  'hc.36': { ev: 'odd', how: '心電圖拉成一條直線的時候' },
+  'hc.37': { ev: 'odd', how: '收音機自己轉台的時候' },
+  'hc.38': { zone: 'f2_corridor', how: '207 門口那段走廊（封院第 7 晚的事）' },
+  'hc.39': { ev: 'odd', how: '停電的時候，牆上、霜上的字' },
+  'hc.40': { ev: 'odd', how: '霧氣、牆上的字' },
+  'hc.41': { ev: 'odd', how: '霜上、牆上的時間' },
+  'hc.42': { ix: 'h.ix.h02', how: '三樓宿舍的抽屜', mem: '那封信，她壓在宿舍的抽屜裡。' },
+  'hc.43': { ix: 'h.ix.h07', how: '三樓隔離房 1 門口的夾板', mem: '大新的人拿的那塊夾板，\n還掛在隔離房 1 的門口。' },
+  'hc.44': { zone: 'f3_corridor', how: '三樓隔離房 3 的門口' },
+};
+// 「還會遇到的事」的分類名
+export const EV = { call: '電話', story: '劇情', ghost: '耳語', odd: '怪事' };
+
 // 紙本 id → 卡(notes.js 的 points 'card:hc.xx' 優先;這裡是備援)
 export const NOTE_CARD = { H01: 'hc.33', H02: 'hc.42', H03: 'hc.31', H05: 'hc.06', H06: 'hc.10', H07: 'hc.43', H10: 'hc.30', 'h.s04': 'hc.04', 'h.s07': 'hc.11', 'h.s08': 'hc.12', 'h.s09': 'hc.08', 'h.s21': 'hc.03', 'h.s23': 'hc.07', 'h.s25': 'hc.17',
   'h.c01': 'hc.01', 'h.c09': 'hc.09', 'h.c14': 'hc.14', 'h.c16': 'hc.16', 'h.c27': 'hc.27', 'h.c05': 'hc.05', 'h.c13': 'hc.13' };

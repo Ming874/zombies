@@ -67,3 +67,5 @@ body.st-ending #gh-subs { visibility: hidden; }
   font-family: "Noto Serif TC", "Source Han Serif TC", "PMingLiU", serif; color: #efe6d2; font-size: clamp(40px, 6vw, 88px); letter-spacing: .18em; }
 .st-revive.on { opacity: 1; }
 .st-revive.mid div { opacity: .82; } .st-revive.weak div { opacity: .6; font-size: .8em; } .st-revive.faint div { opacity: .42; font-size: .7em; }
+#st-end .st-ask .alt { margin-left: 2.2em; opacity: .85; } /* [w7] 第二個選擇〔Q〕 */
+body.st-ending #hud .rd-hud .rd-key { visibility: hidden; } /* [w7] 結局裡 Q 是選擇鍵,不是收音機 */

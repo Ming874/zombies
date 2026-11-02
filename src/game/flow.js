@@ -15,7 +15,7 @@ import { waveRoster, wavePace, waveKind, hpMul, diffOf, COOP, scaleRoster, SPECI
 
 // 回合流程:重開、開始/結束回合、出怪、休息與商店、補給、醫療包、擊殺獎勵、計分、死亡結算。以 mixin 方式掛到 Game 上
 // 難度曲線與計分數值在 src/game/waves.js
-export const REST_TIME = 30; // 每回合結束後的休息(商店開放)秒數(首領回合前 40 秒,見 waves.js restTime)
+export const REST_TIME = 60; // 每回合結束後的休息(商店開放)秒數(首領回合前 75 秒,見 waves.js restTime)
 const HEAL = { time: 2, amount: 50 }; // 醫療包:2 秒內回 50
 const STREAK_GAP = 4; // 連殺:兩次擊殺間隔 4 秒內
 // [w4 節奏] 波內的高峰與山谷(L4D 的 build-up → peak → relax):張力 ≥ PEAK 維持 PEAK_HOLD 秒 → 暫停出怪 RELAX 秒

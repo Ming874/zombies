@@ -1,5 +1,6 @@
 import './book.css';
-import { QUESTION, WORDS, CATS, THROW } from './clues.js';
+import { QUESTION, WORDS, CATS, THROW, EV } from './clues.js';
+import { ENDS, END_NAME, END_ONE, END_HINT, endLedger } from './ending.js';
 import { sfx, ix as ixs } from '../audio.js';
 
 // 筆記本畫面(J):左頁是題目與填空句,右頁是詞庫/線索卡。
@@ -8,6 +9,12 @@ import { sfx, ix as ixs } from '../audio.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SRC = { note: '紙本', photo: '照片', tape: '錄音', call: '電話', ghost: '耳語', env: '現場', video: '錄影' };
 const BL = Object.keys(QUESTION.blanks);
+// [w7] 走到過的結局(至少看過一個才出現):看過的寫名字,沒看過的寫一句方向
+function ends() {
+  const L = endLedger(), n = ENDS.filter((k) => L[k]).length;
+  if (!n) return '';
+  return `<div class="dd-ends"><h4>結局 ${n}／${ENDS.length}</h4><ul>${ENDS.map((k) => (L[k] ? `<li><b>「${esc(END_NAME[k])}」</b>${esc(END_ONE[k])}</li>` : `<li class="no"><b>「？？？」</b>${esc(END_HINT[k].replace(/\n/g, ''))}</li>`)).join('')}</ul></div>`;
+}
 
 export class Book {
   constructor(game, D) {
@@ -100,6 +107,9 @@ export class Book {
       if (s) { this.select(s.dataset.b); return; }
       if (w) { const cat = WORDS[w.dataset.w].cat; const b = this.sel && QUESTION.blanks[this.sel].cat === cat ? this.sel : BL.find((k) => QUESTION.blanks[k].cat === cat && !this.D.state().fill[k]) || BL.find((k) => QUESTION.blanks[k].cat === cat); this.put(b, w.dataset.w); return; }
       if (t) { this.tab = t.dataset.tab; if (this.tab === 'cards') this.D.seenAll(); this.draw(); return; }
+      const f = e.target.closest('[data-find]'), sm = e.target.closest('.dd-old summary');
+      if (sm) { e.preventDefault(); this.oldOpen = !this.oldOpen; this.draw(); return; }
+      if (f) { if (this.D.mark?.(f.dataset.find)) { this.marked = f.dataset.find; ixs.paper?.(); } else sfx.pickupDeny?.(); this.draw(); return; } // [w7] 標在地圖上
       if (c) { this.card = this.card === c.dataset.card ? null : c.dataset.card; this.draw(); return; }
       if (e.target.closest('.dd-x')) this.close(true);
     });
@@ -145,7 +155,8 @@ export class Book {
       // 問題帳本(N15):還不知道的事;知道了就劃掉(還開著的排前面)
       const ask = qs.length ? `<div class="dd-ask"><h4>還不知道的事</h4><ul>${[...qs.filter((x) => !x.done), ...qs.filter((x) => x.done)].map((x) => `<li class="${x.done ? 'done' : ''}">${esc(x.text)}${x.done && x.ans ? `<small>${esc(x.ans)}</small>` : ''}</li>`).join('')}</ul></div>` : '';
       body = `<div class="dd-next"><b>下一步：</b>${nx ? `${esc(nx.goal)}${nx.why ? `<small>｜${esc(nx.why)}</small>` : ''}` : '活下去，等天亮。'}</div>` + ask
-        + (items.length ? `<ol class="dd-notes">${items.map((it) => `<li class="${it.t > seen ? 'new' : ''}">${esc(it.text)}</li>`).join('')}</ol>` : '<div class="dd-empty">還沒有寫什麼。</div>');
+        + (items.length ? `<ol class="dd-notes">${items.map((it) => `<li class="${it.t > seen ? 'new' : ''}">${esc(it.text)}</li>`).join('')}</ol>` : '<div class="dd-empty">還沒有寫什麼。</div>')
+        + ends();
       notes?.seen?.(); this.notesSeen = this.game.time;
     } else if (this.tab === 'words') {
       const words = D.words(), selCat = this.sel ? QUESTION.blanks[this.sel].cat : null, used = new Set(Object.values(fill));
@@ -156,8 +167,17 @@ export class Book {
         return `<div class="dd-cat${selCat === cat ? ' hot' : selCat ? ' dim' : ''}"><h4>${esc(nm)}</h4><div>${ws.map((w) => `<span class="dd-w${used.has(w) ? ' used' : ''}" data-w="${w}" draggable="${solved ? 'false' : 'true'}">${esc(WORDS[w].text)}</span>`).join('')}</div></div>`;
       }).join('');
     } else {
-      if (!cards.length) body = '<div class="dd-empty">還沒有線索。</div>';
-      else body = `<ol class="dd-cards">${cards.map((c) => `<li data-card="${c.id}" class="${this.card === c.id ? 'open' : ''}${this.hot === c.id ? ' hot' : ''}"><b>${esc(c.title)}</b><small>${esc(SRC[c.src] || '')}</small>${this.card === c.id ? `<p>${esc(c.text).replace(/\n/g, '<br>')}</p>` : ''}</li>`).join('')}</ol>`;
+      // [w7] 每一張寫在哪裡拿到的;上一夜的卡標「上一夜」;最後列出這一夜還沒找到的(地點 + 一句話,點一下標在地圖上)
+      const now = cards.filter((c) => D.got(c.id)), old = cards.filter((c) => !D.got(c.id));
+      const from = (c) => { const f = D.from?.(c.id); return f?.at ? `${f.at}${f.w ? `・第 ${f.w} 波` : ''}` : ''; };
+      const li = (c, prev) => `<li data-card="${c.id}" class="${this.card === c.id ? 'open' : ''}${this.hot === c.id ? ' hot' : ''}${prev ? ' prev' : ''}"><b>${esc(c.title)}</b><small>${esc(SRC[c.src] || '')}${prev ? '・上一夜' : ''}</small>${from(c) ? `<em>${prev ? '上一夜在' : ''}${esc(from(c))}</em>` : ''}${this.card === c.id ? `<p>${esc(c.text).replace(/\n/g, '<br>')}</p>` : ''}</li>`;
+      const miss = D.missing?.() || [], all = miss.filter((m) => !m.ev && (m.pos || m.label)), place = all.filter((m) => !m.locked), shut = all.length - place.length, ev = miss.filter((m) => m.ev);
+      const total = D.total || cards.length;
+      body = `<div class="dd-count">這一夜找到 <b>${now.length}</b>／${total}${old.length ? `<small>（筆記本裡還有 ${old.length} 張是上一夜的）</small>` : ''}</div>`
+        + (now.length ? `<ol class="dd-cards">${now.map((c) => li(c, false)).join('')}</ol>` : '<div class="dd-empty">這一夜還沒有線索。</div>')
+        + (place.length ? `<div class="dd-miss"><h4>還沒找到的地方 <small>點一下，標在地圖上</small></h4><ul>${place.slice(0, 10).map((m) => `<li data-find="${m.id}" class="${m.pos ? '' : 'nomap'}${this.marked === m.id ? ' on' : ''}"><b>${esc(m.label || '')}</b>${esc(m.how)}${m.old ? '<i>上一夜看過</i>' : ''}</li>`).join('')}</ul>${place.length > 10 ? `<small class="dd-more">還有 ${place.length - 10} 處，先去近的。</small>` : ''}${shut ? `<small class="dd-more">另外 ${shut} 處現在還進不去（207、三樓、太平間……）。</small>` : ''}</div>` : '')
+        + (ev.length ? `<div class="dd-miss ev"><h4>還會遇到的事</h4><ul>${ev.filter((m) => m.ev !== 'odd').map((m) => `<li><b>${esc(EV[m.ev] || '')}</b>${esc(m.how)}</li>`).join('')}${ev.some((m) => m.ev === 'odd') ? `<li><b>怪事</b>這一夜還會發生 ${ev.filter((m) => m.ev === 'odd').length} 件怪事。看到了，留意牆上和收音機。</li>` : ''}</ul></div>` : '')
+        + (old.length ? `<details class="dd-old"${this.oldOpen ? ' open' : ''}><summary>上一夜找到的（${old.length}）</summary><ol class="dd-cards">${old.map((c) => li(c, true)).join('')}</ol></details>` : '');
     }
     this.el.querySelector('.dd-r').innerHTML = tabs + `<div class="dd-body">${body}</div>`;
     this.el.querySelector('.dd-ft').innerHTML = '點空格，再點詞（或拖曳） · 右鍵清除 · <kbd>1</kbd>~<kbd>7</kbd> 選空格 · <kbd>J</kbd> 收起 · <kbd>Esc</kbd> 暫停選單' + (this.game.net ? ' · 世界沒有暫停，受傷會自動收起' : '');

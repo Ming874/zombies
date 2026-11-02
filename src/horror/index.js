@@ -168,7 +168,7 @@ export function installHorror(game) {
       const e = { id, t: game.time, zone: zoneOf()?.id || null, event: o.event || null, tag: o.tag || null, ghost: o.ghost || null, card: o.card || null, text: o.text || null };
       H.seenLog.push(e); if (H.seenLog.length > 60) H.seenLog.shift();
       game.flags?.set?.('h.seen.' + id, true);
-      if (e.card) { game.deduce?.addCard?.(e.card); game.objectives?.clue?.(e.card, { by: o.event === 'memory' ? 'memory' : 'ghost' }); }
+      if (e.card) { const by = { by: o.event === 'memory' ? 'memory' : 'ghost' }; if (game.deduce?.addCard) game.deduce.addCard(e.card, by); else game.objectives?.clue?.(e.card, by); } // [w7] 只收一次、帶來源(回憶裡的紙本改成指向它)
       H.emit('story', e);
       return e;
     },

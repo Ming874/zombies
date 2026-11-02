@@ -14,7 +14,7 @@
 // 多人:卡、詞、填空、擲筊都是「每位玩家各自的」(本機,存在 localStorage,跨局保留;醫院每一夜會重置,筆記本不會)。
 // 第一個擲出聖筊的人替全隊打開 207:本機設旗標 h.207.unlock、門自己打開(門的開關本來就同步),
 // 再送 'ixf' 給其他人,其他人的鎖也跟著解開(不需要房主仲裁:只會從鎖著變成打開)。
-import { MAP, QUESTION, WORDS, CARD, CARDS, NOTE_CARD, WHISPER, LOOK, TALK, THROW } from './clues.js';
+import { MAP, QUESTION, WORDS, CARD, CARDS, NOTE_CARD, WHISPER, LOOK, TALK, THROW, FIND } from './clues.js';
 import { Book } from './book.js';
 import * as THREE from 'three';
 import { sfx, ghost } from '../audio.js';
@@ -49,9 +49,81 @@ export function installDeduce(game) {
   const emit = (ev, d) => { for (const fn of subs.get(ev) || []) { try { fn(d); } catch (e) { console.warn('[deduce]', ev, e); } } };
   const ix = () => game.interact;
   const H = () => game.horror;
-  const run = { shops: 0, k1: false, k2: false, w02: false, tq: null, tqLate: false, tqAt: 0, look: new Map(), memT: 0, opened207: false, xl: false, got: new Set(), restThrows: 0, wasFight: false };
+  const run = { shops: 0, k1: false, k2: false, w02: false, tq: null, tqLate: false, tqAt: 0, look: new Map(), memT: 0, opened207: false, xl: false, got: new Set(), point: new Set(), restThrows: 0, wasFight: false };
   const diff = () => { try { return new URLSearchParams(location.search).get('diff') || settings.get?.('difficulty') || 'normal'; } catch { return 'normal'; } };
   const sentOK = (i) => !!S().solved || !!S().ok?.[i];
+  // ---------- [w7] 線索在哪裡(clues.js FIND) ----------
+  const map = () => game.ui?.map || null;
+  const zoneById = (id) => game.world?.layout?.zones?.find?.((z) => z.id === id) || null;
+  const zoneAt = (q) => { try { return game.world?.zoneAt?.(q.x, q.y + 0.2, q.z) || null; } catch { return null; } };
+  const zname = (z) => (z ? `${z.level || ''} ${z.name || ''}`.trim() : '');
+  // 一張卡擺在哪裡:{ pos, label }(沒有固定位置的 → pos = null)
+  function placeOf(id) {
+    const f = FIND[id];
+    if (!f) return { pos: null, label: '' };
+    if (f.look === 'door207') { const w = door207(); return { pos: w ? { x: w.cx, y: w.y + 1.4, z: w.cz } : null, label: '2F 207 門口' }; }
+    if (f.ix) { const X = ix(), e = X?.get?.(f.ix); if (e) { const q = X.where(e), pos = { x: q.x, y: q.y, z: q.z }; return { pos, label: zname(zoneAt(pos)) }; } }
+    if (f.zone) { const z = zoneById(f.zone); return { pos: null, label: zname(z) }; }
+    return { pos: null, label: '' };
+  }
+  // 拿到的時候在哪裡:擺在那裡的東西照擺放位置;電話、回憶、耳語照你那時候站的地方
+  function whereOf(id, o = {}) {
+    const by = o.by || null, P = placeOf(id);
+    if ((by === 'note' || by === 'look' || by === 'his') && P.label) return P;
+    const p = game.player?.pos, here = p ? zname(zoneAt(p)) : '';
+    const how = { call: '電話', memory: '回憶', ghost: '耳語', tape: '答錄機', boss: '保全身上', sheng: '擲筊之後' }[by] || '';
+    return { pos: null, label: [here, how].filter(Boolean).join('・') || P.label };
+  }
+  // 回憶裡看到的那份紙本:回憶散去時,指向它(閃一下、地圖畫記號、〈到目前為止〉寫一句)。回傳 false = 沒有擺出來,照舊直接收卡
+  function pointTwin(id) {
+    const f = FIND[id];
+    if (!f?.mem || !f.ix) return false;
+    const P = placeOf(id);
+    if (!P.pos) return false;
+    if (run.point.has(id)) return true;
+    run.point.add(id);
+    const fire = () => {
+      if (run.got.has(id)) return;
+      game.ui?.feed?.(`回憶散去。${f.mem.replace(/\n/g, '')}`, { color: '#e3c98a', ms: 7000 });
+      mark(id, { label: '回憶裡的東西', quiet: true });
+      try { game.story?.notes?.add?.('mem.' + id, `回憶：${f.mem.replace(/\n/g, '')}（${P.label}）`); } catch { /* 略 */ }
+    };
+    let t = 0; // 等回憶放完(卡是放到六成就給的)
+    ix()?.tick?.((dt) => { t += dt; if (H()?.memories?.state?.cur && t < 40) return true; ix()?.after?.(1.2, fire); return false; });
+    return true;
+  }
+  // 在地圖上標出來(M),那個東西閃一下;換到別的卡或拿到就擦掉
+  function mark(id, o = {}) {
+    const P = placeOf(id), m = map();
+    if (!P.pos) return false;
+    const li = m?._levelOf?.(game, P.pos.y) ?? 0;
+    m?.poi?.('clue.' + id, { x: P.pos.x, z: P.pos.z, level: li, label: o.label || '線索', always: true, red: true });
+    try { game.objectives?.glintAt?.(P.pos, 16); } catch { /* 略 */ }
+    if (!o.quiet) game.ui?.feed?.(`在地圖上標出來了（${P.label}）。按 M 看。`, { color: '#e3c98a', ms: 5200 });
+    return true;
+  }
+  // 這一局還沒碰到的線索:有位置的(place)與還會遇到的事(ev);近的排前面
+  function missing() {
+    const p = game.player?.pos, out = [];
+    for (const c of CARDS) {
+      if (run.got.has(c.id)) continue;
+      const f = FIND[c.id];
+      if (!f) continue;
+      const P = placeOf(c.id), d = P.pos && p ? Math.hypot(P.pos.x - p.x, P.pos.z - p.z) + Math.abs(P.pos.y - p.y) * 4 : Infinity;
+      out.push({ id: c.id, how: f.how, ev: f.ev || null, label: P.label, pos: P.pos, d, old: S().cards.includes(c.id), words: (c.words || []).length, locked: lockedAt(P.pos, f) });
+    }
+    return out.sort((a, b) => (a.locked - b.locked) || (a.d - b.d));
+  }
+  // 那個地方現在還進不去(207、三樓、太平間、監控室):清單排在後面、不指路
+  function lockedAt(q, f) {
+    const has = (k) => !!game.objectives?.has?.(k) || !!ix()?.flags?.has?.(k);
+    const z = (q && zoneAt(q)?.id) || f.zone || '';
+    if (z === 'f2_ward_207') return !has('h.207.unlock');
+    if (z === 'f3_monitor') return !has('h.area.3f') || !(ix()?.inv?.has?.('card.security') || has('h.badge'));
+    if (z.startsWith('f3_')) return !has('h.area.3f');
+    if (z === 'b1_morgue') return !has('h.area.morgue');
+    return false;
+  }
   const silentNow = () => game.phase !== 'fighting';
 
   const D = {
@@ -59,6 +131,9 @@ export function installDeduce(game) {
     on(ev, fn) { if (!subs.has(ev)) subs.set(ev, new Set()); subs.get(ev).add(fn); return () => subs.get(ev).delete(fn); },
     has(id) { return S().cards.includes(id); },
     got(id) { return run.got.has(id); }, // 這一局碰到的(重玩時,上一局的卡要這一局再碰一次才算)
+    from(id) { return S().from?.[id] || null; }, // [w7] 在哪裡拿到的 { at, by, w }
+    missing, mark, placeOf,
+    gotCount() { return run.got.size; }, total: CARDS.length,
     cards() { return S().cards.map((id) => CARD[id]).filter(Boolean); },
     words() { return S().words.filter((w) => WORDS[w]); },
     isFresh(id) { return S().fresh.includes(id); },
@@ -68,15 +143,22 @@ export function installDeduce(game) {
       const c = CARD[id];
       if (!c) return false;
       const s = S();
-      if (!run.got.has(id)) { run.got.add(id); emit('got', { id, by: o.by || null }); }
-      if (s.cards.includes(id)) return false;
-      s.cards.push(id);
-      s.fresh.push(id);
+      if (run.got.has(id)) return false;
+      if (o.by === 'memory' && pointTwin(id)) return false; // [w7] 回憶裡看到的紙本:指向那份紙本,撿到才算(不憑空收卡)
+      run.got.add(id);
+      // [w7] 在哪裡、怎麼拿到的(筆記本〈線索〉頁每一張都寫;跨局保留,重玩時看得出是上一夜的)
+      const at = whereOf(id, o);
+      (s.from ||= {})[id] = { at: at.label, by: o.by || null, w: game.round || 0 };
+      map()?.poi?.('clue.' + id, null);
+      emit('got', { id, by: o.by || null });
+      const old = s.cards.includes(id);
+      if (!old) { s.cards.push(id); s.fresh.push(id); }
       let nw = 0;
       for (const w of c.words || []) if (!s.words.includes(w)) { s.words.push(w); nw++; }
       save();
+      if (old) { if (book.isOpen) book.draw(); return false; } // 上一夜就有了:只更新「在哪裡」
       badge.set(s.fresh.length, true);
-      game.ui?.feed?.(`＋線索〈${c.title}〉${nw ? ` · 新的詞 ${nw} 個` : ''}`, { color: '#e3c98a', ms: 4200 });
+      game.ui?.feed?.(`＋線索〈${c.title}〉${at.label ? `｜${at.label}` : ''}${nw ? ` · 新的詞 ${nw} 個` : ''}`, { color: '#e3c98a', ms: 4800 });
       emit('card', { id, by: o.by || null, words: nw });
       if (book.isOpen) book.draw();
       if (s.cards.length === 1 && !s.taught) { s.taught = true; save(); game.ui?.tips?.show?.('deduce', 2); ix()?.after?.(2.4, () => talk(TALK.bookTeach)); } // 第一張卡:小美教你按 J
@@ -266,7 +348,7 @@ export function installDeduce(game) {
       if (!run.xl) { run.xl = true; X0.after(3, () => talk(TALK.xiaoling, () => D.addCard('hc.25', { by: 'call' }))); }
     });
     X0.on('voicemail', () => X0.after(9, () => D.addCard('hc.18', { by: 'tape' })));
-    X0.on('reset', () => { run.restThrows = 0; run.wasFight = false; run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.k3done = run.knew = false; run.kRest = 0; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); });
+    X0.on('reset', () => { run.restThrows = 0; run.wasFight = false; run.shops = 0; run.k1 = run.k2 = run.w02 = false; run.k1done = run.k2done = run.k3done = run.knew = false; run.kRest = 0; run.tq = null; run.tqLate = false; run.look.clear(); run.memT = 0; run.opened207 = false; run.xl = false; run.k3 = false; run.got.clear(); run.point.clear(); for (const c of CARDS) map()?.poi?.('clue.' + c.id, null); });
     X0.tick((dt) => { bindNet(); if (game.state === 'playing') update(dt); return true; });
   }
   // ---------- 卡片來源:靈異系統(耳語、頭七) ----------

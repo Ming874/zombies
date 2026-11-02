@@ -231,7 +231,7 @@ export function installClimax(game, S) {
     const q = p();
     let best = null, bd = Infinity;
     for (const P of list) { let d = Math.hypot(P.pos.x - q.x, P.pos.z - q.z) + Math.abs(P.pos.y - q.y) * 6; try { const f = game.world.flowDistance(P.pos.x, P.pos.y, P.pos.z); if (Number.isFinite(f)) d = Math.min(d, f + Math.abs(P.pos.y - q.y) * 2); } catch { /* 略 */ } if (d < bd) { bd = d; best = P; } }
-    const parts = HO.parts.map((t) => (/^枕頭裡那一頁/.test(t) && D()?.got?.('hc.30') ? '你拿了那一頁。\n……她的字，一直都很工整。' : t)); // 已經拿了:他知道(監視器)
+    const parts = HO.parts.flatMap((t) => (/^枕頭裡那一頁/.test(t) && D()?.got?.('hc.30') ? ['你拿了那一頁。\n……她的字，一直都很工整。', '請不要打開它。\n燈會一直亮著。對大家都好。'] : [t])); // 已經拿了:他知道(監視器);[w7] 他要你不要看(結局裡打不打開那一頁,是你選的)
     if (!best || !best.startRing({ ...HO, parts }, 45)) return false;
     run.hoRang = true; run.hoP = best; run.hoState = 'ringing'; run.hoT = game.time;
     if (!game.net && game.phase === 'shop') game.restT = Math.max(game.restT, 48); // 單人:這通電話不要被下一波打斷
@@ -327,7 +327,7 @@ export function installClimax(game, S) {
     if (run.hoState === 'ringing' && run.hoP && run.hoP.state === 'idle' && game.time - run.hoT > 2) { run.hoState = 'ignored'; flag('h.ho.ignored'); X.after(2, () => seq(game, [['xl', '……不接也好。', undefined, {}]])); }
     if (run.hoState === 'talk' && run.hoP && run.hoP._ended && run.hoP.state === 'call') { // 他說完了(聽筒還在耳邊)
       run.hoState = 'heard'; flag('h.ho.heard'); D()?.addCard?.('hc.20', { by: 'call' });
-      X.after(2.2, () => seq(game, [['xl', '……我都聽到了。', 2.2], ['xl', D()?.got?.('hc.30') ? '他知道你拿了。……沒關係。' : '他要你把那一頁留下來。\n……你自己決定。', 3.6]]));
+      X.after(2.2, () => seq(game, [['xl', '……我都聽到了。', 2.2], ['xl', D()?.got?.('hc.30') ? '他知道你拿了。\n……要不要看，你自己決定。' : '他要你把那一頁留下來。\n……你自己決定。', 3.6]]));
     }
     if (run.hoState === 'talk' && run.hoP) {
       if (run.hoP.state !== 'call') { // 掛了

@@ -151,7 +151,7 @@ export function installRadio(game, S) {
 
   // ---------- 按鍵:Q ----------
   let qDown = 0, qFired = false;
-  const blocked = () => game.state !== 'playing' || game.paused || X.modal || game.deduce?.isOpen || game.shopUIOpen;
+  const blocked = () => game.state !== 'playing' || game.paused || X.modal || game.deduce?.isOpen || game.shopUIOpen || !!game.story?.ending?.active; // 結局裡 Q 是選擇鍵
   // [w6] 點一下 Q 舉起來 = 問小美(目前的目標怎麼做;再問一次會在地圖上畫記號)。壞掉的收音機:點一下 = 拍一拍,雜訊裡還聽得到她
   addEventListener('keydown', (e) => {
     if (e.code !== 'KeyQ' || e.repeat || !run.kind || blocked() || e.target?.closest?.('input, textarea')) return;

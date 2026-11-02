@@ -21,7 +21,7 @@
 //   設好共用旗標,再把整份狀態('objs')廣播給全隊(中途加入的人會先要一份)。目標進度只在這一局有效(每一夜重來)。
 import { sfx, ix as ixs } from '../audio.js';
 import { settings } from '../ui/settings.js';
-import { CARDS, QUESTION, WORDS, CATS } from './clues.js';
+import { CARDS, CARD, QUESTION, WORDS, CATS } from './clues.js';
 import { installOpening } from './opening.js';
 import { installRadio } from './radio.js';
 import { installClimax } from './climax.js';
@@ -326,10 +326,13 @@ export function installObjectives(game) {
     if (b && (kind === 'fill' || !Dd.ready?.())) {
       const cat = B[b].cat, have = new Set(Dd.words());
       const card = CARDS.find((q) => !Dd.has(q.id) && (q.words || []).some((w) => WORDS[w]?.cat === cat && !have.has(w)));
+      // [w7] 缺的詞在哪一張還沒找到的卡上:說出地點(第三級標在地圖上);詞都有了 = 只是還沒填
+      const need = (id) => (CARD[id]?.words || []).some((w) => WORDS[w]?.cat === cat && !have.has(w));
+      const ms = Dd.missing?.() || [], m = ms.find((x) => need(x.id) && x.pos && !x.locked) || ms.find((x) => need(x.id) && !x.locked) || ms.find((x) => need(x.id)) || null;
       const i = keys.indexOf(b) + 1;
-      if (tier === 1) c.talk([[XL, `筆記本第 ${i} 格還空著。\n按 J，看缺的是「${CATS[cat]}」。`, 3.8]], null, { hint: true });
+      if (tier === 1) c.talk([[XL, `筆記本第 ${i} 格還空著，\n缺的是「${CATS[cat]}」。`, 3.6], ...(m ? clueSay(m) : [[XL, '那個詞你已經有了。\n按 J，填進去看看。', 3.2]])], null, { hint: true });
       else if (tier === 2) c.ama(card ? `「${CATS[cat]}」……〈${card.title}〉裡面有。` : `第 ${i} 格……想想阿嬤說過的話。`);
-      else { Dd.hintBlank = b; if (Dd.isOpen) Dd.open(); }
+      else { Dd.hintBlank = b; if (m?.pos) Dd.mark?.(m.id); if (Dd.isOpen) Dd.open(); }
       return true;
     }
     // 有一句可以問了:去照片前(燈熄的時候)
@@ -342,6 +345,11 @@ export function installObjectives(game) {
   // 第一次問:說這一步的提示(沒有提示的步驟就把目標再說一次);再問:同一句再加「地圖上畫了記號」,
   // 那個東西閃一下、地圖(M)上圈起來(換步驟就擦掉)。剛問過 6 秒內不再回答。回傳 false = 這次沒有回答
   let asking = false;
+  // [w7] 線索在哪裡,小美的說法(一行最多 18 字):「2F 走廊，\n護理站的板夾……」
+  const clueSay = (m) => [[XL, m.label ? `${m.label}，` : '我聽大新的人說過，', 1.8], [XL, `${m.how}。\n……去看看。`, Math.max(2.8, m.how.length / 4.5 + 1)]];
+  // 等的步驟(等下一波、等頭七、等首領):問小美就順便指一個還沒找到的線索(第二次問標在地圖上)
+  const WAIT = new Set(['h.s.cyc1', 'h.s.badge', 'h.s.boss', 'h.s.unlock', 'h.s.shop']);
+  function clueNext() { const ms = D()?.missing?.() || []; return ms.find((x) => x.pos && !x.ev && !x.locked) || null; }
   function ask() {
     const s = BY[run.cur], t = game.time || 0;
     if (!s || game.state !== 'playing' || game.story?.ending?.active || t - (run.askT ?? -99) < 6) return false;
@@ -363,6 +371,12 @@ export function installObjectives(game) {
         map?.poi?.('xl.ask', { x: p.x, z: p.z, level: li, label: '小美說在這裡', always: true, red: true });
         lines.push([XL, '我在地圖上畫了記號，\n按 M 看。', 3.2]);
       } else if (n >= 2 && !xl) lines.push([XL, '……我也只知道這些。', 2.4]);
+      // [w7] 等的時候,去找線索:說一個最近的;第二次問就標在地圖上
+      const cm = WAIT.has(s.id) || !xl ? clueNext() : null;
+      if (cm && !p) {
+        lines.push([XL, /等的時候/.test(xl || '') ? '還有，線索也還沒找齊。' : '等的時候，先去找線索。', 2.6], ...clueSay(cm));
+        if (n >= 2 && D()?.mark?.(cm.id, { quiet: true })) lines.push([XL, '我在地圖上畫了記號，\n按 M 看。', 3.2]);
+      }
       c.talk(lines, null, { hint: true });
       return true;
     } finally { asking = false; }

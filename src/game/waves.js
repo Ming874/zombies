@@ -150,7 +150,7 @@ export function scaleRoster(list, k, rand = Math.random) {
 }
 
 // ---------- 經濟 ----------
-export const restTime = (next) => (waveKind(next) === 'boss' ? 40 : 30); // 回合間休息秒數(首領回合前多 10 秒準備)
+export const restTime = (next) => (waveKind(next) === 'boss' ? 75 : 60); // 回合間休息秒數(首領回合前多 15 秒準備);[w7] 30→60:休息是找線索、解謎的時間,不想等可以按 N
 export const roundBonus = (n) => 20 + 10 * n; // 清場獎勵
 export const cleanBonus = (n) => 10 + 5 * n; // 整回合沒受傷的額外獎勵
 
