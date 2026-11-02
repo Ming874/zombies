@@ -224,7 +224,7 @@ function dressBoiler(ctx, zone) {
   for (const s of ctx.wallSpots(zone, { allowNearDoor: true })) wallPipes(P, s, y, R, { tray: R() < 0.3, n: 3 });
   if (freeAt(ctx, li, 24, 17.5, 1.9)) boiler(ctx, P, 24, y, 17.6, 0, R);
   if (freeAt(ctx, li, 30.5, 22.5, 1.9)) boiler(ctx, P, 30.6, y, 22.6, HALF, R);
-  if (freeAt(ctx, li, 21, 25.5, 1.0)) { P.add('po_coal', new THREE.SphereGeometry(1.0, 12, 6, 0, TAU, 0, HALF).scale(1.4, 0.5, 1.0), M(21, y, 25.6)); groundDecal(P, 'ashes', 21, 25.6, 3, 2.4, 0.3, y + 0.006); solid(ctx, 21, y, 25.6, 2.2, 0.5, 1.6, 'stone'); }
+  if (freeAt(ctx, li, 21, 25.5, 1.0)) { P.add('po_coal', ashMound(1.0, 0.55, 5, 0.45, 24, 8).scale(1.4, 1, 1.0), M(21, y, 25.6)); for (let k = 0; k < 28; k++) { const a = k * 2.399, d = 0.8 + (k % 5) * 0.11, s = 0.035 + (k % 3) * 0.022; P.add('po_coal', new THREE.DodecahedronGeometry(s, 0), M(21 + Math.cos(a) * d * 1.4, y + s * 0.45, 25.6 + Math.sin(a) * d, k, k * 2, 0)); } /* [w6] 凹凸的煤堆 + 滾下來的煤塊(原本是一個光滑的黑色半球) */ groundDecal(P, 'ashes', 21, 25.6, 3, 2.4, 0.3, y + 0.006); solid(ctx, 21, y, 25.6, 2.2, 0.5, 1.6, 'stone'); }
   if (freeAt(ctx, li, 34.6, 15.4, 0.6)) { // 工作台
     P.add('wood_old', box(1.8, 0.06, 0.7), M(34.6, y + 0.9, 15.2)); for (const [a, b] of [[-0.8, -0.3], [0.8, -0.3], [-0.8, 0.3], [0.8, 0.3]]) P.add('steel', box(0.05, 0.9, 0.05), M(34.6 + a, y + 0.45, 15.2 + b));
     P.add('cast_iron', box(0.18, 0.12, 0.12), M(34.1, y + 0.99, 15.2)); P.add('steel', box(0.3, 0.02, 0.04), M(34.8, y + 0.94, 15.0, 0, 0.5, 0)); P.add('plastic_red', box(0.4, 0.2, 0.2), M(35.1, y + 1.03, 15.3));
@@ -275,11 +275,12 @@ function ashPit(T, cx, cz, w, d) {
   for (const s of [-1, 1]) T.add('cast_iron', box(w - 0.1, 0.018, 0.022), M(cx, 0.013, cz + s * d * 0.2));
 }
 // 一小堆灰:低矮、邊緣不規則的半球(邊緣貼地)
-function ashMound(r, h, k) {
-  const g = new THREE.SphereGeometry(r, 18, 5, 0, TAU, 0, HALF), p = g.attributes.position;
+function ashMound(r, h, k, j = 0.1, ws = 18, hs = 5) { // j:表面起伏(煤堆用大一點)
+  const g = new THREE.SphereGeometry(r, ws, hs, 0, TAU, 0, HALF), p = g.attributes.position, f = 1 / r;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), s = 1 + 0.16 * Math.sin(a * 2 + k * 1.7) + 0.05 * Math.sin(a * 5 + k * 3.1), t = y / r;
-    p.setXYZ(i, x * s, h * t * t * (3 - 2 * t) * (0.9 + 0.2 * Math.sin(x * 11 + z * 9 + k)), z * s); // 邊緣平緩的土丘輪廓
+    const n = 1 - j + j * 2 * (0.5 + 0.25 * Math.sin(x * f * 11 + z * f * 9 + k) + 0.25 * Math.sin(x * f * 23 - z * f * 19 + k * 2));
+    p.setXYZ(i, x * s, h * t * t * (3 - 2 * t) * n, z * s); // 邊緣平緩的土丘輪廓
   }
   g.computeVertexNormals();
   return g;
