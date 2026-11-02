@@ -570,7 +570,8 @@ export function initMats() {
   const pl = (k, c, r = 0.55, m = 0, o = {}) => registerMat(k, o.raw ? std({ color: c, roughness: r, metalness: m, ...o.raw }) : [c, r, m, o.opacity ?? 1, o.em ?? 0, o.ei ?? 0]);
   pl('po_hedge', 0x2c3a22, 1); pl('po_moss', 0x34442a, 1); pl('po_sand', 0x8a7a5e, 1); pl('po_ash', 0x48464a, 1); pl('po_coal', 0x161618, 0.45, 0.2);
   pl('po_granite', 0x2c2c2e, 0.35); pl('po_firebrick', 0x8a5a3e, 0.95); pl('po_soot', 0x0e0c0a, 1); pl('po_orange', 0xd85a12, 0.5); pl('po_reflect', 0xe8e8e0, 0.3);
-  pl('po_bag_black', 0x0e0e10, 0.35, 0.1); pl('po_bag_red', 0x7c1c16, 0.78); pl('po_bag_yellow', 0xa88c30, 0.8); // [w4 scene] 霧面、降飽和(原本 0.4 的亮面像充氣玩具) pl('po_bodybag', 0x14161c, 0.3, 0.1);
+  pl('po_bag_black', 0x0e0e10, 0.35, 0.1); pl('po_bag_red', 0x7c1c16, 0.78); pl('po_bag_yellow', 0xa88c30, 0.8); // [w4 scene] 霧面、降飽和(原本 0.4 的亮面像充氣玩具)
+  pl('po_bodybag', 0x14161c, 0.3, 0.1); // [w6] 原本被寫在上一行的行尾註解裡 → 未知材質鍵,屍袋整排是洋紅色的備用材質
   pl('po_fabric_dirty', 0x8a8270, 1); pl('po_fabric_pink', 0xa87a80, 1); pl('po_suitcase', 0x2a3a4a, 0.5); pl('po_suitcase2', 0x5a2a2a, 0.5);
   pl('po_cable', 0x0c0c0c, 0.6); pl('po_mattress', 0x9aa8a0, 0.95); pl('po_line_white', 0xc8c8c0, 0.85); pl('po_line_yellow', 0xb8962a, 0.85);
   pl('po_skin_doll', 0xd8c0b0, 0.6); pl('po_hair', 0x2a1a10, 0.9); pl('po_pole', 0x2e3432, 0.55, 0.6); pl('po_green_paint', 0x2a4a3a, 0.6, 0.4);
