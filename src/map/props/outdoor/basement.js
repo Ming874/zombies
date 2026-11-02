@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { rng as mkRng } from '../ctx.js';
-import { Parts, M, box, rbox, cyl, sph, tor, rod, tube, pool, put, solid, V3, HALF, TAU } from './kit.js';
+import { Parts, M, box, rbox, cyl, sph, tor, rod, tube, pool, put, solid, keepUV, V3, HALF, TAU } from './kit.js';
+import { labelUV } from './mats.js';
 import { surf } from '../../hospital/surfaces.js';
 import { groundDecal, labelQuad } from './cars.js';
 import { flatDecal, trashBag, bagFallback } from './industrial.js';
@@ -25,6 +26,27 @@ const freeAt = (ctx, li, x, z, r = 0.6) => {
 // 牆面座標系:spot.x/z 在牆面上,(nx,nz) 朝房間;along = 沿牆方向
 const along = (s) => [s.nz !== 0 ? 1 : 0, s.nx !== 0 ? 1 : 0];
 
+// 圓形壓力錶(本地 +Z 朝外、原點在安裝面):黑色錶殼、鍍鉻錶圈、圓形錶面(po_label 圖集的錶盤,圓形 UV)。
+// [w6] 以前是一塊方形貼片 + 實心鍍鉻圓柱,圓柱端蓋跟錶面在同一個平面 → 錶面上一片黑色楔形的 z-fighting(加上手電筒陰影更明顯)。
+//      現在錶面在錶殼端蓋前 5mm、錶圈壓住錶面邊緣,也沒有方形底色。up > 0:往上接到管線的取壓管(豬尾彎管 + 考克);down > 0:往下的短接頭。
+const dialGeo = (name, r) => { const [u, v, uw, vh] = labelUV(name), g = new THREE.CircleGeometry(r, 24), a = g.attributes.uv, k = 60 / 64; for (let i = 0; i < a.count; i++) a.setXY(i, u + (0.5 + (a.getX(i) - 0.5) * k) * uw, v + (0.5 + (a.getY(i) - 0.5) * k) * vh); return keepUV(g); };
+export function gaugeParts(name, r = 0.09, { up = 0, down = 0, pipeZ = 0.12 } = {}) {
+  const T = new Parts(), d = 0.038, zc = d / 2 + 0.004;
+  T.add('cast_iron', cyl(r, r, d, 20).rotateX(HALF), M(0, 0, zc));
+  T.add('po_label', dialGeo(name, r * 0.9), M(0, 0, d + 0.009));
+  T.add('chrome', tor(r * 0.95, r * 0.075, 5, 24), M(0, 0, d + 0.008));
+  if (up > 0) {
+    T.add('steel', rod(new V3(0, r - 0.004, zc), new V3(0, r + 0.018, zc), 0.008, 6));
+    T.add('steel', tor(0.028, 0.007, 4, 12), M(0, r + 0.046, zc)); // 防震豬尾彎管
+    T.add('steel', rod(new V3(0, r + 0.074, zc), new V3(0, up, zc), 0.008, 6));
+    T.add('cast_iron', box(0.036, 0.05, 0.036), M(0, r + 0.24, zc)); T.add('plastic_red', box(0.075, 0.012, 0.012), M(0.03, r + 0.24, zc + 0.026)); // 考克 + 紅色把手
+    T.add('steel', rod(new V3(0, up, zc), new V3(0, up, pipeZ), 0.008, 6));
+    T.add('cast_iron', cyl(0.016, 0.016, 0.02, 6).rotateX(HALF), M(0, up, pipeZ - 0.012)); // 接頭
+  }
+  if (down > 0) { T.add('steel', rod(new V3(0, -r + 0.004, zc), new V3(0, -r - down, zc), 0.01, 8)); T.add('cast_iron', cyl(0.02, 0.02, 0.024, 6), M(0, -r - 0.014, zc)); }
+  return T;
+}
+
 // 沿牆管線(兩根管 + 支架;每個牆格一段 2m)
 function wallPipes(P, s, y, R, { h = 2.5, n = 2, key = 'steel', r = 0.055, tray = false } = {}) {
   const [ax, az] = along(s);
@@ -45,7 +67,7 @@ function wallPipes(P, s, y, R, { h = 2.5, n = 2, key = 'steel', r = 0.055, tray 
     P.add('plastic_red', tor(0.12, 0.014, 5, 16).rotateY(ax ? 0 : HALF), M(vx + s.nx * 0.2, y + h, vz + s.nz * 0.2));
     P.add('po_label', labelQuad('valvetag', 0.1, 0.1).rotateY(Math.atan2(s.nx, s.nz)), M(vx + s.nx * 0.09, y + h - 0.2, vz + s.nz * 0.09));
   }
-  if (R() < 0.12) { const gx = s.x + s.nx * 0.05 + ax * 0.5, gz = s.z + s.nz * 0.05 + az * 0.5; P.add('po_label', labelQuad(R() < 0.5 ? 'gauge' : 'gauge2', 0.18, 0.18).rotateY(Math.atan2(s.nx, s.nz)), M(gx, y + 1.6, gz)); P.add('chrome', cyl(0.1, 0.1, 0.04, 14).rotateX(HALF).rotateY(Math.atan2(s.nx, s.nz)), M(gx - s.nx * 0.02, y + 1.6, gz - s.nz * 0.02)); }
+  if (R() < 0.12) P.merge(gaugeParts(R() < 0.5 ? 'gauge' : 'gauge2', 0.09, { up: h - 1.6, pipeZ: 0.11 }), M(s.x + ax * 0.5, y + 1.6, s.z + az * 0.5, 0, Math.atan2(s.nx, s.nz), 0)); // 壓力錶 + 取壓管(接到最下面那根管)
   if (R() < 0.25) flatDecal(P, R.pick(['rustrun', 'drip', 'soot']), s.x + s.nx * 0.012, y + h - 0.6, s.z + s.nz * 0.012, R.range(0.5, 1.0), R.range(1.0, 1.8), s.nx > 0.5 ? 'x+' : s.nx < -0.5 ? 'x-' : s.nz > 0.5 ? 'z+' : 'z-');
   wallStrip(P, BAND.grime, s.x - ax, s.z - az, s.x + ax, s.z + az, y, R.range(0.4, 0.9), s.nx, s.nz);
 }
@@ -70,7 +92,7 @@ function boiler(ctx, P, x, y, z, yaw, R) {
   for (const s of [-1, 1]) T.add('concrete', box(0.4, 0.5, 1.5), M(s * L * 0.33, 0.25, 0));
   T.add('metal_gray', cyl(0.25, 0.25, 2.4, 14), M(-L / 2 + 0.4, r * 2 + 0.35 + 1.0, 0)); // 煙道
   T.add('rust', cyl(0.12, 0.12, 0.5, 10), M(0.6, r * 2 + 0.55, 0));
-  T.add('po_label', labelQuad('gauge2', 0.22, 0.22).rotateY(HALF), M(L / 2 + 0.13, r + 0.8, 0.4));
+  T.merge(gaugeParts('gauge2', 0.1, { down: 0.12 }), M(L / 2 + 0.12, r + 0.8, 0.4, 0, HALF, 0)); // [w6] 圓形錶(原本是方形貼片)
   flatDecal(T, 'soot', L / 2 + 0.125, r + 0.45, 0, 1.2, 1.0, 'x+');
   flatDecal(T, 'oil', 0, 0.006, 0, 3.4, 2.0, 'y+');
   P.merge(T, M(x, y, z, 0, yaw, 0));
@@ -268,7 +290,7 @@ function dressPump(ctx, zone) {
   const R = zrng(zone), P = new Parts(), li = zone.levelIndex, y = ctx.L.levels[li].y;
   for (const s of ctx.wallSpots(zone, { allowNearDoor: true })) wallPipes(P, s, y, R, { n: 3, r: 0.07, tray: R() < 0.3 });
   for (const [x, z] of [[40, 59.4], [43.4, 59.4], [56, 64.6]]) if (freeAt(ctx, li, x, z, 0.9)) pump(ctx, P, x, y, z, R() < 0.5 ? 0 : Math.PI);
-  if (freeAt(ctx, li, 56.4, 59.6, 0.8)) { P.add('po_green_paint', cyl(0.6, 0.6, 2.2, 18), M(56.4, y + 1.2, 59.6)); P.add('po_green_paint', new THREE.SphereGeometry(0.6, 18, 8, 0, TAU, 0, HALF), M(56.4, y + 2.3, 59.6)); P.add('po_label', labelQuad('gauge', 0.2, 0.2), M(56.4, y + 1.5, 60.22)); solid(ctx, 56.4, y, 59.6, 1.3, 2.9, 1.3, 'heavy'); }
+  if (freeAt(ctx, li, 56.4, 59.6, 0.8)) { P.add('po_green_paint', cyl(0.6, 0.6, 2.2, 18), M(56.4, y + 1.2, 59.6)); P.add('po_green_paint', new THREE.SphereGeometry(0.6, 18, 8, 0, TAU, 0, HALF), M(56.4, y + 2.3, 59.6)); P.merge(gaugeParts('gauge', 0.1, { down: 0.1 }), M(56.4, y + 1.5, 60.19)); solid(ctx, 56.4, y, 59.6, 1.3, 2.9, 1.3, 'heavy'); }
   wetSign(ctx, 47.5, y, 60.2, 0.6);
   pumpCentre(ctx, P, y, zone, li);
   finish(ctx, P);

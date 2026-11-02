@@ -169,10 +169,18 @@ const tapedSheet = (key, rect, w, h, rz = 0) => tpl(`r8:sheet:${key}`, (b) => {
   b.plane(L(rect), w, h, 0, h / 2, 0.003, { rz });
   for (const s of [-1, 1]) b.box('pl_cream', 0.05, 0.016, 0.002, s * (w / 2 - 0.04), h - 0.01, 0.005, { rz: s * 0.3 + rz });
 });
-const gauge = (b, x, y, z, r, o = {}) => { // 圓形壓力錶(朝 +Z;o.ry 轉向)
+// 圓形錶面(圖集的錶盤,圓形 UV;邊緣剛好對到畫出來的圓)+ 鍍鉻錶圈。z = 錶面位置(要在後面的錶殼端蓋前面幾 mm)
+const dialFace = (b, rf, z) => {
+  const g = new THREE.CircleGeometry(rf, 22), a = g.attributes.uv, k = 23 / 24;
+  for (let i = 0; i < a.count; i++) a.setXY(i, 0.5 + (a.getX(i) - 0.5) * k, 0.5 + (a.getY(i) - 0.5) * k);
+  b.raw(L(gaugeRect()), g, compose(0, 0, z), 'rect');
+  b.tor('chrome', rf * 1.04, rf * 0.085, 0, 0, z - 0.001, { rs: 4, ts: 22 });
+};
+// [w6] 以前是 8 邊形鍍鉻圓柱 + 方形錶面貼片(錶面只在端蓋前 1mm、四個角露出底色)→ 遠一點就 z-fighting、看起來像方塊
+const gauge = (b, x, y, z, r, o = {}) => { // 圓形壓力錶(朝 +Z;o.ry 轉向):黑色錶殼、圓形錶面在端蓋前 4mm、錶圈壓邊
   b.push(x, y, z, 0, o.ry || 0, 0);
-  b.cyl('chrome', r, 0.045, 0, 0, 0, { axis: 'z', seg: 8 });
-  b.plane(L(gaugeRect()), r * 1.7, r * 1.7, 0, 0, 0.0235);
+  b.cyl('iron', r, 0.045, 0, 0, 0, { axis: 'z', seg: 18 });
+  dialFace(b, r * 0.88, 0.0265);
   if (o.stem) b.rod('iron', 0.012, [0, -r, -0.01], [0, -r - o.stem, -0.01], { seg: 5 });
   b.pop();
 };
@@ -375,8 +383,8 @@ const bioBoxes = (k) => tpl(`r8:bioboxes:${k}`, (b) => {
 const scale = () => tpl('r8:scale', (b) => {
   b.box('steel', 0.8, 0.08, 0.6, 0, 0.04, 0, { r: 0.01 });
   b.box('iron', 0.06, 1.0, 0.06, 0, 0.58, -0.32);
-  b.cyl('pl_red', 0.17, 0.09, 0, 1.15, -0.32, { axis: 'z', seg: 16 });
-  b.plane(L(gaugeRect()), 0.27, 0.27, 0, 1.15, -0.274);
+  b.cyl('pl_red', 0.17, 0.09, 0, 1.15, -0.32, { axis: 'z', seg: 18 });
+  b.push(0, 1.15, -0.27); dialFace(b, 0.145, 0); b.pop(); // [w6] 圓形錶面(原本方形貼片只在紅殼前 1mm)
   b.meta.coll = Box([-0.4, 0, -0.38], [0.4, 1.3, 0.3]);
 });
 // 丟在地上的防護衣(攤平的白色連身衣 + 一隻鞋套)
