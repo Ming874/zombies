@@ -374,7 +374,7 @@ function boilerRoom(R) {
   if (E) {
     const c = R.atWall(cot8(0), E, 18.9, { gap: 0.05 });
     if (c) { const q = R.local(c, 0.6, 0, 0.62); if (R.freeAt(q.x, q.z, 0.2)) R.put(nightStool(), q.x, q.z, c.yaw + 0.3, {}); }
-    R.atWall(tapedSheet('cal', calendar(), 0.26, 0.36), E, 17.4, { mount: 1.45 });
+    R.atWall(tapedSheet('cal', calendar(), 0.26, 0.36), E, 19.4, { mount: 1.45 }); // [w6] 月曆挪到行軍床上方(17.4 會跟配電盤旁的停電通知疊在一起)
   }
   // 隧道這一側、門旁的牆上:鍋爐重地 閒人勿進(從隧道走過來就看得到)
   R.put(signPlate('boil', dangerSign('boil', '鍋爐重地', '閒人勿進'), 0.42, 0.26, { screws: true }), 38.01, 27.1, HALF, { y: R.y + 1.55 });

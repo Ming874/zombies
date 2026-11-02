@@ -263,7 +263,7 @@ export function placeAll(game, ix, kit, pack, seed = 2077) {
       return null;
     },
   };
-  const AFTER = {};
+  const AFTER = { 'h.ix.notice.power': 1 };
   // 停電通知(唯一列出三支備品保險絲位置的紙):原本隨機貼到發電機正上方,人被機器擋在 2m 外,準星碰不到 → 貼在配電盤旁邊同一面牆、伸手可及
   function placeDeferred() {
     for (const { spec, s, fp, z } of deferred) {
