@@ -179,6 +179,19 @@ export const flowMethods = {
     sfx.setMood(m);
   },
 
+  // [w6] 門扇不擋導航(上鎖的除外):開到門洞裡/房間窄處的門扇以前會把整間房間從導航圖切開
+  //      (B1 檔案室:殭屍從走廊推開門 → 兩扇門扇轉進房間那一側 → 房間變成孤島 → 玩家在裡面時所有殭屍「走不到」,這一波停住)。
+  //      關著/半開的門本來就是 nav:false(殭屍會推開);全開的門扇現在一樣,殭屍碰到就滑過去。每幀把剛重建的碰撞盒改掉
+  //      (門的碰撞盒在互動更新時重建、導航局部重建排在下一幀,所以在 interact.update 之後改來得及;保險起見再排一次)
+  _doorNav() {
+    const D = this.interact?.doors, W = this.world;
+    if (!D?.list) return;
+    for (const w of D.list) {
+      if (w.lock && !w.lock.open) continue;
+      for (const l of w.leaves) { const B = l.boxes; if (B) for (let i = 0; i < B.length; i++) { const b = B[i]; if (b.nav !== false) { b.nav = false; W._navPatch?.(b); } } }
+    }
+  },
+
   begin() {
     resumeAudio();
     if (!this.ambientStarted) { sfx.ambient(); this.ambientStarted = true; }
@@ -796,6 +809,7 @@ export const flowMethods = {
     this.updateTutorial(dt);
     this._updateHeal(dt);
     this.interact?.update(dt);
+    this._doorNav(); // [w6] 門扇不擋導航
     this.pickups?.update(dt, this);
     this.supplies?.update(dt, this);
     this.shop?.update(dt, this.time, p);
