@@ -314,6 +314,7 @@ export class NetSession {
     // 遊戲事件
     this.on('hurt', (d, f) => { // 殭屍攻擊(房主結算)
       if (f !== this.hostSlot || !Array.isArray(d) || !fin(d[0])) return;
+      if (g.player?.menu) return; // [w6] 開著選單/地圖(房主還沒收到 F.MENU 的那一下)
       const src = fin(d[1], d[2]) ? { x: d[1], z: d[2] } : null;
       g.damagePlayer(g.player, clamp(d[0], 0, 250), src);
     });
@@ -474,6 +475,7 @@ export class NetSession {
     rp.up = !!(s.flags & F.ALIVE) && !(s.flags & F.DEAD); // 依對方自己回報的狀態:活著(含倒地)
     rp.alive = rp.up && rp.connected;
     rp.downed = !!(s.flags & F.DOWNED);
+    rp.menu = !!(s.flags & F.MENU); // [w6] 對方開著選單/地圖:活屍不追、不打(game.flowTargets、zombie.pickTarget、combat.damagePlayer)
     rp.hp = s.hp; rp.armor = s.armor;
     rp.weapon = name(WEAPON_IDS, s.weapon, 'pistol');
     rp.rt = s.rt; rp.rp = s.rp;
@@ -569,7 +571,7 @@ export class NetSession {
     const m = this.mode;
     s.flags = (p.alive !== false && !m.dead ? F.ALIVE : 0) | (p.downed ? F.DOWNED : 0) | (p.sprinting ? F.SPRINT : 0) | (w.reloading > 0 ? F.RELOAD : 0)
       | ((w.ads || 0) > 0.5 ? F.ADS : 0) | (p.flashOn ? F.LIGHT : 0) | (m.dead ? F.DEAD : 0) | (m.shieldT > 0 ? F.SHIELD : 0)
-      | (m.reviving ? F.REVIVE : 0) | (g.paused ? F.MENU : 0) | (this.hud.chatOpen ? F.CHAT : 0) | (g.shopUIOpen ? F.SHOP : 0) | (m.spectating ? F.SPECTATE : 0);
+      | (m.reviving ? F.REVIVE : 0) | (g.player?.menu ? F.MENU : 0) | (this.hud.chatOpen ? F.CHAT : 0) | (g.shopUIOpen ? F.SHOP : 0) | (m.spectating ? F.SPECTATE : 0);
     s.weapon = code(WEAPON_IDS, w.current);
     s.hp = p.hp; s.armor = p.armor || 0;
     s.rt = m.reviveSlot ?? NONE; s.rp = m.reviveP || 0;

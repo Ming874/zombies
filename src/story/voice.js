@@ -94,7 +94,7 @@ export function line(game, who, text, o = {}) {
   // 小美只從收音機出來(REDESIGN §2.4.4):沒有收音機、關著、壞了 → 不說;地下室字幕殘缺;放下 = 左肩小聲、舉起 = 兩耳
   const Rd = game.story?.radio, V0 = voiceLock(game);
   if (who === 'xl' && Rd && !o.sub) {
-    if (!Rd.hear()) return 0;
+    if (!Rd.hear() && !o.force) return 0; // o.force:玩家按 Q 問的提示(壞掉的收音機拍一拍,雜訊裡還聽得到)
     if ((o.warn || o.optional) && (V0.count.xl || 0) >= LIMIT.xl) return 0; // 每局預算(R9):超過了,不必要的句子丟掉
     Rd.tuneHome?.();
     if (!o.raw) text = Rd.garble(text);

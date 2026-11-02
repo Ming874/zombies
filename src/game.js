@@ -156,7 +156,7 @@ export class Game {
   flowTargets() {
     const out = this._flowT || (this._flowT = []);
     out.length = 0;
-    for (let i = 0; i < this.players.length; i++) { const p = this.players[i]; if (p.alive !== false && !p.downed) out.push(p.pos); }
+    for (let i = 0; i < this.players.length; i++) { const p = this.players[i]; if (p.alive !== false && !p.downed && !p.menu) out.push(p.pos); } // [w6] 開著選單的人不算
     return out;
   }
 
@@ -179,7 +179,9 @@ export class Game {
       return;
     }
 
-    const paused = this.paused || this.shopUIOpen || this.consoleOpen; // consoleOpen:F8 控制面板(src/ui/console.js)
+    const paused = this.paused || this.shopUIOpen || this.consoleOpen || !!this.ui.map?.isOpen; // consoleOpen:F8 控制面板(src/ui/console.js);[w6] 看地圖也暫停
+    // [w6] 選單、地圖、筆記本開著:合作時活屍不找你、打不到你(房主看 F.MENU;src/net/session.js、zombie.pickTarget、combat.damagePlayer)
+    this.player.menu = paused || !!this.bookOpen;
     if (paused && !this.net) return; // [net] 多人模式世界不暫停,只是本機玩家不能操作
 
     const p = this.player;
@@ -199,9 +201,12 @@ export class Game {
     // 出怪、回合結束、休息倒數(src/game/flow.js)
     this.updateRound(dt);
 
-    // 殭屍更新(傷害套用到牠攻擊的那位玩家)
+    // 殭屍更新(傷害套用到牠攻擊的那位玩家);[w6] 合作時全隊都開著選單/地圖:活屍停在原地
+    let frozen = !!this.net;
+    if (frozen) for (let i = 0; i < this.players.length; i++) { const q = this.players[i]; if (!q.menu && q.alive !== false) { frozen = false; break; } }
     for (let i = this.zombies.length - 1; i >= 0; i--) {
       const z = this.zombies[i];
+      if (frozen && z.alive) continue;
       const dmg = z.update(dt, this.zctx);
       if (dmg > 0) {
         this.damagePlayer(z.target || p, dmg, z.pos);

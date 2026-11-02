@@ -117,6 +117,12 @@ export function playerMarks(x, L, li, st) {
   for (const p of st.pois) {
     if ((p.level ?? 0) !== li || !p.seen) continue;
     const cx = (p.x / C) * PX, cy = (p.z / C) * PX, sd = Math.round(p.x * 5 + p.z * 17);
+    if (p.red) { // [w6] 小美說的地方(objectives.ask):紅筆圈兩圈,字大一點,一眼看得到
+      stroke(x, loop(cx, cy, 15, 13, sd), { w: 2.2, pen: true, color: INK.red, alpha: 0.9, seed: sd });
+      stroke(x, loop(cx, cy, 19, 16, sd + 3, 1.05), { w: 1.4, pen: true, color: INK.red, alpha: 0.7, seed: sd + 3 });
+      if (p.label) hand(x, p.label, cx + 22, cy - 16, 15, INK.red, { seed: sd, align: 'left', alpha: 0.95 });
+      continue;
+    }
     stroke(x, loop(cx, cy, 8, 7, sd), { w: 1.2, alpha: 0.75, seed: sd });
     if (p.label) hand(x, p.label, cx + 12, cy - 10, 12, INK.pencil, { seed: sd, pencil: true, align: 'left', alpha: 0.85 });
   }

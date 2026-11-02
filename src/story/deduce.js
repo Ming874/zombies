@@ -195,21 +195,22 @@ export function installDeduce(game) {
     const V = voiceLock(game), token = {}, crit = !o.hint;
     const calm = async (max) => { for (let w = 0; V.combat() && w < max; w += 0.5) await wait(game, 0.5); return !V.combat(); };
     let joined = false, heard = 0; // heard = 真的說出口的句數(收音機關著、被丟掉的不算;cb(heard) 讓呼叫端知道玩家有沒有聽到)
-    if (!V.combat()) { V.join(token); joined = true; }
+    // [w6] o.ask:玩家按 Q 問的(objectives.ask):打鬥中也馬上講;收音機關著、壞了也聽得到;地下室不吃字
+    if (!V.combat() || o.ask) { V.join(token); joined = true; }
     (async () => {
       try {
         if (!joined) { const ok = await calm(crit ? 20 : 30); if (!ok && !crit) return; V.join(token); joined = true; }
         for (const [who, text, secs] of ex) {
           await free(game, { token, maxWait: 40 });
           if (game.story?.ending?.active) break;
-          if (!crit && V.busy({ token })) break; // 提示等了 40 秒還輪不到:不講了
+          if (!crit && !o.ask && V.busy({ token })) break; // 提示等了 40 秒還輪不到:不講了
           if (!heard) try { o.onStart?.(); } catch { /* 略 */ } // 輪到這一段了(o.onStart:呼叫端想知道「開始講了」)
           // 小美只從收音機出來(src/story/radio.js):提示在聽不到時丟掉;劇情句等收音機(最多 120 秒,先讓出佇列)
           if (/小美/.test(who) && game.story?.radio) {
-            if (!game.story.radio.hear()) { if (!crit) break; if (!(await radioReady(game, V, token))) continue; }
+            if (!game.story.radio.hear() && !o.ask) { if (!crit) break; if (!(await radioReady(game, V, token))) continue; }
             const d1 = secs || secsOf(text);
             V.claim(d1, 8, 'xl');
-            const said = line(game, 'xl', text, { secs: d1, optional: !crit });
+            const said = line(game, 'xl', text, { secs: d1, optional: !crit && !o.ask, ...(o.ask ? { force: true, raw: true } : null) });
             if (said) { heard++; await wait(game, said + 0.3); }
             continue;
           }

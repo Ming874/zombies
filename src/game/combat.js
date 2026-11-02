@@ -29,6 +29,7 @@ export const combatMethods = {
   // kind:'explosion'(手榴彈等)讓連線層分辨來源(多人:對戰算 PvP 傷害、合作不誤傷)
   damagePlayer(p, amount, src = null, kind = null) {
     if (!(amount > 0) || this.state !== 'playing') return 0;
+    if (this.net && !this.net.pvp && p?.menu) return 0; // [w6] 合作:開著選單/地圖的人打不到(game.update 設 player.menu;遠端隊友看 F.MENU)
     // [w4 難度] 傷害倍率:單人/房主結算時乘一次(房主給遠端隊友的也是;客戶端收到 'hurt' 時已經乘過,不再乘);對戰不乘
     if (!this.net || (this.net.isHost && !this.net.pvp)) amount *= this.diff?.().dmg ?? 1;
     if (p !== this.player) return this.net ? this.net.damageRemote(p, amount, src, kind) : 0; // 遠端隊友交給連線層

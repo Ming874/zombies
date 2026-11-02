@@ -187,7 +187,7 @@ export class Zombie {
     const list = ctx.players;
     if (!list || list.length < 2) return ctx.player;
     const dist = (p) => Math.hypot(p.pos.x - this.pos.x, p.pos.z - this.pos.z) + Math.abs(p.pos.y - this.pos.y) * 3;
-    const ok = (p) => p && p.alive !== false && !p.downed;
+    const ok = (p) => p && p.alive !== false && !p.downed && !p.menu; // [w6] 開著選單/地圖的隊友不追
     let best = ok(this.target) ? this.target : null, bd = best ? dist(best) * 0.75 : Infinity;
     for (const p of list) if (ok(p) && dist(p) < bd) { bd = dist(p); best = p; }
     return best || ctx.player;

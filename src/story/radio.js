@@ -45,6 +45,12 @@ export function installRadio(game, S) {
     clear(sec = 8) { run.clearUntil = Math.max(run.clearUntil, now() + sec); }, // 207 裡:雜訊完全消失
     screech(k = 0.7, long = false) { if (!R.hear() && !long) return; run.screechT = now(); if (!run.screechN++) S.flag?.('h.radio.screech'); try { sfx.screech(k, long); } catch { /* 略 */ } hud.flash(); emit('screech', k); },
     raise(v = !run.raised) { if (!R.has()) return; run.raised = !!v; hud.draw(); emit('raise', run.raised); },
+    // [w6] 問小美(objectives.ask 決定說什麼):壞了的收音機拍一拍,先吱一聲雜訊
+    ask() {
+      if (!run.kind || run.burning) return false;
+      if (run.dead) { try { sfx.screech(0.2, false); } catch { /* 略 */ } hud.flash(); }
+      return O()?.ask?.() ?? false;
+    },
     toggle(v = !run.on) { if (!R.has()) return; run.on = !!v; try { ixs.switchClick?.(null, run.on); } catch { /* 略 */ } if (!run.on) stopCast(); hud.draw(); emit('toggle', run.on); },
     // 小美這一句從哪裡出來:放下 = 左肩(3D,小聲);舉起 = 兩耳
     voice() {
@@ -84,7 +90,7 @@ export function installRadio(game, S) {
         el.classList.toggle('dead', run.dead);
         f.textContent = run.dead ? '' : FREQ[run.freq][0];
         el.style.setProperty('--k', String(run.dead ? 0 : (run.freq + 0.5) / FREQ.length));
-        key.textContent = run.dead ? '壞了' : run.raised ? '放下 · 按住調頻' : run.on ? '舉起 · 按住關掉' : '按住打開';
+        key.textContent = run.dead ? '拍一下：問小美' : run.raised ? '放下 · 按住調頻' : run.on ? '舉起：問小美 · 按住關掉' : '舉起：問小美 · 按住打開';
       },
       tick() {
         const sig = run.dead ? 0 : isB1() ? 1 : 3;
@@ -146,17 +152,19 @@ export function installRadio(game, S) {
   // ---------- 按鍵:Q ----------
   let qDown = 0, qFired = false;
   const blocked = () => game.state !== 'playing' || game.paused || X.modal || game.deduce?.isOpen || game.shopUIOpen;
+  // [w6] 點一下 Q 舉起來 = 問小美(目前的目標怎麼做;再問一次會在地圖上畫記號)。壞掉的收音機:點一下 = 拍一拍,雜訊裡還聽得到她
   addEventListener('keydown', (e) => {
-    if (e.code !== 'KeyQ' || e.repeat || !R.has() || blocked() || e.target?.closest?.('input, textarea')) return;
+    if (e.code !== 'KeyQ' || e.repeat || !run.kind || blocked() || e.target?.closest?.('input, textarea')) return;
     qDown = performance.now(); qFired = false;
   });
   addEventListener('keyup', (e) => {
     if (e.code !== 'KeyQ' || !qDown) return;
     const held = performance.now() - qDown; qDown = 0;
-    if (!qFired && held < 450 && R.has() && !blocked()) R.raise();
+    if (qFired || held >= 450 || blocked()) return;
+    if (R.has()) { const up = !run.raised; R.raise(); if (up) R.ask(); } else if (run.dead) R.ask();
   });
   const holdCheck = () => {
-    if (!qDown || qFired || performance.now() - qDown < 450) return;
+    if (!qDown || qFired || !R.has() || performance.now() - qDown < 450) return;
     qFired = true;
     if (run.raised && run.on) tune(); else R.toggle();
   };

@@ -61,6 +61,16 @@ const fuseSub = (c) => {
 const READ_FAR = { 'h.ix.notice.power': [2.9, 1.8] }; // [互動距離, 視線放寬(losPad:前面的機器擋到一點也算看得到)]
 const fuseNext = (c) => FUSE.find((f) => !f.got(c) && f.know(c)) || FUSE.find((f) => !f.got(c)) || null;
 const fuseGlint = (c) => { const f = fuseNext(c); if (!f) return null; if (f.k === 'morgue') return f.order(c) ? c.at('h.ix.morgue:3') : c.at('h.ix.morgueboard') || c.at('h.ix.morgue:3'); return c.at(f.id, true); };
+// [w6] 按 Q 問小美(objectives.ask):直接說下一支缺的在哪(不用先看停電通知);太平間那支第二次問就把順序講出來
+const fuseAsk = (c, n) => {
+  const f = FUSE.find((q) => !q.got(c));
+  if (!f) return null;
+  if (f.k === 'morgue') {
+    const order = n >= 2 || f.order(c);
+    return { xl: order ? '太平間的冰櫃，照順序拉：\n三號、一號，最後五號。' : '最後一支在太平間的冰櫃裡。\n白板上寫了怎麼拿。', glint: order ? c.at('h.ix.morgue:3') : c.at('h.ix.morgueboard') || c.at('h.ix.morgue:3') };
+  }
+  return { xl: typeof f.xl === 'function' ? f.xl(c) : f.xl, glint: c.at(f.id, true) };
+};
 const door207At = (c) => { const w = c.door207(); return w ? { x: w.cx, y: w.y + 1.4, z: w.cz } : null; };
 const STEPS = [
   { id: 'h.s.radio', act: 1, text: '撿起收音機', why: '裡面有人在說話', cond: (c) => !!c.g.story?.radio?.kind, ok: ['撿起收音機了', '小美在裡面說話'],
@@ -89,7 +99,7 @@ const STEPS = [
       ama: '紅色的插頭不要拔。\n阿嬤把燈接在那裡。', glint: (c) => (!c.D.got('hc.15') ? door207At(c) : c.at('h.look.panel2f')) } },
   // 三支保險絲:清單先指向停電通知;讀到紙條才寫出地點(拿到的那一支一定列出來);提示比較早來,照缺的那一支說
   { id: 'h.s.fuses', act: 3, text: '到地下室找保險絲', why: '三樓沒電，207 的鎖打不開', skip: (c) => c.O.has('h.207.elock'), prog: (c) => (c.X.flags.has('h.gen.on') ? 3 : Math.min(3, c.run.fuses)), m: 3, hk: 0.55,
-    sub: fuseSub, ok: ['三支保險絲都找到了', '拿去鍋爐房的配電盤裝上'], skipOk: ['207 的電子鎖已經開了', '保險絲和密碼都不用找了'],
+    sub: fuseSub, ask: fuseAsk, ok: ['三支保險絲都找到了', '拿去鍋爐房的配電盤裝上'], skipOk: ['207 的電子鎖已經開了', '保險絲和密碼都不用找了'],
     hints: { xl: (c) => { if (!FUSE.some((f) => f.know(c))) return '鍋爐房的配電盤旁邊，\n貼著一張停電通知。'; const f = fuseNext(c); return f ? (typeof f.xl === 'function' ? f.xl(c) : f.xl) : null; },
       ama: (c) => (fuseNext(c)?.k === 'morgue' ? '冷的那邊……三、一、五。照順序。' : '地上……亮亮的那個。'), glint: fuseGlint } },
   { id: 'h.s.gen', act: 3, text: '把保險絲裝回配電盤（鍋爐房）', why: '讓三樓監控室有電', skip: (c) => c.O.has('h.207.elock'), cond: (c) => c.X.flags.has('h.gen.on'), ok: ['配電盤修好了', '三樓和監控室有電了'], skipOk: ['207 的電子鎖已經開了', '保險絲和密碼都不用找了'],
@@ -177,7 +187,7 @@ export function installObjectives(game) {
     phoneNear() { const n = X()?.nearestPhone?.({ ic: true }); return n ? { where: n.where, at: n.at } : null; },
     near(x, y, z, r) { const p = game.player.pos; return Math.abs(p.y - y) < 2.2 && Math.hypot(p.x - x, p.z - z) < r; },
     at(id, unused) { const e = X()?.get?.(id); if (!e || (unused && (e.used || e.n > 0))) return null; const q = X().where(e); return { x: q.x, y: q.y, z: q.z }; },
-    talk: (lines, cb, o) => D()?.talk?.(lines, cb, o),
+    talk: (lines, cb, o) => D()?.talk?.(lines, cb, asking ? { ...o, ask: true } : o), // asking:玩家按 Q 問的(ask)
     ama(text, force) {
       const h = H();
       if (!h) return false;
@@ -234,6 +244,7 @@ export function installObjectives(game) {
   function setCur(id) {
     const prev = run.cur;
     run.cur = id; run.stuck = 0; run.tier = 0; run.prog = ''; run.glint = null;
+    try { game.ui?.map?.poi?.('xl.ask', null); } catch { /* 地圖還沒建好 */ } // 小美畫的記號:換步驟就擦掉
     hud.set(id, true);
     emit('step', { id, prev });
     try { BY[id]?.onStart?.(c); } catch (e) { console.warn('[objectives] onStart', id, e); }
@@ -272,7 +283,13 @@ export function installObjectives(game) {
     if (h.deduce) return deduceHint(h.deduce, tier, s);
     const v = (x) => (typeof x === 'function' ? x(c) : x);
     const xl = v(h.xl), ama = v(h.ama);
-    if (tier === 1 && xl) { c.talk([[XL, xl, Math.max(3, xl.length / 4.5 + 0.6)]], null, { hint: true }); return true; }
+    if (tier === 1 && xl) {
+      const Rd = game.story?.radio;
+      // [w6] 收音機關著、壞了:小美的提示聽不到 → 提醒可以按 Q 問(壞了也能拍一拍)
+      if (Rd?.kind && !Rd.hear?.()) game.ui?.feed?.(Rd.dead ? '卡住了？按 [Q] 拍一拍收音機，問小美' : '卡住了？按 [Q] 舉起收音機，問小美', { color: '#d9b28a', ms: 7000 });
+      c.talk([[XL, xl, Math.max(3, xl.length / 4.5 + 0.6)]], null, { hint: true });
+      return true;
+    }
     if (tier === 2 && ama) return c.ama(ama);
     if (tier >= 3 && h.glint) {
       const p = h.glint(c);
@@ -320,6 +337,37 @@ export function installObjectives(game) {
     else if (tier >= 3) { const p = s.hints.glint?.(c); if (p) { run.glint = p; run.glintT = 14; } }
     return true;
   }
+
+  // ---------- [w6] 問小美:按 Q 舉起收音機(壞了就拍一拍;src/story/radio.js R.ask)----------
+  // 第一次問:說這一步的提示(沒有提示的步驟就把目標再說一次);再問:同一句再加「地圖上畫了記號」,
+  // 那個東西閃一下、地圖(M)上圈起來(換步驟就擦掉)。剛問過 6 秒內不再回答。回傳 false = 這次沒有回答
+  let asking = false;
+  function ask() {
+    const s = BY[run.cur], t = game.time || 0;
+    if (!s || game.state !== 'playing' || game.story?.ending?.active || t - (run.askT ?? -99) < 6) return false;
+    run.askT = t;
+    if (run.askId !== s.id) { run.askId = s.id; run.askN = 0; }
+    const n = ++run.askN, h = s.hints || {}, v = (x) => { try { return typeof x === 'function' ? x(c) : x; } catch { return null; } };
+    emit('hint', { id: s.id, tier: n >= 2 ? 3 : 1, ask: true });
+    run.tier = Math.max(run.tier, 1); // 自動提示的第一級不用再講一次
+    asking = true;
+    try {
+      if (h.deduce) { deduceHint(h.deduce, 1, s); if (n >= 2) deduceHint(h.deduce, 3, s); return true; }
+      const A = s.ask ? (() => { try { return s.ask(c, n); } catch (e) { console.warn('[objectives] ask', s.id, e); return null; } })() : null; // 這一步自己的問答(例:保險絲直接說下一支在哪)
+      const lines = [], xl = A ? A.xl : v(h.xl), p = n >= 2 ? (A ? A.glint : h.glint ? v(h.glint) : null) : null;
+      if (xl) lines.push([XL, xl, Math.max(3, xl.length / 4.5 + 0.6)]);
+      else { lines.push([XL, `${s.text}。`, 2.6]); const why = whyOf(s); if (why) lines.push([XL, `${why}。`, 2.8]); }
+      if (p) {
+        run.glint = p; run.glintT = 16;
+        const map = game.ui?.map, li = map?._levelOf?.(game, p.y) ?? 0;
+        map?.poi?.('xl.ask', { x: p.x, z: p.z, level: li, label: '小美說在這裡', always: true, red: true });
+        lines.push([XL, '我在地圖上畫了記號，\n按 M 看。', 3.2]);
+      } else if (n >= 2 && !xl) lines.push([XL, '……我也只知道這些。', 2.4]);
+      c.talk(lines, null, { hint: true });
+      return true;
+    } finally { asking = false; }
+  }
+  O.ask = game.objectives.ask = ask;
 
   // ---------- HUD:目前的目標(細、淡、一行) ----------
   // 目標列:「目標｜為什麼」(CLARITY_PLAN §7.1);為什麼可以是函式(例:207 的電子鎖開了沒)
