@@ -194,7 +194,7 @@ export function installDeduce(game) {
     // 戰鬥中(15 m 內有活屍、被追)先不講:提示(o.hint)最多等 30 秒,還在打就不講了;金水伯/小美的劇情句最多等 20 秒(排隊前等,不擋住別人的對話)
     const V = voiceLock(game), token = {}, crit = !o.hint;
     const calm = async (max) => { for (let w = 0; V.combat() && w < max; w += 0.5) await wait(game, 0.5); return !V.combat(); };
-    let joined = false;
+    let joined = false, heard = 0; // heard = 真的說出口的句數(收音機關著、被丟掉的不算;cb(heard) 讓呼叫端知道玩家有沒有聽到)
     if (!V.combat()) { V.join(token); joined = true; }
     (async () => {
       try {
@@ -203,22 +203,24 @@ export function installDeduce(game) {
           await free(game, { token, maxWait: 40 });
           if (game.story?.ending?.active) break;
           if (!crit && V.busy({ token })) break; // 提示等了 40 秒還輪不到:不講了
+          if (!heard) try { o.onStart?.(); } catch { /* 略 */ } // 輪到這一段了(o.onStart:呼叫端想知道「開始講了」)
           // 小美只從收音機出來(src/story/radio.js):提示在聽不到時丟掉;劇情句等收音機(最多 120 秒,先讓出佇列)
           if (/小美/.test(who) && game.story?.radio) {
             if (!game.story.radio.hear()) { if (!crit) break; if (!(await radioReady(game, V, token))) continue; }
             const d1 = secs || secsOf(text);
             V.claim(d1, 8, 'xl');
             const said = line(game, 'xl', text, { secs: d1, optional: !crit });
-            if (said) await wait(game, said + 0.3);
+            if (said) { heard++; await wait(game, said + 0.3); }
             continue;
           }
           const d = secs || secsOf(text);
           V.claim(d, 8, who);
           api.speak({ who, parts: [text], voice: /小美|小美|阿嬤|女|淑芬/.test(who) ? 'woman' : /王醫師|男/.test(who) ? 'man' : 'old' }, { filter: o.filter || (/對講機|收音機|AM/.test(who) ? 'radio' : 'phone'), noHorror: true, lockOk: true, critical: crit });
+          heard++;
           await wait(game, d + 0.3);
         }
       } finally { V.leave(token); }
-      cb?.();
+      cb?.(heard);
     })();
   }
   D.talk = talk;
