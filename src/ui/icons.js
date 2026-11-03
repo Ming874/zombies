@@ -4,6 +4,8 @@ const svg = (body, vb = '0 0 24 24') => `<svg viewBox="${vb}" aria-hidden="true"
 export const ICON = {
   cross: svg('<path fill="currentColor" d="M9 2.5h6v6.5h6.5v6H15v6.5H9V15H2.5V9H9z"/>'),
   shield: svg('<path fill="currentColor" d="M12 2 4 5v6.2c0 5 3.4 9.4 8 10.8 4.6-1.4 8-5.8 8-10.8V5z"/><path fill="rgba(0,0,0,.35)" d="M12 4.2v15.6c3.4-1.3 6-4.8 6-8.6V6.4z"/>'),
+  syringe: svg('<g transform="rotate(45 12 12)"><rect x="9.5" y="5.2" width="5" height="10.8" rx="1" fill="currentColor"/><rect x="8" y="3.3" width="8" height="1.8" rx=".6" fill="currentColor"/><rect x="11.3" y="1" width="1.4" height="2.5" fill="currentColor"/><path fill="currentColor" d="M11.45 16h1.1v6.2h-1.1z"/><path fill="rgba(0,0,0,.38)" d="M10.4 8.6h3.2v1h-3.2zM10.4 11.2h3.2v1h-3.2z"/></g>'),
+  boot: svg('<path fill="currentColor" d="M6.5 2.5h6v9.6l5.9 2.5c1.6.7 2.6 2.2 2.6 3.9v2.3H3v-3.6l1.6-4.6 1.9-.8z"/><path fill="rgba(0,0,0,.38)" d="M3 18.9h18v1.9H3zM12.5 8h-3v1.4h3z"/>'),
   bolt: svg('<path fill="currentColor" d="M13.5 2 5 13.5h6L9.5 22 19 10h-6.2z"/>'),
   coin: svg('<circle cx="12" cy="12" r="10" fill="#c9951c"/><circle cx="12" cy="12" r="8.2" fill="#f2c84b"/><circle cx="12" cy="12" r="6" fill="none" stroke="#b07f12" stroke-width="1.4"/><path fill="#fff3b8" opacity=".75" d="M7 8.5a6.5 6.5 0 0 1 6-4.3l-.4 1.7A4.8 4.8 0 0 0 8.6 9z"/>'),
   grenade: svg('<path fill="currentColor" d="M10 6.2h4.6l.9 1.6c2.6 1.3 4.3 3.9 4.3 6.9 0 4.2-3.5 7.6-7.8 7.6S4.2 18.9 4.2 14.7c0-3 1.7-5.6 4.3-6.9z"/><path fill="currentColor" d="M14.6 3.5h-4.8v2.2h4.8z"/><path fill="none" stroke="currentColor" stroke-width="1.4" d="M15 4.6c2.2-.9 4.4.2 5 2.4M15.6 6.8l3.8 6.4"/><path fill="rgba(0,0,0,.3)" d="M7 12.5h10M6.4 15.8h11.2" stroke="rgba(0,0,0,.35)" stroke-width="1.2"/>'),

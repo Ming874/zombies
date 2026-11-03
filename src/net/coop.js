@@ -7,8 +7,8 @@ import { restoreCoop } from '../sys/save.js';
 // 回合間是商店階段(phase 'shop',商店捲門拉起):每人用自己的金幣在實體商店購買;按 N 準備 / 取消,
 // 全員準備就倒數 3 秒開始,否則 REST_MP 秒到了自動開始(房主計時,快照帶倒數)。
 // 金幣、擊殺獎勵、掉落物(彈匣/醫療包/手榴彈)、補給點都是「各人各自」:只在擊殺者的畫面生成、只有他撿得到,不需同步。
-// 血量歸零先倒地 30 秒(坐地持手槍、可以開槍),隊友靠近按住 E 3 秒救起;流血至死則觀戰到下一回合重生;全員倒地才結束。
-const REST_MP = 75, READY_LEFT = 3, BLEED = 30, REVIVE_TIME = 3, REVIVE_DIST = 1.8;
+// 血量歸零先倒地 30 秒(隊上有醫療兵 90 秒;坐地持手槍、可以開槍),隊友靠近按住 E 3 秒救起;流血至死則觀戰到下一回合重生;全員倒地才結束。
+const REST_MP = 75, READY_LEFT = 3, BLEED = 30, BLEED_MEDIC = 90, REVIVE_TIME = 3, REVIVE_DIST = 1.8; // BLEED_MEDIC:隊上有醫療兵(src/game/perks.js)
 // 出怪表的類型代碼(房主轉移時接手剩下的佇列;以前沒有第三波的新類型 → 轉移後全部變成行屍)
 const QCODE = { walker: 'W', runner: 'R', crawler: 'C', bloater: 'B', brute: 'X', screamer: 'S', stalker: 'K', surgeon: 'U', burned: 'F', hazmat: 'H', straitjacket: 'J' };
 const QTYPE = Object.fromEntries(Object.entries(QCODE).map(([t, c]) => [c, t]));
@@ -287,10 +287,10 @@ export class CoopMode {
     p.downed = true;
     p.hp = 0;
     g.healT = 0;
-    this.downT = BLEED;
+    this.downT = g.teamHasMedic?.() ? BLEED_MEDIC : BLEED;
     this.stats.downs++;
     this.bump(s.me, 'downs');
-    if (g.weapons.has('pistol') && g.weapons.current !== 'pistol') g.weapons.switchTo('pistol');
+    if (g.weapons.has('pistol') && (g.weapons.current !== 'pistol' || g.weapons.knifeOut)) g.weapons.switchTo('pistol');
     if (g.shopUIOpen) g.closeShop();
     g.ui.map?.close?.();
     s.send('down', 1);
@@ -409,7 +409,7 @@ export class CoopMode {
     if (this.downB > 0.01 && !this.dead) {
       cam.position.y -= 1.0 * this.downB;
       cam.rotation.z += 0.12 * this.downB;
-      if (p.downed && g.weapons.current !== 'pistol' && g.weapons.has('pistol')) g.weapons.switchTo('pistol', true);
+      if (p.downed && (g.weapons.current !== 'pistol' || g.weapons.knifeOut) && g.weapons.has('pistol')) g.weapons.switchTo('pistol', true);
     }
     // 觀戰:跟在活著的隊友後上方
     if (this.dead) {

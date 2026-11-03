@@ -3,6 +3,7 @@ import { settings } from './settings.js';
 import { loadBest, DIFF, DIFF_ORDER } from '../game/waves.js';
 import { sfx } from '../audio.js';
 import { account } from '../sys/account.js';
+import { CLASSES, CLASS_ORDER } from '../game/perks.js';
 
 // 主選單(標題畫面)、暫停選單、死亡結算、設定/操作說明/製作與授權面板。
 // 沿用 index.html 的 #menu / #pause / #dead 容器與 #startBtn / #resumeBtn / #restartBtn(input.js 會綁定),內容改由這裡建立。
@@ -41,11 +42,11 @@ const SETTINGS = [
 ];
 export const KEYS = [
   ['W A S D', '移動'], ['Shift', '奔跑'], ['Space', '跳躍'], ['C', '蹲下（切換）'],
-  ['滑鼠左鍵', '射擊'], ['滑鼠右鍵', '開鏡（按住）'], ['R', '換彈'], ['1–7 / 滾輪', '切換武器'],
-  ['G', '投擲手榴彈'], ['V', '小刀'], ['F', '手電筒'], ['E', '互動：金水商行／補給櫃／調查'],
-  ['H', '使用醫療包'], ['M', '地圖'], ['N', '休息時不等了，直接開始下一波'], ['T', '關閉提示'],
+  ['滑鼠左鍵', '射擊'], ['滑鼠右鍵', '開鏡（按住）'], ['R', '換彈'], ['1 / 2', '兩個槍位'], ['3', '小刀（左鍵砍）'], ['滾輪', '切換槍位／小刀'],
+  ['G', '投擲手榴彈'], ['V', '小刀快速近戰'], ['H', '手電筒'], ['E', '互動：金水商行／補給櫃／調查'],
+  ['F', '使用醫療包'], ['X', '電擊槍（警察）'], ['Y / N', '閃身鞋：傳回商店／留下來'], ['M', '地圖'], ['N', '休息時不等了，直接開始下一波'], ['T', '關閉提示'],
   ['Q', '收音機：舉起問小美（卡住時）'], ['J', '筆記本'], ['B', '吹口哨（鬼月不要亂吹）'],
-  ['Esc', '暫停'], ['F3', '效能資訊'], ['F8', '控制面板（/give 指令）'],
+  ['Esc', '暫停'], ['F3', '效能資訊'], ['F8', '控制面板（/give /rev /godmod 指令）'],
 ];
 const KEYS_MP = [['Tab', '計分板（多人）'], ['Enter', '聊天（多人）']];
 const TIPS = [
@@ -112,6 +113,7 @@ export class Menu {
           <button class="mn-btn" data-mode="pvp">對戰死鬥<small>2–8 人 · 各自為戰，可加入殭屍騷擾（非正史）</small></button>
           <div class="mn-row mn-diff" id="menuDiff" role="radiogroup" aria-label="難度"></div>
           <div class="mn-diffsub" id="menuDiffSub"></div>
+          <div class="mn-row mn-diff mn-cls" id="menuClass" role="radiogroup" aria-label="職業"></div>
           <div id="menuModes"></div>
           <div class="mn-row">
             <button class="mn-mini" data-p="settings">設定</button>
@@ -144,6 +146,7 @@ export class Menu {
     this.showBest();
     this._diffRow(); // [w4] 難度(存在 settings.difficulty)
     this._account(); // [w5] Google 登入(src/sys/account.js)
+    this._classRow(); // 職業(存在 settings.cls)
     // 回到主選單時更新最佳紀錄
     new MutationObserver(() => { if (m.classList.contains('on')) this.showBest(); }).observe(m, { attributes: true, attributeFilter: ['class'] });
   }
@@ -293,6 +296,22 @@ export class Menu {
     addEventListener('keydown', key, true);
     el.classList.add('on');
     el.querySelector('[data-a="no"]').focus();
+  }
+
+  // 職業:平民 / 警察 / 醫療兵(單人與合作;對戰不套用),下一局開始時生效
+  _classRow() {
+    const row = $('menuClass');
+    if (!row) return;
+    const paint = () => {
+      const cur = CLASSES[settings.get('cls')] ? settings.get('cls') : 'none';
+      for (const b of row.querySelectorAll('[data-c]')) { const on = b.dataset.c === cur; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }
+      const sub = row.querySelector('.mn-csub');
+      if (sub) { sub.textContent = CLASSES[cur].short.replace(/[[\]]/g, ''); sub.title = CLASSES[cur].sub.replace(/[[\]]/g, ''); }
+    };
+    row.innerHTML = `<span class="mn-lbl">職業</span>` + CLASS_ORDER.map((c) => `<button class="mn-mini" role="radio" data-c="${c}" title="${esc(CLASSES[c].sub.replace(/[[\]]/g, ''))}">${esc(CLASSES[c].name)}</button>`).join('') + '<span class="mn-csub"></span>';
+    row.addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (!b) return; e.stopPropagation(); sfx.uiClick(); settings.set('cls', b.dataset.c); paint(); });
+    settings.on((k) => { if (!k || k === 'cls') paint(); });
+    paint();
   }
 
   showBest() {

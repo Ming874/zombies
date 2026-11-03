@@ -281,7 +281,11 @@ export class ShopUI {
       const now = performance.now();
       if (now - (this._hoverT || 0) > 70) { this._hoverT = now; sfx.shopHover(); }
     });
-    this.infoEl.addEventListener('click', (e) => { if (e.target.closest('[data-act="buy"]')) this.buy(); });
+    this.infoEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="buy"]')) this.buy();
+      const sl = e.target.closest('[data-act="slot"]');
+      if (sl && !sl.disabled) this.equip(+sl.dataset.slot);
+    });
     q('[data-act="close"]').addEventListener('click', () => this.game?.closeShop(true));
     root.addEventListener('mousedown', (e) => { if (e.target === root) this.game?.closeShop(true); }); // 點面板外關閉
   }
@@ -379,9 +383,9 @@ export class ShopUI {
         return `<div class="sh-group"><span>${esc(it.name)}</span>${tot}</div>`;
       }
       let right;
-      if (it.state === 'owned') right = '<span class="tag own">已擁有</span>';
-      else if (it.state === 'equipped') right = '<span class="tag eq">使用中</span>';
-      else if (it.state === 'max') right = `<span class="tag max">${it.kind === 'mod' ? '已滿級' : it.id === 'heal' ? '生命已滿' : it.def?.armor && g.player.maxArmor > it.def.armor ? '已有更好' : '已滿'}</span>`;
+      if (it.state === 'owned') right = '<span class="tag own">收在店裡</span>';
+      else if (it.state === 'equipped') right = `<span class="tag eq">${it.slot ? `槍位 ${it.slot}` : '使用中'}</span>`;
+      else if (it.state === 'max') right = `<span class="tag max">${it.kind === 'mod' ? '已滿級' : it.id === 'heal' ? '生命已滿' : it.id === 'blink' ? '已擁有' : it.def?.armor && g.player.maxArmor > it.def.armor ? '已有更好' : '已滿'}</span>`;
       else if (it.state === 'na') right = `<span class="tag na">${it.id === 'armor_fix' ? '需要背心' : '未到貨'}</span>`;
       else if (it.state === 'part') right = `<span class="pr part">${ICON.coin}${it.price}<small>${it.quote.part.mags} 個彈匣</small></span>`;
       else right = `<span class="pr">${ICON.coin}${it.price}${it.state === 'poor' ? `<small>差 ${it.price - coins}</small>` : ''}</span>`;
@@ -406,20 +410,23 @@ export class ShopUI {
     else body = this._gearInfo(it, p);
     const st = it.state;
     const LABEL = {
-      weapon: { buy: '購買', poor: '錢不夠', owned: '裝備', equipped: '使用中' },
+      weapon: { buy: '購買', poor: '錢不夠', owned: '裝備', equipped: it.inHand ? '使用中' : '拿出來' },
       mod: { buy: '升級', poor: '錢不夠', max: '已滿級' },
       ammo: { buy: '補滿', poor: '錢不夠', max: '已滿', part: `購買 ${it.quote?.part?.mags || 0} 個彈匣` },
-      gear: { buy: it.id === 'heal' ? '治療' : it.id === 'armor_fix' ? '修補' : '購買', poor: '錢不夠', max: it.id === 'heal' ? '生命已滿' : it.id === 'armor_fix' ? '無需修補' : '已滿', na: '需要背心' },
+      gear: { buy: it.id === 'heal' ? '治療' : it.id === 'armor_fix' ? '修補' : '購買', poor: '錢不夠', max: it.id === 'heal' ? '生命已滿' : it.id === 'armor_fix' ? '無需修補' : it.id === 'blink' ? '已擁有' : '已滿', na: '需要背心' },
     };
     const label = LABEL[it.kind]?.[st] || (st === 'na' ? '未到貨' : '購買');
-    const disabled = st === 'equipped' || st === 'max' || st === 'na';
+    const disabled = (st === 'equipped' && it.inHand) || st === 'max' || st === 'na';
     const showPrice = st === 'buy' || st === 'poor' || st === 'part';
     const short = st === 'poor' ? `<small>還差 ${it.price - p.coins}</small>` : '';
     const price = showPrice ? `<div class="sh-price${st === 'poor' ? ' poor' : ''}">${ICON.coin}${it.price}${short}</div>` : '';
     const title = it.kind === 'mod'
       ? `${esc(MOD_DEFS[it.mod].name)} ${st === 'max' ? roman(it.max) : roman(it.level + 1)}<small>${esc(weaponName(it.weapon))} · 等級 ${it.level}/${it.max}</small>`
       : `${esc(it.name)}${it.sub ? `<small>${esc(it.sub)}</small>` : ''}`;
-    this.infoEl.innerHTML = `<h3>${title}</h3><div class="sh-buy">${price}<button class="sh-btn${st === 'poor' ? ' poor' : ''}" data-act="buy" ${disabled ? 'disabled' : ''}>${label}<kbd>Enter</kbd></button></div>
+    // 武器(買過的):放到 1 / 2 號槍位(同時只能帶兩把;換下來的收在店裡)
+    const w = g.weapons, slots = it.kind === 'weapon' && (st === 'owned' || st === 'equipped') && w.slots
+      ? `<div class="sh-slots"><span>槍位</span>${[0, 1].map((i) => { const cur = w.slots[i], here = cur === it.id; return `<button class="sh-btn ghost sm" data-act="slot" data-slot="${i}" ${here ? 'disabled' : ''}><kbd>${i + 1}</kbd>${here ? '已在這格' : cur ? `換掉 ${esc(weaponName(cur))}` : '放進空位'}</button>`; }).join('')}</div>` : '';
+    this.infoEl.innerHTML = `<h3>${title}</h3><div class="sh-buy">${price}<button class="sh-btn${st === 'poor' ? ' poor' : ''}" data-act="buy" ${disabled ? 'disabled' : ''}>${label}<kbd>Enter</kbd></button></div>${slots}
       <div class="sh-desc">${esc(it.desc || '')}</div>${body}`;
   }
 
@@ -505,7 +512,10 @@ export class ShopUI {
     }
     if (it.id === 'medkit') {
       const have = p.medkits || 0;
-      return `<div class="sh-facts big"><span>持有 ${pips(have, it.state === 'max' ? 0 : 1, d.cap)}<b>${have}/${d.cap}</b></span><span>使用鍵<b>H</b></span><span>回復<b>50</b> / 2 秒</span></div>`;
+      return `<div class="sh-facts big"><span>持有 ${pips(have, it.state === 'max' ? 0 : 1, d.cap)}<b>${have}/${d.cap}</b></span><span>使用鍵<b>F</b></span><span>回復<b>50</b> / 2 秒</span></div>`;
+    }
+    if (it.id === 'blink') {
+      return `<div class="sh-facts big"><span>觸發<b>3 隻以上</b>圍攻</span><span>考慮時間<b>25 秒</b></span><span>Y<b>傳回金水商行</b></span><span>N<b>10 秒無敵</b></span><span>冷卻<b>2 波</b></span></div>`;
     }
     if (it.id === 'heal') {
       const rows = `<span>生命</span>${bar(p.hp / p.maxHp, 1)}<em>${Math.ceil(p.hp)}</em><em class="${p.hp < p.maxHp ? 'up' : ''}">${p.hp < p.maxHp ? `→${p.maxHp}` : ''}</em>`;
@@ -564,6 +574,16 @@ export class ShopUI {
       if (r.reason === 'coins') { this.coinBox.classList.remove('poor', 'bump'); void this.coinBox.offsetWidth; this.coinBox.classList.add('poor'); }
       this.panel.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 220 });
     }
+  }
+
+  // 武器頁的槍位按鈕
+  equip(slot) {
+    const it = this.item;
+    if (!it || !this.game || it.kind !== 'weapon') return;
+    const r = this.game.equipGun(it.id, slot);
+    this.refresh();
+    if (r.ok) { this.toast(r.msg, 'ok'); this.stamp('已裝備', 'eq'); }
+    else this.toast(r.msg || '無法裝備', 'max');
   }
 
   // 預覽上的大印章(購買/升級/裝備成功)

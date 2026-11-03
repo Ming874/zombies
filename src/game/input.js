@@ -1,8 +1,7 @@
-import { ORDER } from '../weapons/weapon.js';
 import { resume as resumeAudio } from '../audio.js';
 
 // 鍵盤/滑鼠/指標鎖定與選單按鈕。以 mixin 方式掛到 Game 上
-// 右鍵:按住開鏡;G:手榴彈;V:小刀;1~6:切換武器;滾輪:循環武器;巴雷特開鏡時 Shift 改為屏息;C:蹲下(player.js)
+// 右鍵:按住開鏡;G:手榴彈;V:小刀(快速近戰);1、2:兩個槍位;3:小刀拿在手上;滾輪:循環;H:手電筒;巴雷特開鏡時 Shift 改為屏息;C:蹲下(player.js)
 export const inputMethods = {
   bindInput() {
     const canvas = this.canvas;
@@ -40,7 +39,7 @@ export const inputMethods = {
     });
     document.addEventListener('contextmenu', (e) => { if (this.state === 'playing') e.preventDefault(); });
     document.addEventListener('wheel', (e) => {
-      if (playing() && !this.weapons.busy) this.weapons.cycle(e.deltaY > 0 ? 1 : -1);
+      if (playing() && !this.weapons.busy && !this.player.downed) this.weapons.cycle(e.deltaY > 0 ? 1 : -1);
     });
     document.addEventListener('keydown', (e) => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') inp.shift = true;
@@ -54,15 +53,12 @@ export const inputMethods = {
       }
       if (e.repeat) return;
       if (e.code === 'KeyR') this.weapons.startReload();
-      if (e.code === 'KeyF') this.player.toggleFlashlight();
+      if (e.code === 'KeyH') this.player.toggleFlashlight();
       if (e.code === 'KeyG') this.throwGrenade();
       if (e.code === 'KeyV') this.melee();
       if (e.code === 'KeyN' && (this.phase === 'shop' || this.phase === 'break')) this.nextRound();
-      const m = /^Digit([1-9])$/.exec(e.code);
-      if (m) {
-        const id = ORDER[Number(m[1]) - 1];
-        if (id && this.weapons.has(id) && !this.weapons.busy) this.weapons.switchTo(id);
-      }
+      const m = /^(?:Digit|Numpad)([1-3])$/.exec(e.code);
+      if (m && !this.weapons.busy && !this.player.downed) this.weapons.select(Number(m[1]) - 1);
     });
     document.addEventListener('keyup', (e) => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') inp.shift = false;

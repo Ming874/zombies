@@ -102,6 +102,16 @@ const KNIFE_KEYS = [
   [0.36, -0.36, -0.44, -0.4, -0.3, -0.45, 1.35],
   [0.6, 0.38, -0.62, -0.34, -0.15, 0.3, -0.3],
 ];
+// 3 號小刀拿在手上:待機姿勢(右下、刀尖朝前);左鍵從待機蓄力 → 斜劈 → 回到待機
+const KNIFE_IDLE = [0.22, -0.2, -0.42, -0.22, 0.42, -0.5];
+const KNIFE_HELD = [
+  [0, ...KNIFE_IDLE],
+  [0.08, 0.26, -0.05, -0.42, -0.3, 0.5, -0.6],
+  [0.15, 0.06, -0.11, -0.5, -0.42, 0.1, 0.5],
+  [0.22, -0.18, -0.24, -0.46, -0.38, -0.3, 1.15],
+  [0.31, -0.36, -0.44, -0.4, -0.3, -0.45, 1.35],
+  [0.5, ...KNIFE_IDLE],
+];
 // 手榴彈:舉起 → 拔插銷 → 往後上方蓄力 → 投出 → 收手
 const NADE_KEYS = [
   [0, 0.26, -0.42, -0.4, 0.4, 0, 0],
@@ -155,6 +165,10 @@ export class WeaponSystem {
     this.fireQueue = 0;
     this.lowAmmoWarned = false;
     this._st = { pump: 0, phase: null, u: 0, left: null, palm: null }; // 傳給槍模動畫的狀態(重複使用)
+    // 槍位:同時只能帶兩把槍(1、2 號);其他買過的槍收在金水商行,在武器頁換上來。3 號 = 小刀拿在手上(knifeOut 時 current 仍是收起來的那把槍)
+    this.slots = ['pistol', null];
+    this.knifeOut = false;
+    this._dt = 0;
 
     for (const id of ORDER) {
       const m = createWeaponModel(id);
@@ -221,8 +235,9 @@ export class WeaponSystem {
   }
 
   switchTo(id, instant = false) {
-    if (!this.inv[id] || (id === this.current && !instant)) return;
+    if (!this.inv[id] || (id === this.current && !instant && !this.knifeOut)) return;
     if (this.current) this.models[this.current].root.visible = false;
+    if (this.knifeOut) { this.knifeOut = false; if (!this.action) this.knife.root.visible = false; }
     this.current = id;
     this.models[id].root.visible = true;
     this.reloading = 0;
@@ -245,10 +260,72 @@ export class WeaponSystem {
     if (!instant) sfx.switch(id);
   }
 
+  // 滾輪:1 號槍 → 2 號槍 → 小刀 → …(空的槍位跳過)
   cycle(dir) {
-    const owned = ORDER.filter((id) => this.inv[id]);
-    const i = owned.indexOf(this.current);
-    this.switchTo(owned[(i + dir + owned.length) % owned.length]);
+    const list = [0, 1, 2].filter((i) => i === 2 || (this.slots[i] && this.inv[this.slots[i]]));
+    const now = this.knifeOut ? 2 : this.slots.indexOf(this.current);
+    const i = list.indexOf(now);
+    this.select(list[(i + dir + list.length) % list.length]);
+  }
+
+  // 數字鍵:0、1 = 槍位,2 = 小刀;回傳是否換了
+  select(i) {
+    if (i === 2) return this.drawKnife();
+    const id = this.slots[i];
+    if (!id || !this.inv[id] || (id === this.current && !this.knifeOut)) return false;
+    this.switchTo(id);
+    return true;
+  }
+
+  // 新拿到的槍放進槍位:有空位放空位,否則換掉手上那一格(拿著小刀時換 2 號);已經在槍位上就不動。回傳槍位
+  stow(id) {
+    let i = this.slots.indexOf(id);
+    if (i >= 0) return i;
+    i = this.slots.indexOf(null);
+    if (i < 0) i = this.knifeOut ? 1 : Math.max(0, this.slots.indexOf(this.current));
+    this.slots[i] = id;
+    return i;
+  }
+
+  // 商店:把擁有的槍放到槍位 i(另一格已經是牠就互換);手上那把被換下來就改拿新的
+  equip(id, i) {
+    if (!this.inv[id] || (i !== 0 && i !== 1) || this.slots[i] === id) return false;
+    const o = this.slots.indexOf(id);
+    if (o >= 0) this.slots[o] = this.slots[i];
+    this.slots[i] = id;
+    if (!this.knifeOut && !this.slots.includes(this.current)) this.switchTo(id);
+    return true;
+  }
+
+  // 重新開局 / 對戰重生:清空武器,依序給槍並放進空的槍位,拿第一把
+  resetLoadout(ids) {
+    this.inv = {};
+    this.slots = [null, null];
+    this.knifeOut = false;
+    if (!this.action) this.knife.root.visible = false;
+    for (const id of ids) { this.give(id); if (this.slots.includes(null)) this.stow(id); }
+    this.switchTo(ids[0], true);
+  }
+
+  // 3 號:小刀拿在手上(槍收起來;左鍵砍)
+  drawKnife() {
+    if (this.knifeOut || this.action) return false;
+    if (this.current) this.models[this.current].root.visible = false;
+    this.knifeOut = true;
+    this.knife.root.visible = true;
+    this.reloading = 0;
+    this.shell = null;
+    this.autoReload = 0;
+    this.fireQueue = 0;
+    this.raise = 1;
+    this.ads = 0;
+    this.zoom = 1;
+    this.scoped = false;
+    this.scopeAmt = 0;
+    this.dotAmt = 0;
+    this.aiming = false;
+    sfx.switch('knife');
+    return true;
   }
 
   get def() { return WEAPONS[this.current]; }
@@ -259,7 +336,7 @@ export class WeaponSystem {
 
   startReload() {
     const a = this.ammo, d = this.def, id = this.current;
-    if (this.reloading > 0 || this.shell || this.action || a.mag >= this.stat(id, 'mag') || a.reserve <= 0) return;
+    if (this.knifeOut || this.reloading > 0 || this.shell || this.action || a.mag >= this.stat(id, 'mag') || a.reserve <= 0) return;
     if (d.shellReload) { // 霰彈:打開 → 逐發裝填 → (空膛時)泵動上膛
       this.shell = { phase: 'open', t: 0, u: 0, loaded: false, stop: false, chamber: a.mag === 0 };
       this.reloading = 1;
@@ -273,7 +350,8 @@ export class WeaponSystem {
   // 開始小刀/手榴彈動作;回傳是否成功
   startAction(kind) {
     if (this.action || this.raise > 0.5) return false;
-    this.action = { kind, t: 0, dur: kind === 'knife' ? 0.6 : 0.95, hit: false, pin: false, thrown: false };
+    const held = kind === 'knife' && this.knifeOut; // 3 號小刀:從待機姿勢出刀,比 V 快
+    this.action = { kind, t: 0, dur: kind === 'knife' ? (held ? 0.5 : 0.6) : 0.95, hit: false, pin: false, thrown: false, held };
     this.reloading = 0;
     this.shell = null;
     if (kind === 'knife') { this.knife.root.visible = true; sfx.knifeSwing(); }
@@ -307,6 +385,7 @@ export class WeaponSystem {
 
   update(dt, input, speedNorm, sprinting, look) {
     const id = this.current, d = this.def, a = this.ammo, m = this.models[id];
+    this._dt = dt;
     const magSize = this.stat(id, 'mag');
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.sinceShot += dt;
@@ -328,22 +407,14 @@ export class WeaponSystem {
         this.reloading = 0;
       }
     }
+    if (this.knifeOut) { this._tickAction(); this._knifeUpdate(dt, input, speedNorm, sprinting, look); return; }
     // ---- 霰彈逐發裝填 ----
     if (this.shell) this._shellReload(dt, d, a, magSize, input);
     // ---- 自動換彈(打空後) ----
     if (this.autoReload > 0) { this.autoReload -= dt; if (this.autoReload <= 0) this.startReload(); }
 
     // ---- 小刀/手榴彈 ----
-    const act = this.action;
-    if (act) {
-      act.t += dt;
-      if (act.kind === 'knife' && !act.hit && act.t >= 0.17) { act.hit = true; if (this.onEvent) this.onEvent('knife'); }
-      if (act.kind === 'grenade') {
-        if (!act.pin && act.t >= 0.24) { act.pin = true; this.nade.pin.visible = false; if (this.onEvent) this.onEvent('pin'); }
-        if (!act.thrown && act.t >= 0.52) { act.thrown = true; this.nade.nade.visible = false; sfx.grenadeThrow(); if (this.onEvent) this.onEvent('throw'); }
-      }
-      if (act.t >= act.dur) { this.action = null; this.knife.root.visible = false; this.nade.root.visible = false; }
-    }
+    this._tickAction();
 
     // ---- 開鏡 ----
     const canAim = !!d.ads && this.reloading <= 0 && !sprinting && !this.action && this.raise < 0.6 && (!d.pump || this.pumpT > 0.62 || this.pumped);
@@ -414,6 +485,63 @@ export class WeaponSystem {
 
     // 放大光學鏡:槍身在開鏡行程 80% 時就貼到眼前,鏡內畫面淡入時目鏡已在正中央(交叉溶接時兩個圓重合)
     this._animate(dt, d, a, m, speedNorm, sprinting, look, overlay ? ease(clamp01(this.ads / 0.8)) : e);
+  }
+
+  // 小刀/手榴彈動作的時間軸(砍中、拔插銷、投出的時間點)
+  _tickAction() {
+    const act = this.action;
+    if (!act) return;
+    act.t += this._dt;
+    if (act.kind === 'knife' && !act.hit && act.t >= (act.held ? 0.15 : 0.17)) { act.hit = true; if (this.onEvent) this.onEvent('knife'); }
+    if (act.kind === 'grenade') {
+      if (!act.pin && act.t >= 0.24) { act.pin = true; this.nade.pin.visible = false; if (this.onEvent) this.onEvent('pin'); }
+      if (!act.thrown && act.t >= 0.52) { act.thrown = true; this.nade.nade.visible = false; sfx.grenadeThrow(); if (this.onEvent) this.onEvent('throw'); }
+    }
+    if (act.t >= act.dur) { this.action = null; this.knife.root.visible = false; this.nade.root.visible = false; }
+  }
+
+  // 3 號小刀拿在手上:沒有開鏡/換彈;左鍵(按住連砍)出刀,G 照樣丟手榴彈(小刀先放低)
+  _knifeUpdate(dt, input, speedNorm, sprinting, look) {
+    const m = this.models[this.current];
+    this.ads = 0; this.zoom = 1; this.scoped = false; this.scopeAmt = 0; this.dotAmt = 0; this.optic = null;
+    this.aiming = false;
+    if ((input.firePressed || input.fireHeld) && !this.action && this.raise < 0.5) { this.startAction('knife'); this.idleT = 0; }
+    input.firePressed = false;
+    // 擺動與呼吸(與槍同一套彈簧)
+    const tx = -look.x * 0.0011, ty = -look.y * 0.0011;
+    this.swayVX += ((tx - this.swayX) * 160 - this.swayVX * 18) * dt;
+    this.swayVY += ((ty - this.swayY) * 160 - this.swayVY * 18) * dt;
+    this.swayX = Math.max(-0.05, Math.min(0.05, this.swayX + this.swayVX * dt));
+    this.swayY = Math.max(-0.05, Math.min(0.05, this.swayY + this.swayVY * dt));
+    look.x = look.y = 0;
+    this.bobT += dt * (sprinting ? 11 : 7.5) * speedNorm;
+    const bobAmp = 0.008 * speedNorm * (sprinting ? 1.8 : 1);
+    const bx = Math.sin(this.bobT) * bobAmp, by = Math.abs(Math.cos(this.bobT)) * bobAmp * 0.9;
+    const br = 1 - speedNorm;
+    const breathY = Math.sin(this.idleT * 1.35) * 0.0016 * br, breathX = Math.sin(this.idleT * 0.7) * 0.0009 * br;
+    const act = this.action, k = this.knife.root, n = this.nade.root;
+    if (act && act.kind === 'knife') {
+      const P = keyPose(act.held ? KNIFE_HELD : KNIFE_KEYS, act.t, _pose);
+      k.position.set(P[0] + this.swayX * 0.5, P[1] + this.swayY * 0.5, P[2]);
+      k.rotation.set(P[3], P[4], P[5]);
+      k.visible = true;
+    } else {
+      const I = KNIFE_IDLE;
+      let low = this.raise;
+      if (act && act.kind === 'grenade') low = Math.max(low, env(act.t / act.dur, 0, 0.18, 0.75, 1)); // 丟手榴彈:小刀放低移出畫面
+      let px = I[0] + bx + this.swayX + breathX, py = I[1] - by + this.swayY + breathY, rx = I[3], ry = I[4];
+      if (sprinting) { px -= 0.03; py -= 0.05; rx += 0.25; ry += 0.3; }
+      py -= low * 0.4; rx -= low * 0.6;
+      k.position.set(px, py, I[2]);
+      k.rotation.set(rx, ry, I[5]);
+      k.visible = low < 0.98;
+    }
+    if (act && act.kind === 'grenade') {
+      const P = keyPose(NADE_KEYS, act.t, _pose);
+      n.position.set(P[0], P[1], P[2]);
+      n.rotation.set(P[3], P[4], P[5]);
+    }
+    if (m) { m.root.visible = false; if (this.flashT > 0) this.flashT -= dt; m.flash.update(dt, false); }
   }
 
   // 霰彈逐發裝填:open → shell × n → close(空膛時含泵動)

@@ -106,6 +106,30 @@
 .hd-inv svg { width: 1.2em; height: 1.2em; }
 .hd-inv .g svg { color: #a5b27a; }
 .hd-inv .m svg { color: #e9e4da; }
+.hd-inv .s svg { color: #7fe08f; }
+/* 槍位列(1、2 號槍 + 3 號小刀)與狀態列;沒有 filter,手上那一格只換顏色與底線 */
+.hd-slots { display: flex; justify-content: flex-end; gap: .7em; margin-bottom: .35em; font-size: .78em; letter-spacing: .08em; color: var(--hud-dim); }
+.hd-slots span { padding-bottom: .15em; border-bottom: 2px solid transparent; white-space: nowrap; }
+.hd-slots span.on { color: var(--hud-text); border-bottom-color: var(--hud-amber); }
+.hd-slots span.empty { opacity: .4; }
+.hd-slots kbd.kc { font-size: .8em; margin-left: 0; }
+.hd-perks { display: flex; flex-direction: column; align-items: flex-end; gap: .25em; margin-bottom: .45em; font-size: .8em; letter-spacing: .06em; }
+.hd-perks:empty { display: none; }
+.hd-perks span { padding: .12em .5em; border-right: 2px solid rgba(232,227,214,.4); background: rgba(10,12,12,.5); white-space: nowrap; }
+.hd-perks span svg { margin-right: .3em; }
+.hd-perks .gold { color: var(--hud-gold); border-right-color: var(--hud-gold); }
+.hd-perks .blue { color: var(--hud-blue); border-right-color: var(--hud-blue); }
+.hd-perks .green { color: var(--hud-green); border-right-color: var(--hud-green); }
+.hd-perks .red { color: #ff7a6a; border-right-color: #ff5446; }
+.hd-perks .dim { color: var(--hud-dim); }
+.hd-perks kbd.kc { font-size: .78em; }
+/* 閃身鞋詢問框(畫面中央偏下) */
+.hd-ask { left: 50%; top: 58%; transform: translateX(-50%); min-width: 22em; padding: .7em 1.3em .8em; text-align: center; background: rgba(8,10,10,.82);
+  border: 1px solid rgba(141,183,216,.55); border-left: 3px solid var(--hud-blue); letter-spacing: .06em; }
+.hd-ask .t { font-size: 1.15em; font-weight: 700; color: var(--hud-blue); }
+.hd-ask .o { margin-top: .35em; font-size: 1em; }
+.hd-ask .hd-bar { height: .3em; margin-top: .55em; border-color: rgba(141,183,216,.4); }
+.hd-ask .fill { background: var(--hud-blue); transition: none; transform-origin: left center; }
 .hd-inv kbd.kc { font-size: .65em; }
 
 /* ---- 準心周圍:受傷方向 ---- */

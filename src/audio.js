@@ -40,6 +40,7 @@ import { trackState, resumeTracks, preloadStings, _trackX } from './audio/tracks
 import { roomInfo, resetRooms } from './audio/rooms.js';
 import * as SM from './audio/samples.js';
 import { glass } from './audio/glass.js';
+import * as perk from './audio/perks.js';
 
 // AudioContext 只能在使用者互動後建立/恢復;第一次互動(點擊、按鍵)就自動啟動,選單也聽得到配樂與環境音
 let booted = false;
@@ -169,6 +170,11 @@ export const sfx = {
 
   // ---- 驚嚇 / 環境 / 天氣(未建立 context 時也可呼叫,狀態會先記下) ----
   scare: safe((kind, pos) => scare(kind, pos)),
+  // ---- 職業能力 / 裝備(src/game/perks.js) ----
+  zap: safe((pos, n) => perk.zap(pos, n)),
+  blink: safe(() => perk.blink()),
+  inject: safe(() => perk.inject()),
+  shriek: safe((pos) => perk.shriek(pos)),
   setZone: always((zoneId, mood) => setZone(zoneId, mood)),
   loopStart: always((key, kind, pos) => loopStart(key, kind, pos)),
   loopStop: always((key) => loopStop(key)),

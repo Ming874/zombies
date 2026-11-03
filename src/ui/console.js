@@ -3,11 +3,12 @@ import { ITEMS, CATS, findItem, itemNames, clampCount, countable, maxCount, appl
 import { CICON, WIDE } from './conicons.js';
 
 // ===== 控制面板(F8 開關)=====
-// 指令:/give <玩家> <物品> [數量]、/list、/help、/clear(斜線可省略,也可以打中文別名)。
+// 指令:/give <玩家> <物品> [數量]、/rev [玩家]、/godmod [玩家] [on|off]、/stop spawn、/start spawn、/list、/help、/clear(斜線可省略,也可以打中文別名)。
 // 補全選單:輸入框上方即時列出游標這一格(指令、玩家、物品、數量)能填什麼;支援中文別名、英文、只打開頭、模糊比對(錯一兩個字也找得到)。
 //   ↑↓ 選擇、Tab / Enter 套用、Esc 先收起選單,再按一次關閉面板;滑鼠也能點。選單收起時 ↑↓ 翻歷史紀錄。
 // 分色:輸入框底下疊一層同步的著色層(.pt);指令、玩家、物品(依種類)、數量、錯誤各一種顏色。選單色條、物品格子、/help 用同一套顏色。
-// 玩家:me / @s 自己、@a 所有人、/list 裡的編號、或暱稱(可只打開頭)。多人模式只有房主能 /give(伺服器也只轉發房主的 'gv')。
+// 玩家:me / @s 自己、@a 所有人、/list 裡的編號、或暱稱(可只打開頭)。多人模式只有房主能用 /give /rev /godmod /stop /start
+// (伺服器也只轉發房主的 'gv' / 'hrv' / 'hgod';出怪本來就只在房主那一端)。
 // 開著時:單人遊戲暫停;多人世界照常進行,但本機玩家不能動。
 //
 // 鍵盤:遊戲有很多在捕獲階段處理按鍵的模組(flow.js、互動、推理本…)。本模組在載入時就註冊 window 捕獲監聽器(main.js 第一個 import),
@@ -20,6 +21,9 @@ const SELF = ['me', '@s', '@p', 'self', 'local', '我', '自己'];
 const ALL = ['@a', 'all', '所有人', '全部玩家'];
 const isAll = (a) => ALL.includes(String(a).toLowerCase());
 const DIGITS = /^\d+$/;
+const ON = ['on', '1', 'true', '開'], OFF = ['off', '0', 'false', '關'];
+const SPAWN = ['spawn', 'spawns', 'zombie', 'zombies', '殭屍', '出怪'];
+const godR = new Map(); // 房主送出的隊友無敵狀態(/godmod 不填 on/off 時切換用)
 
 export function installConsole(game) { S.game = game; }
 
@@ -58,7 +62,8 @@ function onKeyDown(e) {
 // 常用指令:點了只填進輸入框(玩家可以接著改);物品格子:點一下直接給自己
 const QUICK = [
   ['give me ', '給自己…'], ['give @a ', '給所有人…'], ['give me all', '全部給齊'], ['give me ammo', '補滿彈藥'],
-  ['give me hp', '補滿生命'], ['give me coins 1000', '1000 金幣'], ['list', '玩家清單'], ['help', '說明'],
+  ['give me hp', '補滿生命'], ['give me coins 1000', '1000 金幣'], ['rev @a', '全員救起'], ['godmod @a', '全員無敵'],
+  ['stop spawn', '停止出怪'], ['start spawn', '恢復出怪'], ['list', '玩家清單'], ['help', '說明'],
 ];
 
 function build() {
@@ -212,8 +217,13 @@ const CMDS = {
   give: { name: '給予物品', args: '<玩家> <物品> [數量]', use: '給予物品；省略玩家就是給自己', ex: 'give me rpg', alias: ['給', '給予'], run: runGive },
   list: { name: '玩家清單', args: '', use: '列出玩家和編號', ex: 'list', alias: ['ls', 'players', '玩家', '清單'], run: runList },
   help: { name: '說明', args: '', use: '顯示這份說明', ex: 'help', alias: ['?', 'h', '說明', '幫助'], run: runHelp },
+  rev: { name: '救起', args: '[玩家]', use: '救起倒地／陣亡的玩家並補滿生命；省略玩家就是自己', ex: 'rev @a', alias: ['revive', '復活', '救起'], run: runRev },
+  godmod: { name: '無敵模式', args: '[玩家] [on|off]', use: '開關無敵；不填 on/off 就切換（有人沒開 → 全部開）', ex: 'godmod @a', alias: ['god', 'godmode', '無敵'], run: runGod },
+  stop: { name: '停止出怪', args: 'spawn', use: '停止出怪（場上的殭屍不會消失）', ex: 'stop spawn', alias: ['停止'], run: (a) => runSpawn(a, true) },
+  start: { name: '恢復出怪', args: 'spawn', use: '恢復出怪', ex: 'start spawn', alias: ['恢復'], run: (a) => runSpawn(a, false) },
   clear: { name: '清除紀錄', args: '', use: '把上面的紀錄清掉', ex: 'clear', alias: ['cls', '清除'], run() { S.log.textContent = ''; } },
 };
+const ARGS = { rev: ['pl'], godmod: ['pl', 'onoff'], stop: ['spawn'], start: ['spawn'] }; // 這些指令每一格要填什麼
 function findCmd(n) {
   n = String(n ?? '').toLowerCase();
   if (CMDS[n]) return n;
@@ -264,6 +274,63 @@ function runGive(a) {
       ok(`已送給${/^[!-~]/.test(t.name) ? ' ' : ''}${esc(t.name)}：${itemTag(r.key, amount(r.key, countable(r.key) ? clampCount(r.key, count) : 0))}`);
     }
   }
+}
+
+// 房主指令的共同檢查
+function hostOk(cmd, dead = false) {
+  const g = S.game;
+  if (g.state !== 'playing' && !(dead && g.state === 'dead')) { fail(`要開始遊戲之後才能用 /${cmd}。`); return false; }
+  if (g.net && !g.net.isHost) { fail(`多人模式只有房主能用 /${cmd}。`); return false; }
+  return true;
+}
+const who = (t) => (t.self ? '你' : esc(t.name));
+
+// /godmod 的參數:第一格可以直接是 on/off(= 自己)
+function resolveGod(a) {
+  const m0 = String(a[0] ?? '').toLowerCase(), first = ON.includes(m0) || OFF.includes(m0);
+  const r = first ? { whoI: -1, modeI: 0, who: 'me' } : { whoI: 0, modeI: 1, who: a[0] ?? 'me' };
+  r.mode = String(a[r.modeI] ?? '').toLowerCase();
+  r.ts = targets(r.who);
+  return r;
+}
+
+function runRev(a) {
+  const g = S.game;
+  if (!hostOk('rev', true)) return;
+  const ts = targets(a[0] ?? 'me');
+  if (typeof ts === 'string') { fail(ts); return; }
+  for (const t of ts) {
+    if (t.self) { g.reviveSelf(); ok('已救起你，生命補滿。'); }
+    else if (t.p.connected === false) fail(`${t.name} 已經斷線了。`);
+    else { g.net.reviveRemote(t.slot); ok(`已救起 ${who(t)}。`); }
+  }
+}
+
+function runGod(a) {
+  const g = S.game;
+  if (!hostOk('godmod')) return;
+  const r = resolveGod(a);
+  if (typeof r.ts === 'string') { fail(r.ts); return; }
+  if (r.mode && !ON.includes(r.mode) && !OFF.includes(r.mode)) { fail(`要打 on 或 off，例如 /godmod @a on。`); return; }
+  const isGod = (t) => (t.self ? !!g.player.god : !!godR.get(t.slot));
+  const on = ON.includes(r.mode) ? true : OFF.includes(r.mode) ? false : !r.ts.every(isGod);
+  for (const t of r.ts) {
+    if (t.self) g.setGod(on);
+    else if (t.p.connected === false) { fail(`${t.name} 已經斷線了。`); continue; }
+    else { g.net.godRemote(t.slot, on); godR.set(t.slot, on); }
+    ok(`${who(t)}：無敵模式${on ? '開啟' : '關閉'}。`);
+  }
+}
+
+// /stop spawn、/start spawn:出怪由單人/房主的 flow.updateRound 決定(game.spawnStopped)
+function runSpawn(a, stop) {
+  const g = S.game, cmd = stop ? 'stop' : 'start';
+  if (!SPAWN.includes(String(a[0] ?? '').toLowerCase())) { fail(`要打 /${cmd} spawn。`); return; }
+  if (!hostOk(cmd)) return;
+  if (g.net?.pvp) { fail('對戰模式沒有出怪。'); return; }
+  g.spawnStopped = stop;
+  g.updatePerkHud?.(true);
+  ok(stop ? '已停止出怪，場上的殭屍不會消失。打 /start spawn 恢復。' : '已恢復出怪。');
 }
 
 function runList() {
@@ -319,6 +386,7 @@ function analyze(toks, cur) {
   }
   A.cls[0] = 'x-cmd';
   if (ck === 'give') { giveCheck(w.slice(1), A, cur - 1); return A; }
+  if (ARGS[ck]) { argCheck(ck, w.slice(1), A, cur - 1); return A; }
   for (let i = 1; i < w.length; i++) A.cls[i] = 'x-extra';
   if (w.length > 1) A.tips.push(`/${ck} 不用加參數，多打的「${w.slice(1).join(' ')}」會略過。`);
   A.ready = true;
@@ -361,9 +429,41 @@ function giveCheck(a, A, cur) {
   }
 }
 
+// /rev /godmod /stop /start 的參數
+function argCheck(ck, a, A, cur) {
+  const set = (i, c) => { A.cls[i + 1] = c; };
+  const bad = (i, text) => { set(i, 'x-err'); A.err ??= { i: i + 1, text }; };
+  const extra = (from) => { for (let i = from; i < a.length; i++) set(i, 'x-extra'); if (a.length > from) A.tips.push(`多打的「${a.slice(from).join(' ')}」會略過。`); };
+  if (ck === 'stop' || ck === 'start') {
+    if (!a.length) { A.need = true; return; }
+    if (SPAWN.includes(a[0].toLowerCase())) set(0, 'x-it');
+    else if (cur === 0 && rank(spawnCands(), a[0]).length) { set(0, 'x-pend'); A.need = true; return; }
+    else bad(0, `要打 /${ck} spawn。`);
+    extra(1);
+    if (!A.err) { A.ready = true; A.preview = esc(ck === 'stop' ? '停止出怪（場上的殭屍不會消失）' : '恢復出怪'); }
+    return;
+  }
+  const r = ck === 'godmod' ? resolveGod(a) : { whoI: 0, who: a[0] ?? 'me', ts: targets(a[0] ?? 'me'), modeI: -1, mode: '' };
+  if (r.whoI >= 0 && a[r.whoI] !== undefined) {
+    if (Array.isArray(r.ts)) set(r.whoI, 'x-pl');
+    else if (cur === r.whoI && rank(ck === 'godmod' ? [...playerCands(), ...onoffCands()] : playerCands(), a[r.whoI]).length) { set(r.whoI, 'x-pend'); A.need = true; return; }
+    else bad(r.whoI, r.ts);
+  }
+  if (r.modeI >= 0 && a[r.modeI] !== undefined) {
+    if (ON.includes(r.mode) || OFF.includes(r.mode)) set(r.modeI, 'x-num');
+    else if (cur === r.modeI && rank(onoffCands(), r.mode).length) { set(r.modeI, 'x-pend'); A.need = true; return; }
+    else bad(r.modeI, '要打 on 或 off，例如 /godmod @a on。');
+  }
+  extra(ck === 'godmod' ? r.modeI + 1 : 1);
+  if (A.err || !Array.isArray(r.ts) || !r.ts.length) return;
+  const names = isAll(r.who) && S.game?.net ? `所有人（${r.ts.length} 位）` : r.ts.map(who).join('、');
+  A.ready = true;
+  A.preview = ck === 'rev' ? `救起 ${names}，生命補滿` : `${names}：無敵模式${ON.includes(r.mode) ? '開啟' : OFF.includes(r.mode) ? '關閉' : '切換'}`;
+}
+
 function unknownCmd(w) {
   const b = rank(cmdCands(false), w)[0];
-  return b ? `沒有「${w}」這個指令，你是不是要打 /${b.v}？` : `沒有「${w}」這個指令。可以用 /give、/list、/help、/clear。`;
+  return b ? `沒有「${w}」這個指令，你是不是要打 /${b.v}？` : `沒有「${w}」這個指令。可以用 /give、/rev、/godmod、/stop spawn、/start spawn、/list、/help、/clear。`;
 }
 function unknownItem(w) {
   const b = rank(itemCands(), w)[0];
@@ -402,6 +502,11 @@ function itemCands() {
   return itemNames().map((k) => { const it = ITEMS[k]; return { v: k, keys: [k, it.name, it.short, ...it.aliases], code: k, name: it.name, desc: it.desc, cat: it.cat, icon: CICON[k], wide: WIDE.has(k) }; });
 }
 const whoCands = () => [...playerCands(), ...itemCands()];
+const onoffCands = () => [
+  { v: 'on', keys: ON, code: 'on', name: '開啟', desc: '打開無敵模式', cat: 'num', icon: CICON.ok },
+  { v: 'off', keys: OFF, code: 'off', name: '關閉', desc: '關掉無敵模式', cat: 'num', icon: CICON.err },
+];
+const spawnCands = () => [{ v: 'spawn', keys: SPAWN, code: 'spawn', name: '出怪', desc: '殭屍的生成', cat: 'cmd', icon: CICON.stop }];
 
 function countCands(key, q) {
   const it = ITEMS[key], max = maxCount(key), picks = key === 'coins' ? [100, 500, 1000, 10000, max] : [1, 5, 10, max];
@@ -459,7 +564,13 @@ function roleAt(toks, at) {
   const w = toks.map((t) => t.t);
   if (at.tok.v) w.splice(at.i, 0, '');
   if (at.i === 0) return { r: 'cmd' };
-  if (findCmd(w[0]) !== 'give') return null;
+  const ck = findCmd(w[0]);
+  if (ARGS[ck]) {
+    const k = at.i - 1;
+    if (ck === 'godmod' && k === 1) { const m0 = String(w[1] ?? '').toLowerCase(); return ON.includes(m0) || OFF.includes(m0) ? null : { r: 'onoff' }; }
+    return k === 0 ? { r: ARGS[ck][0] } : null;
+  }
+  if (ck !== 'give') return null;
   const a = w.slice(1), k = at.i - 1;
   if (k === 0) return { r: 'who' };
   const x0 = findItem(a[0]), p0 = typeof targets(a[0]) !== 'string';
@@ -478,7 +589,8 @@ function refresh() {
   const toks = lex(v), at = slotAt(toks, caret), A = analyze(toks, at.tok.v ? -1 : at.i), role = roleAt(toks, at);
   S.cx = { v, toks, at, A, role };
   const q = at.tok.t, r = role?.r;
-  const list = r === 'cmd' ? cmdCands(!v.trim()) : r === 'who' ? whoCands() : r === 'item' ? itemCands() : r === 'count' ? countCands(role.key, q) : [];
+  const list = r === 'cmd' ? cmdCands(!v.trim()) : r === 'who' ? whoCands() : r === 'item' ? itemCands() : r === 'count' ? countCands(role.key, q)
+    : r === 'pl' ? (findCmd(toks[0]?.t) === 'godmod' ? [...playerCands(), ...onoffCands()] : playerCands()) : r === 'onoff' ? onoffCands() : r === 'spawn' ? spawnCands() : [];
   let c = rank(list, q);
   if (c.length === 1 && c[0].exact) c = []; // 已經打完整了,沒有別的可選
   S.cands = c.slice(0, 40);
@@ -499,6 +611,9 @@ function caption(role) {
     case 'cmd': return S.cands.some((c) => c.whole) ? '選一個指令，或重打最近用過的' : '選一個指令';
     case 'who': return '給誰？也可以直接選物品，就是給自己';
     case 'item': return '給什麼？';
+    case 'pl': return '對誰？不填就是自己';
+    case 'onoff': return '開還是關？不填就是切換';
+    case 'spawn': return '打 spawn';
     case 'count': return role.key === 'coins' ? '給多少？直接打數字也可以，不填就是 1000' : `要幾個？直接打數字也可以，不填就是 ${ITEMS[role.key].def} 個`;
     default: return '';
   }
@@ -558,6 +673,9 @@ function renderHint() {
   else if (findCmd(toks[0]?.t) === 'give') {
     const on = { who: 1, item: 2, count: 3 }[role?.r];
     h = `<span class="u">${['/give', '&lt;玩家&gt;', '&lt;物品&gt;', '[數量]'].map((p, i) => (i === on ? `<b>${p}</b>` : p)).join(' ')}</span><span>玩家可以省略，就是給自己</span>`;
+  } else if (ARGS[findCmd(toks[0]?.t)]) {
+    const ck = findCmd(toks[0]?.t), on = { pl: 1, onoff: 2, spawn: 1 }[role?.r];
+    h = `<span class="u">${['/' + ck, ...CMDS[ck].args.split(' ')].map((p, i) => (i === on ? `<b>${esc(p)}</b>` : esc(p))).join(' ')}</span><span>${esc(CMDS[ck].use)}</span>`;
   } else if (shown()) h = '<span><kbd>Tab</kbd> 或 <kbd>Enter</kbd> 套用　<kbd>↑</kbd><kbd>↓</kbd> 選擇　<kbd>Esc</kbd> 收起清單　<kbd>F8</kbd> 關閉面板</span>';
   else h = '<span><kbd>↑</kbd> 叫回上一個指令　<kbd>↓</kbd> 或 <kbd>Tab</kbd> 打開清單　<kbd>Esc</kbd> 關閉面板</span>';
   if (A.tips.length) h += `<span class="t">${CICON.tip}${esc(A.tips[0])}</span>`;

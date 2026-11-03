@@ -137,9 +137,7 @@ export class PvpMode {
   }
   loadout() {
     const g = this.g, w = g.weapons, p = g.player;
-    w.inv = {};
-    w.give('pistol');
-    if (this.primary !== 'pistol' && WEAPONS[this.primary]) w.give(this.primary);
+    w.resetLoadout(this.primary !== 'pistol' && WEAPONS[this.primary] ? ['pistol', this.primary] : ['pistol']); // 1 號手槍、2 號主武器
     w.refillAll();
     w.switchTo(this.primary in w.inv ? this.primary : 'pistol', true);
     p.hp = p.maxHp = 100;

@@ -140,6 +140,9 @@ export class NetSession {
     if (this.pvp && p.alive && !(p.flags & F.SHIELD)) { this.queuePvp(p.id, 0, amount, kind === 'explosion' ? W_BOOM : code(WEAPON_IDS, g.weapons.current)); return amount; }
     return 0;
   }
+  // 控制面板(房主):/rev、/godmod 給某位隊友
+  reviveRemote(slot) { this.send('hrv', 1, slot); }
+  godRemote(slot, on) { this.send('hgod', on ? 1 : 0, slot); }
   // combat:每一道曳光的終點(打中肉體 = 遠端畫面噴血)
   onShot(end, flesh) { this.mode.onFire?.(); this.recordShot(end, flesh); }
   // combat:本機丟出手榴彈 → 其他人模擬同一條拋物線(只有特效)
@@ -355,6 +358,17 @@ export class NetSession {
       const msg = key ? applyGive(g, key, fin(d[1]) ? d[1] : undefined) : null;
       if (msg) this.hud.feed(`${this.nameOf(f)}（房主）給了你：${msg}`, 'host');
     });
+    // 背後撲臉(房主判定):我被撲臉了
+    this.on('js', (d, f) => {
+      if (f !== this.hostSlot || !fin(d)) return;
+      const z = this.zs.byId.get(d);
+      if (z) g.jumpScare(z);
+    });
+    // 電擊槍(任何玩家):房主電暈自己的殭屍,其他人只畫電弧
+    this.on('tz', (d, f) => { const rp = this.remotes.get(f); if (rp && Array.isArray(d)) g.remoteZap(d.filter((x) => fin(x)), rp); });
+    // 控制面板(只收房主送的):/rev 救起、/godmod 無敵模式
+    this.on('hrv', (d, f) => { if (f === this.hostSlot) { g.reviveSelf(); this.hud.feed(`${this.nameOf(f)}（房主）把你救起來了`, 'host'); } });
+    this.on('hgod', (d, f) => { if (f === this.hostSlot) { g.setGod(!!d); this.hud.feed(`${this.nameOf(f)}（房主）${d ? '開啟' : '關閉'}了你的無敵模式`, 'host'); } });
     this.zs.listen();
     this.mode.listen();
   }
@@ -571,7 +585,7 @@ export class NetSession {
     const m = this.mode;
     s.flags = (p.alive !== false && !m.dead ? F.ALIVE : 0) | (p.downed ? F.DOWNED : 0) | (p.sprinting ? F.SPRINT : 0) | (w.reloading > 0 ? F.RELOAD : 0)
       | ((w.ads || 0) > 0.5 ? F.ADS : 0) | (p.flashOn ? F.LIGHT : 0) | (m.dead ? F.DEAD : 0) | (m.shieldT > 0 ? F.SHIELD : 0)
-      | (m.reviving ? F.REVIVE : 0) | (g.player?.menu ? F.MENU : 0) | (this.hud.chatOpen ? F.CHAT : 0) | (g.shopUIOpen ? F.SHOP : 0) | (m.spectating ? F.SPECTATE : 0);
+      | (m.reviving ? F.REVIVE : 0) | (g.player?.menu ? F.MENU : 0) | (this.hud.chatOpen ? F.CHAT : 0) | (g.shopUIOpen ? F.SHOP : 0) | (m.spectating ? F.SPECTATE : 0) | (p.cls === 'medic' ? F.MEDIC : 0);
     s.weapon = code(WEAPON_IDS, w.current);
     s.hp = p.hp; s.armor = p.armor || 0;
     s.rt = m.reviveSlot ?? NONE; s.rp = m.reviveP || 0;

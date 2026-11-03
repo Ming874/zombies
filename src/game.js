@@ -16,6 +16,7 @@ import { fxMethods } from './game/fx.js';
 import { combatMethods } from './game/combat.js';
 import { flowMethods } from './game/flow.js';
 import { inputMethods } from './game/input.js';
+import { perkMethods } from './game/perks.js';
 import { createPhysics } from './physics/index.js';
 import { applyTruth } from './physics/truth.js';
 import { Weather } from './map/weather.js';
@@ -23,7 +24,7 @@ import { installProgramSort } from './sys/drawsort.js';
 import { instrument } from './gfx/gpuprof.js';
 
 // 遊戲主體:建立渲染器/場景/各系統,並跑主迴圈。
-// 細節分在 src/game/*:fx(粒子/血池)、combat(射擊/傷害/爆炸)、flow(回合/出怪/商店/死亡)、input(輸入)、post(後處理)
+// 細節分在 src/game/*:fx(粒子/血池)、combat(射擊/傷害/爆炸)、flow(回合/出怪/商店/死亡)、input(輸入)、post(後處理)、perks(職業/無敵/閃身鞋)
 export class Game {
   // opts.deferred:只建最基本的欄位,其餘由 buildSteps() 分段建構(main.js 分時執行,載入時主執行緒不會被佔住好幾秒)
   constructor(canvas, opts = {}) {
@@ -248,4 +249,4 @@ export class Game {
   }
 }
 
-Object.assign(Game.prototype, fxMethods, combatMethods, flowMethods, inputMethods);
+Object.assign(Game.prototype, fxMethods, combatMethods, flowMethods, inputMethods, perkMethods);

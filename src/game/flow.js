@@ -1,7 +1,7 @@
 import { Zombie } from '../zombies/zombie.js';
 import { TYPES } from '../zombies/types.js';
 import { spawnAffinity } from './waves.js'; // [zombies-w3] 新類型的出生區域偏好
-import { Shop, shopTabs, purchase, modTotal } from '../shop.js';
+import { Shop, shopTabs, purchase, equipSlot, modTotal } from '../shop.js';
 import { Pickups, Supplies } from '../pickups.js';
 import { sfx, resume as resumeAudio, ix as ixs, ghost } from '../audio.js';
 import { settings } from '../ui/settings.js';
@@ -154,12 +154,10 @@ export const flowMethods = {
     p.lastHurtFrom = null;
     if (p.place) p.place(st.x, st.y || 0, st.z, st.yaw || 0); // 位置 + 清掉速度/跳躍/蹲姿
     else { p.pos.set(st.x, st.y || 0, st.z); p.yaw = st.yaw || 0; p.pitch = 0; p.vx = p.vz = 0; }
-    // 重新給武器(只剩手槍),清除改裝
-    this.weapons.inv = {};
+    // 重新給武器(只剩手槍,放在 1 號槍位),清除改裝
     this.weapons.mods = {};
     this.upgrades = {};
-    this.weapons.give('pistol');
-    this.weapons.switchTo('pistol', true);
+    this.weapons.resetLoadout(['pistol']);
     this.round = 0;
     this.kills = 0;
     this.phase = 'fighting';
@@ -176,6 +174,7 @@ export const flowMethods = {
     this.ui.setScore?.(0, true);
     this.ui.setHP(p.hp, p.maxHp);
     this.ui.setArmor?.(0, 0);
+    this.initPerks(); // 職業(醫療兵的醫療包/針筒)、無敵、閃身鞋、停止出怪歸零(src/game/perks.js)
   },
 
   setMood(m) {
@@ -421,7 +420,7 @@ export const flowMethods = {
       // 壓力:太久沒有殭屍接近玩家(12m 內)→ 出怪間隔減半、出生點挑近一點、遠處閒晃的殭屍移近(長回合不會冷場);山谷裡不算
       this._calmT = near < 12 || relax ? 0 : (this._calmT || 0) + dt;
       this.spawnTimer -= dt * (this._calmT > 8 ? 2 : 1);
-      if (!this.spawnHeld && !relax && this.toSpawn > held && alive < this.maxAlive + (this._wgCap | 0) && this.spawnTimer <= 0) {
+      if (!this.spawnHeld && !this.spawnStopped && !relax && this.toSpawn > held && alive < this.maxAlive + (this._wgCap | 0) && this.spawnTimer <= 0) { // spawnStopped:控制面板 /stop spawn
         if (this.spawnZombie()) alive++; // 這一幀剛出的也算活著(否則最後一隻出生的那一幀會誤判清場)
         if (this.spawnBurst > 0) { this.spawnBurst--; this.spawnTimer = 0.45; } else this.spawnTimer = this.spawnEvery * (0.7 + Math.random() * 0.6);
       }
@@ -656,13 +655,21 @@ export const flowMethods = {
     return r;
   },
 
+  // 商店武器頁:把買過的槍放到槍位 slot(0/1)
+  equipGun(id, slot) {
+    const r = equipSlot(this, id, slot);
+    if (r.ok) sfx.switch(id); else sfx.deny();
+    this.updateAmmoHud();
+    return r;
+  },
+
   nextRound() {
     if (this.state !== 'playing' || (this.phase !== 'shop' && this.phase !== 'break')) return;
     if (this.shopUIOpen) this.closeShop();
     this.startRound(this.round + 1);
   },
 
-  // ---------- 醫療包(H) ----------
+  // ---------- 醫療包(F) ----------
   useMedkit() {
     const p = this.player;
     if (this.state !== 'playing' || this.healT > 0 || p.hp <= 0 || p.downed) return false;
@@ -743,7 +750,7 @@ export const flowMethods = {
     this.ui.setScore?.(this.stats.score);
   },
 
-  // ---------- 按鍵(E 互動、N 下一回合、H 醫療包、M 地圖) ----------
+  // ---------- 按鍵(E 互動、N 下一回合、F 醫療包、M 地圖) ----------
   onGameplayKey(e) {
     if (this.state !== 'playing') return;
     if (this.shopUIOpen) { // 商店介面吃掉所有按鍵
@@ -762,6 +769,7 @@ export const flowMethods = {
       }
     }
     if (this.paused || e.repeat) return;
+    if (this.perkKey(e)) return; // X 電擊槍、閃身鞋詢問中的 Y / N
     switch (e.code) {
       case 'KeyE': {
         this.player.keys.KeyE = true; // [net] 合作模式按住 E 救援隊友要讀這個(放開時 input.js 的 keyup 會清掉)
@@ -779,7 +787,7 @@ export const flowMethods = {
         e.stopPropagation();
         this.nextRound();
         return;
-      case 'KeyH':
+      case 'KeyF':
         this.useMedkit();
         return;
       case 'KeyM':
@@ -822,7 +830,7 @@ export const flowMethods = {
     this._tutT = 0.5;
     const p = this.player, w = this.weapons;
     const cap = w.magSize || 1;
-    if (w.ammo && w.ammo.mag <= Math.max(1, Math.floor(cap * 0.25)) && !(w.reloading > 0)) T.show('reload');
+    if (w.ammo && !w.knifeOut && w.ammo.mag <= Math.max(1, Math.floor(cap * 0.25)) && !(w.reloading > 0)) T.show('reload');
     if (this.pickups?.items.some((it) => it.state === 'idle')) T.show('drop', 1);
     if ((p.grenades || 0) > 0) T.show('grenade');
     if ((p.medkits || 0) > 0) T.show('medkit');
@@ -843,6 +851,7 @@ export const flowMethods = {
     this.stats.time += dt;
     this.updateTutorial(dt);
     this._updateHeal(dt);
+    this.updatePerks(dt); // 無敵倒數、醫療兵回血、閃身鞋、電弧(src/game/perks.js)
     this.interact?.update(dt);
     this._doorNav(); // [w6] 門扇不擋導航
     this.pickups?.update(dt, this);
@@ -871,6 +880,8 @@ export const flowMethods = {
 
   updateAmmoHud() {
     const w = this.weapons;
+    this.ui.hud?.setSlots?.(w);
+    if (w.knifeOut) { this.ui.setAmmo('小刀', null, null, false, 0, 0); this._ammoLow = false; return; } // 3 號小刀拿在手上:沒有彈藥
     const cap = typeof w.stat === 'function' ? Math.round(w.stat(w.current, 'mag')) : Math.round(w.def.mag * (w.mods?.[w.current]?.mag ?? 1));
     const prev = this._ammoLow;
     this.ui.setAmmo(w.def.name, w.ammo.mag, w.ammo.reserve, w.reloading > 0, cap, modTotal(this, w.current));

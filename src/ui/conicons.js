@@ -33,6 +33,10 @@ export const CICON = {
   all: CRATE,
   // 指令
   give: svg(`<path fill="currentColor" d="M3.5 9h17v3.4h-17zM5 13.4h14V21H5z"/><path fill="${D}" d="M10.8 9h2.4v12h-2.4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 8.6C10 4 6.6 4.4 7 7c.3 1.6 3 1.8 5 1.6 2 .2 4.7 0 5-1.6.4-2.6-3-3-5 1.6z"/>`),
+  rev: ICON.heal,
+  godmod: ICON.shield,
+  stop: svg('<rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor"/><path fill="rgba(0,0,0,.34)" d="M8 11h8v2H8z"/>'),
+  start: svg('<path fill="currentColor" d="M6 3.5v17l14-8.5z"/>'),
   list: svg('<path fill="currentColor" d="M3 4h4v4H3zm0 6h4v4H3zm0 6h4v4H3zM9 5h12v2H9zm0 6h12v2H9zm0 6h12v2H9z"/>'),
   help: svg('<circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M9.2 9.4c0-1.8 1.3-2.8 2.8-2.8 1.6 0 2.8 1 2.8 2.5 0 2.3-2.8 2.5-2.8 4.7"/><circle cx="12" cy="17.4" r="1.4" fill="currentColor"/>'),
   clear: svg(`<path fill="currentColor" d="M14.2 3.6 21 10.4 12.4 19H7.6L3 14.4z"/><path fill="${D}" d="m8.6 9.2 6.8 6.8-3 3H7.6L3 14.4z"/><path fill="none" stroke="currentColor" stroke-width="1.6" d="M12 20.6h9"/>`),

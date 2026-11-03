@@ -33,12 +33,12 @@ export const combatMethods = {
     // [w4 難度] 傷害倍率:單人/房主結算時乘一次(房主給遠端隊友的也是;客戶端收到 'hurt' 時已經乘過,不再乘);對戰不乘
     if (!this.net || (this.net.isHost && !this.net.pvp)) amount *= this.diff?.().dmg ?? 1;
     if (p !== this.player) return this.net ? this.net.damageRemote(p, amount, src, kind) : 0; // 遠端隊友交給連線層
-    if (p.hp <= 0) return 0;
+    if (p.hp <= 0 || this.invuln(p)) return 0; // 無敵:上帝模式(/godmod)、撲臉、閃身鞋、針筒(src/game/perks.js)
     const dealt = p.hurt(amount, this.time, src);
     this.ui.damageFlash(dealt, src, p); // [motion] 依傷害大小與方向
     this.ui.setHP(p.hp, p.maxHp);
     if (this.ui.setArmor) this.ui.setArmor(p.armor, p.maxArmor);
-    if (p.hp <= 0) this.die();
+    if (p.hp <= 0 && !this.autoInject()) this.die(); // 醫療兵:倒下前自動打一支綠色針筒
     return dealt;
   },
 

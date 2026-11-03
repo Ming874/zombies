@@ -401,6 +401,7 @@ export class ZombieSync {
     (z.amb ? z._ambPose : z['_pose_' + z.type]).call(z, dt, ctx, dist, toX, toZ);
     if (z.type === 'runner' && z.state === 'leap') { const u = z.st / 0.46; z.rootY = Math.max(0, 4 * 0.42 * u * (1 - u)); }
     z._reactions(dt, ctx); // [zombies-w3] ctx:共用動畫層(抽搐、受擊部位反應、首次遭遇提示)
+    if (z.state === 'stun' && z.type !== 'brute') z._shockPose?.(); // 電擊槍電暈(房主的狀態)
     z._applyRoot();
     // 腳步聲(與 Zombie.update 相同的規則)
     if (z.type !== 'brute' && z.type !== 'crawler') {

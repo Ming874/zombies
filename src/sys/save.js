@@ -13,6 +13,7 @@ import { account } from './account.js';
 import { settings } from '../ui/settings.js';
 import { restTime, DIFF } from '../game/waves.js';
 import { WEAPONS, ORDER } from '../weapons/weapon.js';
+import { CLASSES } from '../game/perks.js';
 import { CARD } from '../story/clues.js';
 
 export const SAVE_V = 1;
@@ -46,7 +47,11 @@ const SYS = {
     ser: (g) => ({ round: g.round | 0, diff: g.diffId?.() || 'normal', day: safe('day', () => g.story?.days?.day?.()) || g.round | 0 }),
   },
   player: {
-    ser: (g) => { const p = g.player; return { hp: Math.ceil(p.hp), maxHp: p.maxHp, armor: Math.ceil(p.armor || 0), maxArmor: p.maxArmor || 0, grenades: p.grenades | 0, medkits: p.medkits | 0, coins: p.coins | 0 }; },
+    ser: (g) => {
+      const p = g.player;
+      return { hp: Math.ceil(p.hp), maxHp: p.maxHp, armor: Math.ceil(p.armor || 0), maxArmor: p.maxArmor || 0, grenades: p.grenades | 0, medkits: p.medkits | 0, coins: p.coins | 0,
+        cls: p.cls || 'none', syr: p.syringes | 0, blink: !!p.blink, taser: g.taserRound | 0, blinkR: g.blinkRound | 0 }; // 職業、綠色針筒、閃身鞋與兩者的冷卻(src/game/perks.js)
+    },
     load: (g, d) => {
       const p = g.player;
       if (d.maxHp > 0) p.maxHp = d.maxHp;
@@ -54,13 +59,20 @@ const SYS = {
       p.maxArmor = Math.max(0, num(d.maxArmor)); p.armor = clamp(num(d.armor), 0, p.maxArmor || 0);
       p.grenades = Math.max(0, d.grenades | 0); p.medkits = Math.max(0, d.medkits | 0); p.coins = Math.max(0, d.coins | 0);
       g.ui.setHP(p.hp, p.maxHp); g.ui.setArmor?.(p.armor, p.maxArmor); g.ui.setCoins(p.coins, true);
+      if (CLASSES[d.cls] && !g.net?.pvp) p.cls = d.cls; // 這一局開始時選的職業(舊存檔沒有:沿用開局時的)
+      if (d.syr !== undefined) p.syringes = clamp(d.syr | 0, 0, 9);
+      if (d.blink !== undefined) p.blink = !!d.blink;
+      if (d.taser !== undefined) g.taserRound = Math.max(1, d.taser | 0);
+      if (d.blinkR !== undefined) g.blinkRound = Math.max(0, d.blinkR | 0);
+      g.ui.hud?.setInv?.(p.grenades, p.medkits);
+      g.updatePerkHud?.(true);
     },
   },
   weapons: {
     ser: (g) => {
       const w = g.weapons, inv = {};
       for (const id in w.inv) if (WEAPONS[id]) inv[id] = [w.inv[id].mag | 0, w.inv[id].reserve | 0];
-      return { inv, cur: w.current, up: JSON.parse(JSON.stringify(g.upgrades || {})), mods: JSON.parse(JSON.stringify(w.mods || {})) };
+      return { inv, cur: w.current, slots: [...(w.slots || [])], up: JSON.parse(JSON.stringify(g.upgrades || {})), mods: JSON.parse(JSON.stringify(w.mods || {})) };
     },
     load: (g, d) => {
       const w = g.weapons;
@@ -70,7 +82,13 @@ const SYS = {
       if (!ids.length) return;
       w.inv = {};
       for (const id of ids) { w.give(id); w.inv[id].mag = Math.max(0, d.inv[id][0] | 0); w.inv[id].reserve = Math.max(0, d.inv[id][1] | 0); }
-      w.switchTo(w.inv[d.cur] ? d.cur : ids[0], true);
+      // 槍位(1、2 號):存檔裡的;舊存檔沒有 → 手上那把先放,再補一把
+      const sl = Array.isArray(d.slots) ? d.slots : [];
+      w.slots = [0, 1].map((i) => (typeof sl[i] === 'string' && w.inv[sl[i]] && sl.indexOf(sl[i]) === i ? sl[i] : null));
+      w.knifeOut = false;
+      const cur = w.inv[d.cur] ? d.cur : ids[0];
+      for (const id of [cur, ...ids]) if (w.slots.includes(null) && !w.slots.includes(id)) w.stow(id);
+      w.switchTo(w.slots.includes(cur) ? cur : w.slots.find(Boolean) || cur, true);
       g.updateAmmoHud?.();
     },
   },

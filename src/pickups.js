@@ -802,9 +802,9 @@ export class Pickups {
         p.hp += gain;
         ui.setHP(p.hp, p.maxHp);
         ui.pickup(`+${Math.round(gain)} 生命`, L.css, { icon: 'med', panel: 'health' });
-      } else if ((p.medkits || 0) < Q.medkitCap) { // 滿血:收進背包(按 H 使用)
+      } else if ((p.medkits || 0) < Q.medkitCap) { // 滿血:收進背包(按 F 使用)
         p.medkits = (p.medkits || 0) + 1;
-        ui.pickup('醫療包 +1', L.css, { icon: 'med', sub: `按 H 使用 · 持有 ${p.medkits}/${Q.medkitCap}`, panel: 'medkit' });
+        ui.pickup('醫療包 +1', L.css, { icon: 'med', sub: `按 F 使用 · 持有 ${p.medkits}/${Q.medkitCap}`, panel: 'medkit' });
       } else return false;
       count();
       say('pickupMed', 'switch');

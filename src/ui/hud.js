@@ -27,6 +27,7 @@ function merge(box, key, life) {
   return false;
 }
 const _v = new THREE.Vector3();
+const WNAME = { pistol: '手槍', revolver: '左輪', shotgun: '霰彈槍', ak47: 'AK-47', m4a1: 'M4A1', barrett: '巴雷特', rpg: 'RPG-7' };
 const PICK_ICON = { ammo: ICON.ammo, med: ICON.medkit, grenade: ICON.grenade, armor: ICON.shield, heal: ICON.heal, coin: ICON.coin };
 
 // 位置 → 樓層代號與區域(新多樓層 World 有 layout/zoneAt;舊地圖沒有就只顯示 1F)
@@ -91,13 +92,16 @@ export class Hud {
     hp.appendChild(this.soulEl);
     this.soulFl = [...this.soulEl.children];
 
-    this.weapon = add(mk('hd hd-weapon', `<div class="hd-wname"></div><div class="hd-ammo"><b class="mag">0</b><span class="res">/ 0</span></div>
-      <div class="hd-inv"><span class="g">${ICON.grenade}<b>0</b><kbd class="kc">G</kbd></span><span class="m">${ICON.medkit}<b>0</b><kbd class="kc">H</kbd></span></div>`));
-    this.wName = this.weapon.children[0];
-    this.ammoEl = this.weapon.children[1];
+    this.weapon = add(mk('hd hd-weapon', `<div class="hd-perks"></div><div class="hd-slots"></div><div class="hd-wname"></div><div class="hd-ammo"><b class="mag">0</b><span class="res">/ 0</span></div>
+      <div class="hd-inv"><span class="s hd-hide">${ICON.syringe}<b>0</b></span><span class="g">${ICON.grenade}<b>0</b><kbd class="kc">G</kbd></span><span class="m">${ICON.medkit}<b>0</b><kbd class="kc">F</kbd></span></div>`));
+    this.perksEl = this.weapon.children[0]; // 職業能力與狀態(無敵、電擊槍、閃身鞋…;src/game/perks.js)
+    this.slotsEl = this.weapon.children[1]; // 槍位:1、2 號槍 + 3 號小刀
+    this.wName = this.weapon.children[2];
+    this.ammoEl = this.weapon.children[3];
     this.magEl = this.ammoEl.children[0];
     this.resEl = this.ammoEl.children[1];
     this.gEl = this.weapon.querySelector('.g');
+    this.sEl = this.weapon.querySelector('.s');
     this.mEl = this.weapon.querySelector('.m');
 
     this.dmg = add(mk('hd hd-dmg'));
@@ -108,6 +112,11 @@ export class Hud {
     this.warnEl = add(mk('hd hd-warn hd-hide'));
     this.healEl = add(mk('hd hd-heal hd-hide', '治療中<div class="hd-bar"><div class="fill"></div></div>'));
     this.healFill = this.healEl.querySelector('.fill');
+    // 閃身鞋:被包圍時的詢問框(Y 傳回金水商行 / N 留下來拿無敵);倒數條只改 transform
+    this.askEl = add(mk('hd hd-ask hd-hide', `<div class="t"></div><div class="o"></div><div class="hd-bar"><div class="fill"></div></div>`));
+    this.askT = this.askEl.children[0];
+    this.askO = this.askEl.children[1];
+    this.askFill = this.askEl.querySelector('.fill');
     this.wp = add(mk('hd hd-wp hd-hide', `<i class="arr"></i>${ICON.cart}<span></span><small>金水商行</small>`));
     this.wpArr = this.wp.children[0];
     this.wpTxt = this.wp.querySelector('span');
@@ -183,8 +192,8 @@ export class Hud {
     this._set('wn', `${name}|${reloading ? 1 : 0}|${tier}`, () => {
       this.wName.innerHTML = (tier ? `<i class="tier" title="改裝等級">${'◆'.repeat(Math.min(tier, 9))}</i>` : '') + esc(name) + (reloading ? '<em>換彈中…</em>' : '');
     });
-    this._set('mag', mag, (v) => { this.magEl.textContent = v; });
-    this._set('res', reserve, (v) => { this.resEl.textContent = `/ ${v}`; });
+    this._set('mag', mag, (v) => { this.magEl.textContent = v ?? ''; });
+    this._set('res', reserve, (v) => { this.resEl.textContent = v == null ? '' : `/ ${v}`; }); // null:小刀(沒有彈藥)
     const low = cap && mag < cap && mag <= Math.max(1, Math.floor(cap * 0.25)); // 單發武器(RPG)裝滿時不算彈藥不足
     const st = mag === 0 ? (reserve === 0 ? 'empty dry' : 'empty') : low ? 'low' : '';
     this._set('ammost', st + (reserve === 0 ? ' dry' : ''), (v) => { this.ammoEl.className = `hd-ammo ${v}`; });
@@ -202,6 +211,32 @@ export class Hud {
       this.warnEl.className = `hd hd-warn ${cls}${text ? '' : ' hd-hide'}`;
       if (text) this.warnEl.innerHTML = withKeys(text);
     });
+  }
+  // 槍位列:[1] 手槍 [2] AK-47 [3] 小刀,手上那一格亮起
+  setSlots(w) {
+    if (!w?.slots) return;
+    const cur = w.knifeOut ? 2 : w.slots.indexOf(w.current);
+    const key = `${w.slots[0]}|${w.slots[1]}|${cur}`;
+    this._set('slots', key, () => {
+      const nm = (id) => (id ? WNAME[id] || id : '—');
+      this.slotsEl.innerHTML = [0, 1, 2].map((i) => `<span class="${i === cur ? 'on' : ''}${i < 2 && !w.slots[i] ? ' empty' : ''}"><kbd class="kc">${i + 1}</kbd>${esc(i === 2 ? '小刀' : nm(w.slots[i]))}</span>`).join('');
+    });
+  }
+  // 狀態列:[{ t 文字, c 樣式 }](同樣的內容不重寫 DOM)
+  setPerks(list) {
+    const key = list.map((x) => x.c + ':' + x.t).join('|');
+    this._set('perks', key, () => { this.perksEl.innerHTML = list.map((x) => `<span class="${x.c || ''}">${x.i ? ICON[x.i] || '' : ''}${withKeys(x.t)}</span>`).join(''); });
+  }
+  setSyringes(n) {
+    this._set('syr', n, (v) => { this.sEl.classList.toggle('hd-hide', v == null); if (v != null) { this.sEl.children[1].textContent = v; this.sEl.classList.toggle('zero', !v); } });
+  }
+  // 閃身鞋的詢問框:title 為 null 時收起;u = 剩下的比例
+  ask(title, opts = '', u = 0) {
+    this._set('ask', title ? `${title}|${opts}` : '', () => {
+      this.askEl.classList.toggle('hd-hide', !title);
+      if (title) { this.askT.innerHTML = withKeys(title); this.askO.innerHTML = withKeys(opts); }
+    });
+    if (title) this._set('askU', Math.round(u * 200), () => { this.askFill.style.transform = `scaleX(${Math.max(0, Math.min(1, u))})`; });
   }
   setInv(g = 0, m = 0) {
     this._set('g', g, (v) => { this.gEl.children[1].textContent = v; this.gEl.classList.toggle('zero', !v); });

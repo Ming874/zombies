@@ -17,6 +17,7 @@ export const DEFAULTS = {
   motion: 'auto', // [motion] 畫面動態 auto(跟著 prefers-reduced-motion)| full | reduced(src/ui/motion.js)
   scare: 'normal', // [ghost] 驚嚇強度 off | low | normal | high(src/horror/director.js)
   difficulty: 'normal', // [w4] 難度 easy | normal | hard | nightmare(src/game/waves.js DIFF;src/story/revive.js 也讀它)
+  cls: 'none', // 職業 none | police | medic(src/game/perks.js CLASSES;下一局開始時生效)
   // 沒有效能模組時的畫質備援
   preset: 'high', shadows: true, bloom: true, dynamicRes: true,
 };

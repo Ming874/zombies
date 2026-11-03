@@ -54,6 +54,7 @@ function giveWeapon(game, id) {
   const a = w.inv[id];
   a.mag = w.stat(id, 'mag');
   a.reserve = Math.max(had, def.reserveCap);
+  w.stow(id); // 槍位滿了就換掉手上那一格(其他的收在金水商行)
   if (!w.busy) w.switchTo(id);
 }
 

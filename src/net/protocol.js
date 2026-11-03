@@ -23,6 +23,7 @@ export const name = (list, i, def) => (i < list.length ? list[i] : def);
 export const F = {
   ALIVE: 1, DOWNED: 2, SPRINT: 4, RELOAD: 8, ADS: 16, LIGHT: 32, DEAD: 64, SHIELD: 128,
   REVIVE: 256, MENU: 512, CHAT: 1024, SPECTATE: 2048, SHOP: 4096,
+  MEDIC: 8192, // 職業是醫療兵(src/game/perks.js:隊上有醫療兵 → 合作倒地撐 90 秒)
 };
 
 // ---------- 量化 ----------

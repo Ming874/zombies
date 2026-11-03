@@ -16,7 +16,7 @@ import { sfx } from './audio.js';
 // =====================================================================
 // 商品目錄(4 個分頁:武器 / 彈藥 / 改裝 / 裝備)
 // 商品物件:{ key, kind, id, name, sub, desc, price, icon, preview, state, … };state:
-//   'buy' 可購買、'poor' 錢不夠、'part' 買不起補滿但可買部分彈藥、'owned' 已擁有(可裝備)、'equipped' 使用中、'max' 已滿/已滿級、'na' 未到貨
+//   'buy' 可購買、'poor' 錢不夠、'part' 買不起補滿但可買部分彈藥、'owned' 買過、收在店裡(可裝備到槍位)、'equipped' 在 1/2 號槍位上、'max' 已滿/已滿級、'na' 未到貨
 // =====================================================================
 export const WEAPON_ITEMS = ['pistol', 'revolver', 'shotgun', 'ak47', 'm4a1', 'barrett'];
 const PRICE_FALLBACK = { pistol: 0, revolver: 120, shotgun: 180, ak47: 300, m4a1: 450, barrett: 1350 };
@@ -63,8 +63,10 @@ export const GEAR = [
   { id: 'armor_fix', group: '防具', name: '護甲修補', per: 2, icon: 'shield', desc: '補好目前背心的破損，恢復到滿護甲。每點 2 元，比買新背心便宜。' },
   { id: 'grenade', group: '投擲物', name: '手榴彈', price: 60, add: 1, cap: 6, icon: 'grenade', desc: 'M67 破片手榴彈。按 G 投擲，約 3 秒後爆炸，半徑約 6 公尺。最多攜帶 6 顆。' },
   { id: 'grenade3', group: '投擲物', name: '手榴彈 ×3', price: 165, add: 3, cap: 6, icon: 'grenade', desc: '三顆一組，省 15 元。按 G 投擲。最多攜帶 6 顆。' },
-  { id: 'medkit', group: '醫療', name: '醫療包', price: 90, add: 1, cap: 3, icon: 'medkit', desc: '按 H 使用：2 秒內回復 50 生命，使用時無法射擊。最多攜帶 3 個。' },
+  { id: 'medkit', group: '醫療', name: '醫療包', price: 90, add: 1, cap: 3, icon: 'medkit', desc: '按 F 使用：2 秒內回復 50 生命，使用時無法射擊。最多攜帶 3 個。' },
   { id: 'heal', group: '醫療', name: '急救處置', per: 1, icon: 'heal', desc: '在櫃台立刻包紮，生命直接回滿。每點生命 1 元。' },
+  // 閃身鞋(src/game/perks.js):永久持有;3 隻以上殭屍圍著你打 → 25 秒內選 Y 傳回金水商行 / N 留下來 10 秒無敵;用過冷卻 2 波
+  { id: 'blink', group: '機動', name: '閃身鞋', price: 600, icon: 'boot', desc: '被 3 隻以上的殭屍圍攻時，有 25 秒可以選：按 Y 傳回金水商行門口，或按 N 留下來，換 10 秒無敵。永久持有，每次用完要等 2 波。' },
 ];
 
 const weaponDef = (id) => WEAPONS[id];
@@ -154,12 +156,13 @@ export function shopTabs(game) {
   const w = game.weapons, p = game.player, coins = p.coins;
   const st = (price, blocked) => (blocked ? blocked : coins >= price ? 'buy' : 'poor');
   // ---- 武器 ----
+  // 槍位:'equipped' = 放在 1 或 2 號槍位(slot = 1/2);'owned' = 買過、收在店裡
   const weapons = WEAPON_ITEMS.map((id) => {
-    const d = weaponDef(id), price = weaponPrice(id), owned = !!d && w.has(id);
+    const d = weaponDef(id), price = weaponPrice(id), owned = !!d && w.has(id), si = w.slots ? w.slots.indexOf(id) : -1;
     return {
-      key: `w:${id}`, kind: 'weapon', id, weapon: id, slot: d?.slot, name: weaponName(id), sub: d?.desc || INFO_FALLBACK[id]?.desc || '',
-      desc: BLURB[id] || d?.desc || '', price, preview: { type: 'gun', id },
-      state: !d ? 'na' : owned ? (w.current === id ? 'equipped' : 'owned') : st(price),
+      key: `w:${id}`, kind: 'weapon', id, weapon: id, slot: si >= 0 ? si + 1 : null, name: weaponName(id), sub: d?.desc || INFO_FALLBACK[id]?.desc || '',
+      desc: BLURB[id] || d?.desc || '', price, preview: { type: 'gun', id }, inHand: w.current === id && !w.knifeOut,
+      state: !d ? 'na' : owned ? (si >= 0 || !w.slots ? 'equipped' : 'owned') : st(price),
     };
   });
   // ---- 彈藥 ----
@@ -221,6 +224,9 @@ export function shopTabs(game) {
     } else if (g.id === 'medkit') {
       have = `持有 ${p.medkits || 0}/${g.cap}`;
       if ((p.medkits || 0) >= g.cap) blocked = 'max';
+    } else if (g.id === 'blink') {
+      have = p.blink ? (game.round >= (game.blinkRound || 0) ? '已擁有 · 就緒' : `已擁有 · 第 ${game.blinkRound} 波可再用`) : '永久持有';
+      if (p.blink) blocked = 'max';
     } else if (g.id === 'heal') {
       const miss = Math.max(0, Math.ceil(p.maxHp - p.hp));
       price = miss > 0 ? r5(miss * g.per) : 0;
@@ -242,6 +248,17 @@ export function findItem(tabs, key) {
   return null;
 }
 
+// 武器頁的槍位按鈕:把買過的槍放到槍位 slot(0/1;另一格已經是牠就互換)
+export function equipSlot(game, id, slot) {
+  const w = game.weapons;
+  if (!w.has(id) || !w.equip) return { ok: false, reason: 'na', msg: '還沒有這把槍' };
+  if (w.slots[slot] === id) return { ok: false, reason: 'max', msg: `${weaponName(id)} 已經在槍位 ${slot + 1}` };
+  const old = w.slots[slot];
+  w.equip(id, slot);
+  const away = old && !w.slots.includes(old) ? `（${weaponName(old)} 收進店裡）` : old ? `（${weaponName(old)} 換到槍位 ${w.slots.indexOf(old) + 1}）` : '';
+  return { ok: true, equip: true, msg: `${weaponName(id)} → 槍位 ${slot + 1}${away}`, sound: 'equip', price: 0 };
+}
+
 // 購買:依商品 key 以目前狀態重新報價後執行(不信任 UI 手上的舊資料)。
 // 回傳 { ok, reason?, msg, sound, price, equip?, key, item }。reason:'coins' 錢不夠、'max' 已滿、'na' 尚未開放
 export function purchase(game, ref) {
@@ -252,8 +269,11 @@ export function purchase(game, ref) {
   const fail = (reason, msg) => ({ ok: false, reason, msg, key, item });
   if (item.state === 'na') return fail('na', item.id === 'armor_fix' ? '需要先購買防彈背心' : '這項商品尚未到貨');
   if (item.kind === 'weapon' && (item.state === 'owned' || item.state === 'equipped')) {
-    if (w.current !== item.id) w.switchTo(item.id);
-    return { ok: true, equip: true, msg: `裝備 ${item.name}`, key, item, sound: 'equip', price: 0 };
+    // 收在店裡的:換掉手上那一格(有空的槍位先放空位);已經在槍位上:拿出來
+    const old = w.slots?.includes(item.id) ? null : w.slots?.[w.slots.indexOf(null) >= 0 ? w.slots.indexOf(null) : w.knifeOut ? 1 : Math.max(0, w.slots.indexOf(w.current))];
+    const i = w.stow ? w.stow(item.id) : 0;
+    if (w.current !== item.id || w.knifeOut) w.switchTo(item.id);
+    return { ok: true, equip: true, msg: `裝備 ${item.name} · 槍位 ${i + 1}${old && old !== item.id ? `（${weaponName(old)} 收進店裡）` : ''}`, key, item, sound: 'equip', price: 0 };
   }
   if (item.state === 'max') {
     const msg = item.kind === 'mod' ? '已達最高等級' : item.kind === 'ammo' ? '彈藥已經是滿的'
@@ -271,6 +291,11 @@ export function purchase(game, ref) {
     syncMods(game, item.id);
     const a = w.inv[item.id];
     if (a) { a.mag = statOf(w, item.id, 'mag'); a.reserve = Math.max(a.reserve, weaponDef(item.id).reserveCap ?? a.reserve); }
+    if (w.stow) { // 槍位:有空位放空位,否則換掉手上那一格(換下來的收在店裡,武器頁可以再換回來)
+      const old = w.slots[w.slots.indexOf(null) >= 0 ? w.slots.indexOf(null) : w.knifeOut ? 1 : Math.max(0, w.slots.indexOf(w.current))];
+      const i = w.stow(item.id);
+      msg += ` · 槍位 ${i + 1}${old ? `（${weaponName(old)} 收進店裡）` : ''}`;
+    }
     w.switchTo(item.id);
     sound = 'weapon';
   } else if (item.kind === 'mod') {
@@ -296,6 +321,7 @@ export function purchase(game, ref) {
   else if (item.id === 'grenade' || item.id === 'grenade3') { p.grenades = Math.min(item.def.cap, (p.grenades || 0) + item.def.add); sound = 'item'; }
   else if (item.id === 'medkit') { p.medkits = Math.min(item.def.cap, (p.medkits || 0) + 1); sound = 'item'; }
   else if (item.id === 'heal') { p.hp = p.maxHp; msg = '急救完成 · 生命已回滿'; sound = 'heal'; }
+  else if (item.id === 'blink') { p.blink = true; msg = '購買 閃身鞋（永久持有）'; sound = 'item'; }
   return { ok: true, msg, sound, price, key, item };
 }
 

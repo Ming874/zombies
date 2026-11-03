@@ -206,6 +206,40 @@ export class Zombie {
   }
   cross(t) { return this.st0 < t && this.st >= t; }
 
+  // 電擊槍(src/game/perks.js):電暈 sec 秒——原地抽搐、不能移動和攻擊(巨屍也是)。狀態 'stun' 跟著快照送到隊友畫面
+  shock(sec) {
+    if (!this.alive) return;
+    this.shockT = Math.max(this.shockT || 0, sec);
+    this.rootY = 0;
+    this.vel.x = this.vel.z = 0;
+    if (this.state !== 'stun') this.go('stun');
+  }
+  _shockTick(dt, w) {
+    this.shockT -= dt;
+    w.speed = 0;
+    w.face = this.heading;
+    if (this.shockT <= 0) { this.shockT = 0; this.go('chase'); this.attackCd = Math.max(this.attackCd, 0.5); return 0; }
+    if (this.state !== 'stun') this.go('stun'); // 被打到的受擊反應也不能讓牠掙脫
+    else if (this.type === 'brute' && this.st > 1.6) this.st = 1.2; // 巨屍沿用自己的暈眩姿勢,撐住不放
+    return 0;
+  }
+  // 電暈:全身細碎地抽搐(疊在原本的姿勢上)
+  _shockPose() {
+    const b = this.b, t = this.t * 31 + (this.seed || 0) * 7;
+    const j = (k) => Math.sin(t * k) * 0.6 + Math.sin(t * k * 2.3 + 1.7) * 0.4;
+    b.spine.rotation.x += 0.12 + j(1) * 0.05;
+    b.chest.rotation.z += j(1.3) * 0.07;
+    b.neck.rotation.x += 0.15 + j(0.8) * 0.06;
+    b.head.rotation.x += 0.2 + j(1.1) * 0.12;
+    b.head.rotation.z += j(0.9) * 0.18;
+    if (b.jaw) b.jaw.rotation.x += 0.25 + j(1.7) * 0.1;
+    for (const [s, k] of [['L', 1], ['R', -1]]) {
+      const ua = b['upperArm' + s], fa = b['forearm' + s];
+      if (ua) { ua.rotation.x += -0.45 + j(1.2 + k * 0.1) * 0.12; ua.rotation.z += k * (0.3 + j(1.5) * 0.08); }
+      if (fa) fa.rotation.x += -0.55 + j(1.9) * 0.15;
+    }
+  }
+
   // part:'head' | 'body' | 'armor' | 'arm' | 'leg';回傳是否擊殺
   // hit(可省略,只在呼叫期間有效):{ bone 命中盒所在骨骼, point, dir, dmg 實際傷害, range 射擊距離, weapon, explosive, melee }
   damage(amount, part = 'body', hit = null) {
@@ -357,7 +391,8 @@ export class Zombie {
     this.specialCd -= dt;
 
     const think = this.amb ? this._ambThink : this._thinkFn || (this._thinkFn = this['_think_' + this.type]); // 快取方法,避免每幀組字串;[ambush] 衝出/掉落中
-    const dealt = !this.amb && Z3.pre(this, dt, ctx, dist, w) ? 0 : think.call(this, dt, ctx, dist, toX, toZ, w); // [zombies-w3] pre:面壁等閒置怪癖(埋伏中不跑)
+    const dealt = this.shockT > 0 ? this._shockTick(dt, w) // 電暈中:不思考、不攻擊
+      : !this.amb && Z3.pre(this, dt, ctx, dist, w) ? 0 : think.call(this, dt, ctx, dist, toX, toZ, w); // [zombies-w3] pre:面壁等閒置怪癖(埋伏中不跑)
     if (!this.alive) return dealt; // 膿腫者自爆
     climbStep(this, world, player, hd, dy, w, ZR); // [physics] 玩家站在道具上:爬上去 / 同檯面直接走過去
     // 樓梯上放慢(衝鋒/飛撲除外)
@@ -428,6 +463,7 @@ export class Zombie {
     this._resetPose();
     (this.amb ? this._ambPose : this._poseFn || (this._poseFn = this['_pose_' + this.type])).call(this, dt, ctx, dist, toX, toZ);
     this._reactions(dt, ctx);
+    if (this.state === 'stun' && (this.type !== 'brute' || this.shockT > 0)) this._shockPose();
     this._applyRoot();
     // 腳步(巨屍用重踏,爬行者用拖行,另外處理)
     if (this.type !== 'brute' && this.type !== 'crawler') {
@@ -628,9 +664,12 @@ export class Zombie {
         this.rootY = Math.max(0, 4 * 0.42 * u * (1 - u));
         if (!this.leap.hit && dist < 0.95 && this._canHit(world)) {
           this.leap.hit = true;
-          dealt = L.dmg;
-          p.knock(this.leap.x * 5, this.leap.z * 5);
-          say('bite', p.pos);
+          if (ctx.game?.pounceScare?.(this, p)) { w.speed = 0; w.instant = false; } // 從背後撲上來:撲臉(不扣血,換成 10 秒無敵;src/game/perks.js)
+          else {
+            dealt = L.dmg;
+            p.knock(this.leap.x * 5, this.leap.z * 5);
+            say('bite', p.pos);
+          }
         }
         if (this.st > 0.46 || (this.blocked && this.st > 0.1)) { this.rootY = 0; this.go('recover'); }
         break;
