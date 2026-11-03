@@ -2,15 +2,19 @@ import * as THREE from 'three';
 import { sfx } from '../audio.js';
 import { settings } from '../ui/settings.js';
 import { F } from '../net/protocol.js';
+import { PIN } from '../zombies/zombie.js';
+import { createZombieHand } from '../weapons/models.js';
 
 // 職業、無敵與裝備能力(以 mixin 掛到 Game 上;resetRun 呼叫 initPerks,updateGameplay 每幀呼叫 updatePerks)
 // - 無敵:player.god(控制面板 /godmod)或 player.invulnT 秒數(撲臉、閃身鞋、針筒);combat.damagePlayer 檢查 invuln()
-// - 背後撲臉:狂奔者從玩家背後飛撲命中 → 轉頭、牠的臉貼在眼前、尖嘯;不扣血,換成 10 秒無敵;20 秒內不會再撲臉
+// - 背後撲臉:狂奔者從玩家背後飛撲命中 → 一隻手搭上右肩 → 回頭看到牠 → 被撲倒壓在地上 → 推開起身(約 3.6 秒,
+//   時間軸 PIN 在 zombies/zombie.js);不扣血,演出中無敵,起身後再 10 秒無敵;20 秒內不會再撲臉
 // - 職業(主選單選,存在 settings.cls;單人與合作有效,對戰不套用):
 //   警察 電擊槍 [X]:打中前方的殭屍,連鎖到附近的(最多 10 隻),每隻電暈 10 秒(巨屍也是);用過要等 2 波才充好
 //   醫療兵 受傷 3 秒後自然回血;開局 3 個醫療包 + 4 支綠色針筒(倒下時自動打一針,回到 75% 生命);
 //          隊上有醫療兵時,合作模式倒地可以撐 90 秒(net/coop.js)
-// - 閃身鞋(金水商行裝備,永久持有):3 隻以上殭屍同時圍著你打 → 25 秒內選 [Y] 傳回金水商行,或 [N] 留下來拿 10 秒無敵;用過冷卻 2 波
+// - 閃身鞋(金水商行裝備,永久持有):3 隻以上殭屍同時圍著你打 → 25 秒內選 [Y] 傳回金水商行,或 [N] 留下來拿 10 秒無敵;
+//   考慮的這 25 秒也是無敵;沒選、時間到也算用掉。用過冷卻 2 波
 export const CLASSES = {
   none: { name: '平民', short: '沒有職業能力', sub: '沒有職業能力' },
   police: { name: '警察', short: '[X] 電擊槍 · 連鎖電暈 10 隻', sub: '電擊槍 [X]：打中前方的殭屍並連鎖最多 10 隻，全部電暈 10 秒；用過要等 2 波才充好' },
@@ -19,14 +23,15 @@ export const CLASSES = {
 export const CLASS_ORDER = ['none', 'police', 'medic'];
 export const classPref = () => (CLASSES[settings.get('cls')] ? settings.get('cls') : 'none');
 
-const SCARE = { invuln: 10, cd: 20, behind: -0.3, turn: 0.14, face: 0.62 };
+const SCARE = { invuln: 10, cd: 20, behind: -0.3 };
 export const TASER = { range: 16, cone: 0.34, hop: 7, max: 10, stun: 10, rounds: 2 };
 const MEDIC = { delay: 3, rate: 1.2, syringes: 4, medkits: 3, revive: 0.75 };
 export const BLINK = { crowd: 3, near: 2.2, hold: 0.35, window: 25, invuln: 10, rounds: 2 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-const _o = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3(), _c = new THREE.Vector3(), _n = new THREE.Vector3();
+const _o = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3(), _c = new THREE.Vector3(), _n = new THREE.Vector3(), _h = new THREE.Vector3();
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 // 殭屍胸口(電擊的落點)
 function chest(z, out) {
@@ -48,7 +53,7 @@ function arcLine() {
 
 export const perkMethods = {
   // ---------- 無敵 ----------
-  invuln(p = this.player) { return !!(p && (p.god || p.invulnT > 0)); },
+  invuln(p = this.player) { return !!(p && (p.god || p.invulnT > 0 || (p === this.player && (this._ask || this._pin)))); }, // _ask:閃身鞋考慮中;_pin:撲臉演出中
   grantInvuln(sec) { const p = this.player; p.invulnT = Math.max(p.invulnT || 0, sec); },
   setGod(on) { this.player.god = !!on; this.updatePerkHud(true); },
 
@@ -67,7 +72,7 @@ export const perkMethods = {
     this._crowdT = 0;
     this._scareCd = 0;
     this._scareCdR = null;
-    this._scareCam = null;
+    this._pinEnd();
     for (const a of this._arcs || []) a.line.visible = false;
     if (p.cls === 'medic') { p.medkits = Math.max(p.medkits || 0, MEDIC.medkits); p.syringes = MEDIC.syringes; }
     this.ui.hud?.setInv?.(p.grenades || 0, p.medkits || 0);
@@ -86,7 +91,7 @@ export const perkMethods = {
   updatePerks(dt) {
     const p = this.player;
     if (p.invulnT > 0) p.invulnT = Math.max(0, p.invulnT - dt);
-    this._scareTick(dt);
+    this._pinStep(dt);
     if (p.cls === 'medic') this._medicRegen(dt);
     this._blinkTick(dt);
     this._arcTick(dt);
@@ -108,6 +113,7 @@ export const perkMethods = {
     this._perkT = 6;
     const p = this.player, list = [];
     if (p.god) list.push({ t: '無敵模式', c: 'gold', i: 'shield' });
+    else if (this._ask) list.push({ t: '無敵 · 閃身鞋考慮中', c: 'gold', i: 'shield' });
     else if (p.invulnT > 0) list.push({ t: `無敵 ${Math.ceil(p.invulnT)} 秒`, c: 'gold', i: 'shield' });
     if (this.spawnStopped) list.push({ t: '已停止出怪', c: 'red', i: 'skull' });
     if (p.cls === 'police') list.push(this.round >= this.taserRound ? { t: '[X] 電擊槍 · 就緒', c: 'blue', i: 'bolt' } : { t: `電擊槍充電中 · 第 ${this.taserRound} 波`, c: 'dim', i: 'bolt' });
@@ -143,59 +149,115 @@ export const perkMethods = {
   },
 
   // ---------- 背後撲臉 ----------
-  // zombie.js 狂奔者飛撲命中時呼叫;回傳 true = 這一撲變成撲臉(不扣血、10 秒無敵)
+  // zombie.js 狂奔者飛撲命中時呼叫;回傳 true = 這一撲變成撲臉(不扣血)
   pounceScare(z, t) {
-    if (!z || !t || t.alive === false || t.downed || !Number.isFinite(t.yaw)) return false;
+    if (!z || !t || t.alive === false || t.downed || !Number.isFinite(t.yaw) || z.pin) return false;
     const ax = z.pos.x - t.pos.x, az = z.pos.z - t.pos.z, l = Math.hypot(ax, az) || 1;
     if ((-Math.sin(t.yaw) * ax - Math.cos(t.yaw) * az) / l > SCARE.behind) return false; // 從前方/側面撲:一般的飛撲
     if (t === this.player) {
-      if (this.time < (this._scareCd || 0)) return false;
+      if (this.time < (this._scareCd || 0) || this._pin) return false;
+      z.pinOn?.(t);
       this.jumpScare(z);
       return true;
     }
-    if (!t.remote || !this.net?.isHost || !(z._nid > 0)) return false; // 房主替隊友判定,送給他本人演
+    if (!t.remote || !this.net?.isHost || !(z._nid > 0)) return false; // 房主替隊友判定:殭屍照時間軸演,畫面送給他本人
     const cd = this._scareCdR || (this._scareCdR = new Map());
     if (this.time < (cd.get(t.id) || 0)) return false;
     cd.set(t.id, this.time + SCARE.cd);
+    z.pinOn?.(t);
     this.net.send('js', z._nid, t.id);
     return true;
   },
+  // 本機玩家的撲臉演出(單人/房主直接呼叫;隊友收到房主的 'js')。殭屍那邊由 zombie.pinOn 照同一條時間軸演
   jumpScare(z) {
     const p = this.player;
+    if (this._pin) return;
     this._scareCd = this.time + SCARE.cd;
-    p.invulnT = Math.max(p.invulnT || 0, SCARE.invuln);
-    const ax = z.pos.x - p.pos.x, az = z.pos.z - p.pos.z, l = Math.hypot(ax, az) || 1;
-    if (!z._proxy) { // 單人/房主:牠停在眼前 0.6m、臉朝你(多人的隊友畫面跟著快照)
-      const d = Math.min(l, SCARE.face);
-      z.pos.x = p.pos.x + (ax / l) * d;
-      z.pos.z = p.pos.z + (az / l) * d;
-      this.world.resolve?.(z.pos, Math.min(z.T?.radius || 0.3, 0.3));
-      z.heading = Math.atan2(-ax, -az);
-      z.vel.x = z.vel.z = 0;
-      z.rootY = 0;
-      z.go?.('recover');
-      z.attackCd = Math.max(z.attackCd || 0, 1.2);
-    }
-    const eye = p.pos.y + (p.eyeH || 1.6), head = z.pos.y + (z.type === 'crawler' ? 0.4 : z.headH || 1.55);
-    const yaw = Math.atan2(-ax, -az);
-    this._scareCam = { t: 0, y0: p.yaw, y1: p.yaw + wrap(yaw - p.yaw), p0: p.pitch, p1: clamp(Math.atan2(head - eye, Math.min(l, SCARE.face)), -0.7, 0.5) };
-    p.addShake?.(0.75);
-    this.grade?.pulse?.(1.2);
-    this.ui.damageFlash?.(30, z.pos, p);
-    sfx.shriek(z.vp || z.pos);
-    sfx.scare('sting', z.pos);
-    if (this.input) this.input.fireHeld = false;
-    this.ui.feed?.('牠從背後撲上來了！10 秒內不會受傷', { icon: 'skull', color: '#ff6a5a', ms: 4200 });
+    const dx = z.pos.x - p.pos.x, dz = z.pos.z - p.pos.z, l = Math.hypot(dx, dz) || 1;
+    this._pin = { z, t: 0, y0: p.yaw, p0: p.pitch, yaw: p.yaw, pitch: p.pitch, dx: dx / l, dz: dz / l, ev: 0, bite: PIN.tackle + 0.15 };
+    if (this.input) { this.input.fireHeld = false; this.input.firePressed = false; this.input.aimHeld = false; }
+    if (this.healT > 0) { this.healT = 0; this.ui.healing?.(null); }
+    p.addShake?.(0.15);
+    sfx.scare('breath_close', { x: p.pos.x + dx * 0.4, y: p.pos.y + 1.6, z: p.pos.z + dz * 0.4 });
     this.updatePerkHud(true);
   },
-  _scareTick(dt) {
-    const c = this._scareCam;
-    if (!c) return;
-    c.t += dt;
-    const u = Math.min(1, c.t / SCARE.turn), e = u * u * (3 - 2 * u), p = this.player;
-    p.yaw = c.y0 + (c.y1 - c.y0) * e;
-    p.pitch = c.p0 + (c.p1 - c.p0) * e;
-    if (u >= 1) this._scareCam = null;
+  // 每幀:鏡頭(在 player.update 設好相機之後疊上去)、肩上的手、聲音
+  _pinStep(dt) {
+    const P = this._pin;
+    if (!P) return;
+    const p = this.player, cam = this.camera, z = P.z, w = this.weapons;
+    P.t += dt;
+    if ((!z.alive || this.state !== 'playing') && P.t < PIN.pinned) P.t = PIN.pinned; // 牠被打死了:直接起身
+    const t = P.t;
+    // 槍放下、不能開槍(移動由 game.update 擋)
+    w.raise = Math.max(w.raise, 1);
+    if (this.input) { this.input.fireHeld = false; this.input.firePressed = false; this.input.aimHeld = false; }
+    // ---- 事件 ----
+    const fire = (k, at, fn) => { if (P.ev < k && t >= at) { P.ev = k; fn(); } };
+    fire(1, PIN.touch, () => sfx.scare('heartbeat_spike'));
+    fire(2, PIN.turn, () => { // 回過頭:牠的臉就在眼前
+      sfx.shriek(z.vp || z.pos);
+      sfx.scare('sting', z.pos);
+      this.grade?.pulse?.(1.2);
+      p.addShake?.(0.45);
+    });
+    fire(3, PIN.tackle, () => { // 被撲倒在地上
+      sfx.knock?.();
+      sfx.thud?.(p.pos, true);
+      this.ui.damageFlash?.(30, z.pos, p);
+      p.addShake?.(1);
+      this.ui.feed?.('牠從背後撲上來，把你壓倒在地上！', { icon: 'skull', color: '#ff6a5a', ms: 3600 });
+    });
+    if (t >= P.bite && t < PIN.pinned) { P.bite += 0.32 + Math.random() * 0.12; sfx.bite?.(z.vp || z.pos); p.addShake?.(0.25); }
+    fire(4, PIN.pinned, () => { sfx.thud?.(z.pos, false); p.addShake?.(0.3); }); // 把牠推開
+    // ---- 鏡頭 ----
+    const down = t < PIN.face ? 0 : t < PIN.tackle ? sstep(PIN.face, PIN.tackle, t) : t < PIN.pinned ? 1 : 1 - sstep(PIN.pinned, PIN.end, t);
+    cam.position.y -= ((p.eyeH || 1.6) - 0.32) * down; // 倒在地上
+    cam.position.x -= P.dx * 0.2 * down; // 往後倒(離開殭屍)
+    cam.position.z -= P.dz * 0.2 * down;
+    // 看哪裡:先往右肩偏一點 → 回頭盯著牠的頭(轉完就固定朝向)→ 倒地仰看壓在上面的牠 → 起身時視線放平
+    const head = z.b?.head;
+    if (head) head.getWorldPosition(_h); else _h.set(z.pos.x, z.pos.y + (z.headH || 1.55), z.pos.z);
+    const hx = _h.x - cam.position.x, hz = _h.z - cam.position.z, hy = _h.y - cam.position.y;
+    let yaw, pitch;
+    if (t < PIN.touch) { const e = sstep(0.15, PIN.touch, t); yaw = P.y0 - 0.12 * e; pitch = P.p0; } // 右肩被抓:頭往右偏一點
+    else {
+      if (t < PIN.turn && Math.hypot(hx, hz) > 0.12) P.yawA = Math.atan2(-hx, -hz); // 回頭的目標:牠的頭(還在背後時才更新;壓上來時頭會越過鏡頭)
+      const y1 = P.y0 - 0.12, e = sstep(PIN.touch, PIN.turn, t);
+      yaw = y1 + wrap((P.yawA ?? y1) - y1) * e;
+      const along = hx * -Math.sin(yaw) + hz * -Math.cos(yaw); // 頭在視線方向上的距離(越過頭頂時是負的 → 仰到最高)
+      const pitchA = clamp(Math.atan2(hy, along), -1.0, 1.3);
+      if (t < PIN.pinned) { pitch = P.p0 + (pitchA - P.p0) * e; P.pitchEnd = pitch; }
+      else pitch = P.pitchEnd * (1 - sstep(PIN.pinned, PIN.end, t));
+    }
+    const off = cam.rotation.x - p.pitch; // player.update 疊上去的晃動/後座
+    p.yaw = yaw;
+    p.pitch = pitch;
+    const roll = (t < PIN.turn ? -0.06 * sstep(0.1, PIN.touch, t) * (1 - sstep(PIN.touch, PIN.turn, t)) : 0) + 0.22 * down;
+    cam.rotation.set(pitch + off, yaw, cam.rotation.z + roll);
+    // ---- 右肩上的手(手持場景:畫面右下)----
+    const H = this._hand || (this._hand = (() => { const h = createZombieHand(); this.weaponScene.add(h.root); return h; })());
+    const vis = t < PIN.turn + 0.1;
+    H.root.visible = vis;
+    if (vis) {
+      const inn = sstep(0, 0.22, t), out = sstep(PIN.touch + 0.1, PIN.turn + 0.1, t);
+      // 從背後越過右肩搭上來:前臂往右上後方出畫面,手指朝前下方垂在鎖骨上(手持相機 52°:z -0.3 時畫面下緣約 y -0.146)
+      H.root.position.set(0.19 + 0.22 * (1 - inn) + 0.3 * out, -0.115 + 0.05 * (1 - inn) + 0.005 * Math.sin(t * 9) * inn, -0.3);
+      H.root.rotation.set(-0.55, 0.4, 0.2);
+      H.set(Math.min(1, sstep(0.1, 0.5, t) + 0.15 * Math.sin(t * 13) * (1 - out)));
+    }
+    if (t >= PIN.end) this._pinEnd(true);
+  },
+  _pinEnd(done = false) {
+    if (this._hand) this._hand.root.visible = false;
+    if (!this._pin) return;
+    this._pin = null;
+    if (!done) return;
+    const p = this.player;
+    p.invulnT = Math.max(p.invulnT || 0, SCARE.invuln); // 起身後再 10 秒無敵
+    this.weapons.raise = Math.max(this.weapons.raise, 0.9); // 槍重新舉起來
+    this.ui.feed?.(`爬起來了 · ${SCARE.invuln} 秒內不會受傷`, { icon: 'shield', color: '#f2c84b', ms: 3200 });
+    this.updatePerkHud(true);
   },
 
   // ---------- 警察:電擊槍 ----------
@@ -320,8 +382,16 @@ export const perkMethods = {
     if (this._ask) {
       const a = this._ask;
       a.t -= dt;
-      if (a.t <= 0 || this.state !== 'playing' || p.downed || p.alive === false) { this._ask = null; H?.ask?.(null); return; } // 沒選:鞋子不算用掉
-      H?.ask?.('閃身鞋 · 被包圍了！', `[Y] 傳回金水商行　　[N] 留下來（${BLINK.invuln} 秒無敵）　${Math.ceil(a.t)} 秒`, a.t / BLINK.window);
+      if (this.state !== 'playing' || p.downed || p.alive === false) { this._ask = null; H?.ask?.(null); return; }
+      if (a.t <= 0) { // 沒選:考慮的 25 秒已經無敵過了,鞋子算用掉
+        this._ask = null;
+        H?.ask?.(null);
+        this.blinkRound = this.round + BLINK.rounds;
+        this.ui.feed?.('閃身鞋 · 沒有選擇，無敵結束', { icon: 'shield', color: '#a3a39a', ms: 3000 });
+        this.updatePerkHud(true);
+        return;
+      }
+      H?.ask?.('閃身鞋 · 被包圍了！考慮的時候不會受傷', `[Y] 傳回金水商行　　[N] 留下來（再 ${BLINK.invuln} 秒無敵）　${Math.ceil(a.t)} 秒`, a.t / BLINK.window);
       return;
     }
     if (!p.blink || this.round < this.blinkRound || this.phase !== 'fighting' || p.downed || p.alive === false || this.state !== 'playing') { this._crowdT = 0; return; }

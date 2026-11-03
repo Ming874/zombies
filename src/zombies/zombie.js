@@ -9,6 +9,9 @@ const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const lerp = (a, b, t) => a + (b - a) * t;
 const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const env = (t, a, b, c, d) => sstep(a, b, t) * (1 - sstep(c, d, t)); // 進場 a→b、退場 c→d 的包絡
+// 背後撲臉的時間軸(秒;zombie 的狀態 'pin' 與 src/game/perks.js 的鏡頭共用):
+// 0 手搭上右肩 → touch 開始回頭 → turn 看到牠的臉 → face 撲上來 → tackle 倒地被壓住 → pinned 推開、起身 → end
+export const PIN = { touch: 0.85, turn: 1.3, face: 1.55, tackle: 1.95, pinned: 2.9, end: 3.6 };
 const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const TAU = Math.PI * 2;
 // 每幀預算(以 10ms 時間窗近似一幀,所有殭屍共用):語音是在主執行緒即時合成的(每次 2~5ms,第一次可到 20ms),
@@ -206,6 +209,33 @@ export class Zombie {
   }
   cross(t) { return this.st0 < t && this.st >= t; }
 
+  // 背後撲臉(src/game/perks.js):站到目標背後偏右 0.5m,照 PIN 時間軸演完(單人/房主;隊友畫面看快照的 'pin' 狀態)
+  pinOn(T) {
+    if (!this.alive || !T) return;
+    const y = T.yaw || 0, fx = -Math.sin(y), fz = -Math.cos(y), rx = Math.cos(y), rz = -Math.sin(y);
+    this.pin = { T, t: 0, px: T.pos.x, pz: T.pos.z, ax: T.pos.x - fx * 0.5 + rx * 0.18, az: T.pos.z - fz * 0.5 + rz * 0.18 };
+    this.shockT = 0;
+    this.rootY = 0;
+    this.go('pin');
+  }
+  _pinTick(dt, w) {
+    const P = this.pin;
+    P.t += dt;
+    const t = P.t, dx = P.px - P.ax, dz = P.pz - P.az, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+    // 起點(背後偏右)→ 撲上來壓住(離玩家中心 0.55m,身體往前壓、臉在倒地的玩家上方)→ 被推開 1.3m
+    const reach = Math.max(0, l - 0.55), ox = P.ax + ux * reach, oz = P.az + uz * reach;
+    if (t < PIN.face) { this.pos.x = P.ax; this.pos.z = P.az; }
+    else if (t < PIN.pinned) { const k = sstep(PIN.face, PIN.tackle, t); this.pos.x = P.ax + (ox - P.ax) * k; this.pos.z = P.az + (oz - P.az) * k; }
+    else { const k = sstep(PIN.pinned, PIN.end, t) * 1.3; this.pos.x = ox - ux * k; this.pos.z = oz - uz * k; }
+    this.vel.x = this.vel.z = 0;
+    this.heading = Math.atan2(ux, uz);
+    w.x = w.z = 0; w.speed = 0; w.instant = true; w.face = this.heading;
+    this.state = 'pin';
+    this.st = t;
+    if (t >= PIN.end || P.T.alive === false) { this.pin = null; this.go('recover'); this.attackCd = 1.5; this.specialCd = 4; }
+    return 0;
+  }
+
   // 電擊槍(src/game/perks.js):電暈 sec 秒——原地抽搐、不能移動和攻擊(巨屍也是)。狀態 'stun' 跟著快照送到隊友畫面
   shock(sec) {
     if (!this.alive) return;
@@ -391,7 +421,8 @@ export class Zombie {
     this.specialCd -= dt;
 
     const think = this.amb ? this._ambThink : this._thinkFn || (this._thinkFn = this['_think_' + this.type]); // 快取方法,避免每幀組字串;[ambush] 衝出/掉落中
-    const dealt = this.shockT > 0 ? this._shockTick(dt, w) // 電暈中:不思考、不攻擊
+    const dealt = this.pin ? this._pinTick(dt, w) // 背後撲臉的演出中
+      : this.shockT > 0 ? this._shockTick(dt, w) // 電暈中:不思考、不攻擊
       : !this.amb && Z3.pre(this, dt, ctx, dist, w) ? 0 : think.call(this, dt, ctx, dist, toX, toZ, w); // [zombies-w3] pre:面壁等閒置怪癖(埋伏中不跑)
     if (!this.alive) return dealt; // 膿腫者自爆
     climbStep(this, world, player, hd, dy, w, ZR); // [physics] 玩家站在道具上:爬上去 / 同檯面直接走過去
@@ -439,7 +470,7 @@ export class Zombie {
     }
     const minD = this.T.radius + 0.38;
     const pd = Math.hypot(pos.x - player.pos.x, pos.z - player.pos.z);
-    if (pd < minD && same && this.state !== 'climb') {
+    if (pd < minD && same && this.state !== 'climb' && !this.pin) { // 撲臉演出:要壓到玩家身上
       const nx = (pos.x - player.pos.x) / (pd || 1), nz = (pos.z - player.pos.z) / (pd || 1);
       pos.x = player.pos.x + nx * minD;
       pos.z = player.pos.z + nz * minD;
@@ -955,6 +986,7 @@ export class Zombie {
     let o = RUN_O;
     if (S === 'crouch') { crouch = lerp(crouch, 0.5, sstep(0, 0.2, st)); lean = 0.6; }
     if (S === 'recover') { crouch = lerp(0.45, 0.15, st / 0.5); lean = 0.5; }
+    if (S === 'pin') { crouch = st < PIN.face ? 0.15 : st < PIN.pinned ? 0.55 : lerp(0.55, 0.15, sstep(PIN.pinned, PIN.end, st)); lean = st < PIN.face ? 0.3 : 0.6; }
     if (S === 'leap') o = LEAP_O;
     const climb = S === 'climb' ? Math.sin(Math.PI * clamp(st / VAULT_T, 0, 1)) : 0; // 翻越:收腿、手撐
     if (climb) { o = this._vo || (this._vo = { th: 0, kn: 0, toe: 0.05, wide: 0.12 }); o.th = -1.2 * climb; o.kn = 1.8 * climb; lean = 0.35 + 0.3 * climb; }
@@ -986,6 +1018,10 @@ export class Zombie {
         x = lerp(0.5, -1.9, u); z = lerp(0.6, 0.0, u) + 0.2; el = lerp(1.0, 0.2, u);
       }
       if (S === 'trip' || S === 'getup') { x = -1.4; z = 0.4; el = 0.2; }
+      if (S === 'pin') {
+        if (st < PIN.face) { if (k) { x = -1.35; z = 0.12; el = 0.45; wr = -0.2; } else { x = -0.25; z = 0.35; el = 0.5; } } // 右手搭在玩家右肩,左手垂著
+        else { x = lerp(-1.4, -1.9, sstep(PIN.face, PIN.tackle, st)) + (st > PIN.tackle && st < PIN.pinned ? Math.sin(this.t * 22 + k * 2) * 0.15 : 0); z = 0.25; el = 0.4; wr = -0.2; } // 雙手壓上來
+      }
       if (climb) { x = lerp(x, -1.15 + k * 0.1, climb); z = lerp(z, 0.25, climb); el = lerp(el, 0.25, climb); wr = -0.6 * climb; }
       this._arm(L, s, x, z, el, wr);
     }
@@ -996,7 +1032,14 @@ export class Zombie {
     else if (S === 'getup') { const e = 1 - sstep(0, 0.8, st); this.rootPitch = e * 1.42; this.rootY = e * 0.12; this._legs(0, 0, 0, e * 0.6, NO_O); }
     else if (climb || S === 'climb') this.rootY = climb * ((this.vault ? this.vault.h : 0.9) + 0.12);
     else if (S !== 'leap') this.rootY = 0;
-    b.jaw.rotation.x = S === 'crouch' || S === 'leap' ? 0.75 : 0.22 + Math.sin(this.t * 9) * 0.1;
+    if (S === 'pin') { // 撲倒:身體往前壓、跳起一點;壓住時頭低下來對著玩家
+      const u = st < PIN.face ? 0 : st < PIN.tackle ? sstep(PIN.face, PIN.tackle, st) : st < PIN.pinned ? 1 : 1 - sstep(PIN.pinned, PIN.end, st);
+      this.rootPitch = 0.35 * u;
+      this.rootY = st > PIN.face && st < PIN.tackle ? Math.sin((Math.PI * (st - PIN.face)) / (PIN.tackle - PIN.face)) * 0.15 : 0;
+      b.spine.rotation.x = 0.3 + 0.35 * u;
+      b.head.rotation.set(-0.3 + 0.35 * u, 0, st < PIN.face ? 0.35 : 0); // 壓住時低頭盯著地上的玩家
+    }
+    b.jaw.rotation.x = S === 'crouch' || S === 'leap' ? 0.75 : S === 'pin' && st > PIN.turn ? 0.6 + Math.sin(this.t * 14) * 0.2 : 0.22 + Math.sin(this.t * 9) * 0.1;
     this._jaw(0.2);
   }
 

@@ -186,7 +186,7 @@ export class Game {
     if (paused && !this.net) return; // [net] 多人模式世界不暫停,只是本機玩家不能操作
 
     const p = this.player;
-    p.update(dt, !paused && !p.downed && p.alive !== false); // [net] 倒地/陣亡/多人暫停選單時不能移動
+    p.update(dt, !paused && !p.downed && p.alive !== false && !this._pin); // [net] 倒地/陣亡/多人暫停選單時不能移動;_pin:背後撲臉的演出(src/game/perks.js)
     this.physics.begin(dt); // 物理:送出上一幀的命令,Worker 與下面的遊戲邏輯平行步進
     if (this.net) this.net.afterPlayer(dt); // [net] 倒地/觀戰鏡頭、遠端角色動畫、送出本機狀態
     const targets = this.flowTargets();

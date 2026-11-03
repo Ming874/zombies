@@ -37,9 +37,9 @@ export const WEAPONS = {
     stats: { damage: 0.82, rate: 0.16, accuracy: 0.22, range: 0.2, mobility: 0.72 },
   },
   ak47: {
-    name: 'AK-47', desc: '7.62×39mm · 全自動 · Kobra 紅點鏡', price: 300, damage: 35, rpm: 600, auto: true,
+    name: 'AK-47', desc: '7.62×39mm · 全自動 · 機械瞄具', price: 300, damage: 35, rpm: 600, auto: true,
     mag: 30, reserveStart: 90, reserveCap: 180, reload: 2.5, spread: 0.014, kick: 0.05, pitch: 0.016,
-    hold: [0.17, -0.17, -0.66], slot: 4, ads: { zoom: 1.5, spread: 0.0009, time: 0.22, optic: 'reddot' }, penetrate: 1, penMul: 0.65,
+    hold: [0.17, -0.17, -0.66], slot: 4, ads: { zoom: 1.35, spread: 0.0012, time: 0.22, optic: 'iron' }, penetrate: 1, penMul: 0.65,
     falloff: [30, 70], minDmg: 0.65, bloom: 0.0035, moveSpread: 1.6,
     recoil: { yaw: [0, 0.15, 0.3, 0.35, 0.2, -0.15, -0.45, -0.55, -0.35, 0.05, 0.45, 0.6, 0.4, 0, -0.4, -0.6, -0.45, -0.05, 0.4, 0.55], rand: 0.25 },
     flash: 'rifle', casing: 'rifle', casingSize: [0.0113, 0.039], move: 0.97,
@@ -505,7 +505,10 @@ export class WeaponSystem {
     const m = this.models[this.current];
     this.ads = 0; this.zoom = 1; this.scoped = false; this.scopeAmt = 0; this.dotAmt = 0; this.optic = null;
     this.aiming = false;
-    if ((input.firePressed || input.fireHeld) && !this.action && this.raise < 0.5) { this.startAction('knife'); this.idleT = 0; }
+    // 剛拿出來(還在舉刀)或上一刀還沒收回時按的那一下記著,一可以就砍(和半自動槍的 fireQueue 一樣跟手)
+    if (input.firePressed) this.slashQ = 0.35;
+    this.slashQ = Math.max(0, (this.slashQ || 0) - dt);
+    if ((this.slashQ > 0 || input.fireHeld) && !this.action && this.raise < 0.5) { this.slashQ = 0; this.startAction('knife'); this.idleT = 0; }
     input.firePressed = false;
     // 擺動與呼吸(與槍同一套彈簧)
     const tx = -look.x * 0.0011, ty = -look.y * 0.0011;

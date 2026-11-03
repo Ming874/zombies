@@ -641,34 +641,45 @@ function leftToMag(st, t, x, y, z) {
   L.rotation.set(-0.15 * g, 0.35 * g, -1.35 * g);
 }
 
-const AK_DOT = { fc: 0.072, y: 0.0982 }; // AK 紅點鏡:鏡身中心(往槍口距離)與窗口中心高度
 const M4_ACOG_Y = 0.104; // M4 ACOG 光軸高度
 
-// ---------- Kobra 式反射式紅點鏡(AK 左側軌座):窗框 + 前伸遮光罩 + 亮度旋鈕 ----------
-// 紅點本身是準直光:永遠落在彈道上(畫面正中央),由 HUD 畫(src/weapons/scope.js),不隨槍身晃動。
-// fc:鏡身中心(往槍口距離)、WY:窗口中心高度;窗口內開口 ±0.0155 × ±0.0145
-function kobraGeos(k, fc, WY) {
-  const P = M.park, L = 0.074, f0 = fc - L / 2, f1 = fc + L / 2;
-  k.add(P, box(0.042, 0.007, L + 0.006, 0, WY - 0.0145 - 0.0035, fc, 0.0015)); // 底板
-  k.add(P, box(0.03, 0.004, L - 0.01, 0, WY - 0.0145 - 0.0085, fc, 0.001));
-  for (const sx of [-1, 1]) {
-    k.add(P, side([[f0, WY - 0.0146], [f1, WY - 0.0146], [f1 + 0.006, WY + 0.0185, 0.003], [f0 + 0.006, WY + 0.0185, 0.003], [f0, WY + 0.012, 0.002]], 0.0042, { x: sx * 0.0176, bevel: 0.0008 }));
+// ---------- 殭屍的手(背後撲臉:搭在玩家右肩,src/game/perks.js)----------
+// 材質複製手套指尖的皮革(只改顏色 = 同一個 shader 變體,第一次出現不會現場編譯)
+export function createZombieHand() {
+  const skin = M.leather.clone(), nail = M.leather.clone();
+  skin.color.setHex(0x5e6152); skin.roughness = 0.85; skin.emissive.setHex(0x0a0b07); // 暗處也看得到(emissive 是 uniform,不換 shader)
+  nail.color.setHex(0x2a2117); nail.roughness = 0.5;
+  const root = new THREE.Group(), fingers = [];
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.22, 4, 12).rotateX(HALF), skin); // 從後面伸過來的前臂
+  arm.position.set(0.02, 0.02, 0.16);
+  root.add(arm);
+  const palm = new THREE.Mesh(new RoundedBoxGeometry(0.085, 0.026, 0.09, 2, 0.01), skin);
+  root.add(palm);
+  // 四根長手指:從掌心往前、兩節往下彎(搭過肩膀)
+  for (let i = 0; i < 4; i++) {
+    const f = new THREE.Group();
+    f.position.set(-0.03 + i * 0.02, -0.002, -0.045);
+    f.rotation.y = (i - 1.5) * 0.06;
+    const len = [0.05, 0.058, 0.055, 0.044][i];
+    const s1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0085, len, 3, 8).rotateX(HALF).translate(0, 0, -len / 2), skin);
+    const j = new THREE.Group();
+    j.position.z = -len;
+    const s2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.0075, len * 0.8, 3, 8).rotateX(HALF).translate(0, 0, -len * 0.4), skin);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.0072, 8, 6).scale(1, 0.5, 1.4).translate(0, 0.004, -len * 0.8), nail);
+    j.add(s2, tip);
+    f.add(s1, j);
+    root.add(f);
+    fingers.push({ f, j });
   }
-  k.add(P, box(0.0394, 0.0042, L + 0.004, 0, WY + 0.0166, fc + 0.004, 0.0012)); // 頂罩
-  // 前窗框(四邊細框)與後框唇
-  k.add(P, box(0.031, 0.0026, 0.004, 0, WY + 0.0137, f1 - 0.002, 0.0006));
-  k.add(P, box(0.031, 0.0026, 0.004, 0, WY - 0.0137, f1 - 0.002, 0.0006));
-  for (const sx of [-1, 1]) k.add(P, box(0.0026, 0.027, 0.004, sx * 0.0142, WY, f1 - 0.002, 0.0006));
-  k.add(M.lens, box(0.031, 0.0012, 0.0016, 0, WY - 0.0124, f1 - 0.0045, 0)); // 前鏡片下緣反光
-  // 亮度旋鈕(右)、電池蓋(左)、側軌座支臂與夾桿(左側往下夾住機匣側軌)
-  k.add(M.worn, cylX(0.0068, 0.003, 0.0213, WY - 0.003, fc - 0.012, 20));
-  k.add(P, cylX(0.0064, 0.007, 0.024, WY - 0.003, fc - 0.012, 20));
-  for (let i = 0; i < 10; i++) k.add(M.dark, rot(box(0.0072, 0.0009, 0.0012, 0.024, WY - 0.003 + 0.0062, fc - 0.012, 0), (i / 10) * Math.PI * 2, 0, 0, 0.024, WY - 0.003, fc - 0.012));
-  k.add(P, cylX(0.0058, 0.006, -0.022, WY + 0.002, fc + 0.014, 16));
-  k.add(M.steel, box(0.009, 0.006, 0.05, -0.0205, WY - 0.0215, fc + 0.004, 0.0015));
-  k.add(M.steel, box(0.004, 0.056, 0.05, -0.0245, WY - 0.0465, fc + 0.004, 0.0015));
-  k.add(M.steel, rot(box(0.004, 0.006, 0.034, -0.0275, WY - 0.064, fc - 0.006, 0.0015), 0.25, 0, 0, -0.0275, WY - 0.064, fc - 0.006));
-  k.add(M.worn, cylX(0.0032, 0.006, -0.0272, WY - 0.064, fc + 0.014, 12));
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.0095, 0.04, 3, 8).rotateX(HALF).translate(0, 0, -0.02), skin);
+  thumb.position.set(-0.048, -0.004, -0.01);
+  thumb.rotation.set(0.5, 0.7, 0);
+  root.add(thumb);
+  root.visible = false;
+  // grip 0..1:手指扣緊
+  const set = (grip) => { for (const { f, j } of fingers) { f.rotation.x = -0.35 - 0.45 * grip; j.rotation.x = -0.5 - 0.6 * grip; } };
+  set(0);
+  return { root, set };
 }
 
 // ---------- 3× ACOG 式光學瞄準鏡(TA31 風格:前寬後窄的鋁合金鏡身、頂部光纖、平頂座) ----------
@@ -949,8 +960,7 @@ function buildAK(g) {
   }
   for (const sx of [-1, 1]) k.add(M.steel, box(0.0016, 0.012, 0.038, sx * 0.0186, 0.021, 0.116, 0.003));
   k.add(M.dark, box(0.0012, 0.0118, 0.088, 0.0181, 0.0462, 0.104, 0)); // 退殼口
-  k.add(M.steel, box(0.0036, 0.016, 0.1, -0.0196, 0.033, 0.08, 0.001)); // 左側瞄具軌
-  kobraGeos(k, AK_DOT.fc, AK_DOT.y);
+  k.add(M.steel, box(0.0036, 0.016, 0.1, -0.0196, 0.033, 0.08, 0.001)); // 左側瞄具軌(空的,沒有裝鏡)
   k.build(g);
 
   // 槍機(含拉機柄,開火時後座)
@@ -976,8 +986,8 @@ function buildAK(g) {
 
   return {
     muzzle: new THREE.Vector3(0, BORE, -0.632), length: 0.95, bolt, mag,
-    // 開鏡看紅點鏡窗口(光軸 = 窗口中心線);機械瞄具在窗口下緣共線
-    sight: { rear: [AK_DOT.fc - 0.037, AK_DOT.y], front: [AK_DOT.fc + 0.037, AK_DOT.y], eye: 0.17, optic: 'reddot' },
+    // 機械瞄具:表尺缺口的肩部(0.2105)對準準星頂端(0.5815,護耳中間)
+    sight: { rear: [0.2105, 0.0888], front: [0.5815, 0.0931], eye: 0.27, optic: 'iron' },
     grip: { a: (18 * Math.PI) / 180, c: [-0.0005, 0.0005], depth: 0.047, halfW: 0.0163 },
     fore: { f: 0.33, y: -0.0072, halfW: 0.0253 },
     anim(shot, reload, empty, st) {

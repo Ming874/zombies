@@ -13,7 +13,7 @@ export const W_KNIFE = 253, W_BOOM = 254; // 對戰傷害的「武器」代碼:�
 // 對照表由遊戲資料產生(各端是同一個版本,順序一致);找不到的值送 255
 export const ZTYPES = Object.keys(TYPES);
 export const WEAPON_IDS = [...ORDER, ...Object.keys(WEAPONS).filter((k) => !ORDER.includes(k))];
-export const ZSTATES = ['chase', 'attack', 'stumble', 'stagger', 'crouch', 'leap', 'recover', 'trip', 'getup', 'spit', 'roar', 'charge', 'stun', 'slam', 'idle', 'wander', 'spawn', 'climb', 'hit', 'knock', 'scream', 'grab', 'feed', 'fall', 'burn'];
+export const ZSTATES = ['chase', 'attack', 'stumble', 'stagger', 'crouch', 'leap', 'recover', 'trip', 'getup', 'spit', 'roar', 'charge', 'stun', 'slam', 'idle', 'wander', 'spawn', 'climb', 'hit', 'knock', 'scream', 'grab', 'feed', 'fall', 'burn', 'pin']; // pin:背後撲臉(src/game/perks.js)
 export const PARTS = ['body', 'head', 'arm', 'leg', 'armor', 'torso', 'neck', 'hand', 'foot'];
 export const PHASES = ['fighting', 'collecting', 'break', 'shop', 'pvp', 'wait', 'over', 'warmup'];
 export const code = (list, v) => { const i = list.indexOf(v); return i < 0 ? NONE : i; };
