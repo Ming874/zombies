@@ -1,6 +1,9 @@
-## Zeabur Deployment
-- Project: temp (ID: 6adda651c375e0e40c02b23f), on Ming's Server
-- GitHub repo: Ming874/zombies (renamed from Ming874/ta; Zeabur repo ID 1432875614)
-- Service `zombie` (ID: 6adda657c375e0e40c02b240) — tracks branch `main`; pushing to `main` triggers a redeploy
-- Service `zombie-test` (ID: 6ade3940c375e0e40c02d353) — tracks branch `test`; pushing to `test` triggers a redeploy
-- A force-push does not trigger an automatic redeploy; run `npx zeabur@latest service redeploy --id <service-id> -y -i=false`
+## Deployment (self-hosted on this Mac since 2026-11-06)
+- Runs on this Mac mini, inside the Lima VM `mac-a` (K3s + open-source Zeabur). Public traffic comes in through Cloudflare Tunnel; the admin UI is reachable only over Tailscale. The old Zeabur Tokyo project and service IDs no longer exist (Tokyo was shut down), and there is no `test` branch or test service anymore.
+- GitHub repo: Ming874/zombies. Live site: https://zombie.iosoftware.ai (test domain `mac-zombie.iosoftware.ai`). Kubernetes namespace `zombie`: Deployment `zombie`, Build `zombie` (railpack).
+- To deploy, push to `main`. CI (`.github/workflows/ci.yml`: server tests, build, gitleaks) must pass; its promote job then fast-forwards the `production` branch. The Mac's Builder follows `production`, builds an arm64 image within about a minute, and rolls it out. If CI fails, nothing is deployed and a notice goes to Discord.
+- Every commit that reaches `production` rebuilds and redeploys, including docs-only commits. zombie deploys stop-then-start (its database is an in-memory JSON file, so two copies would overwrite each other), which means a few seconds of downtime per deploy.
+- Check what is running: `limactl shell mac-a -- sudo k3s kubectl -n zombie get builds.builder.zeabur.com,buildruns.builder.zeabur.com,deploy,pods` (the Build's REVISION and the Deployment's image tag end in the deployed commit).
+- Emergency deploy that skips CI: `git push origin <commit>:production`. Roll back: Zeabur UI → service → restart and roll back, or `kubectl -n zombie set image deploy/zombie zombie=zot.zot.svc:5000/zombie/zombie:<old tag>`.
+- Accounts and saves live on the PVC `zombie-data`, which the `vol-daily` CronJob backs up every day at 03:45 (restic to R2).
+- The full ops handover (backups and restore, alerts, admin UI, tokens) is in `~/migration/HANDOVER.md`.
