@@ -11,7 +11,7 @@ export const inputMethods = {
     const playing = () => this.state === 'playing' && !this.paused && !this.shopUIOpen;
     document.addEventListener('pointerlockchange', () => {
       const locked = document.pointerLockElement === canvas;
-      if (!locked && this.state === 'playing' && !this.shopUIOpen && !this.bookOpen && !this.consoleOpen) { // [story] 推理本 / F8 控制面板開著:放開滑鼠是故意的
+      if (!locked && this.state === 'playing' && !this.shopUIOpen && !this.bookOpen && !this.consoleOpen && !this.teachOpen) { // [story] 推理本 / F8 控制面板 / F2 教學模式開著:放開滑鼠是故意的
         this.paused = true;
         this.ui.overlay('pause', true);
       }

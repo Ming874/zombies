@@ -1,4 +1,5 @@
 import { installConsole } from './ui/console.js'; // 第一個載入:F8 控制面板的按鍵攔截要比其他模組的捕獲監聽器早註冊
+import { installTeach } from './teach/index.js'; // 第二個:F2 教學模式的按鍵攔截(教室介面第一次按 F2 才載入)
 import * as THREE from 'three';
 import { Game } from './game.js';
 import { Quality } from './sys/quality.js';
@@ -83,6 +84,7 @@ installDeduce(game); // [story] 線索卡、推理本(J)、擲筊、頭七(src/s
 installObjectives(game); // [story] 目標鏈、區域解鎖、提示(src/story/objectives.js)
 installMotion(game); // [motion] 轉場與手感:開機、開場、燈篙節拍、受傷、倒下、暫停(src/ui/motion.js;全部是 post 的 uniform)
 installConsole(game); // F8 控制面板:/give 等指令(src/ui/console.js)
+installTeach(game); // F2 教學模式:遊戲製作課的互動場景(src/teach)
 window.__game = game; // 除錯用:在瀏覽器 console 操作 __game
 if (earlyStart && !account.gated) { // 建構途中按過開始:現在照常開始(按鈕的處理在 bindInput 才綁上);[w6] 要登入才能玩時不算
   const b = document.getElementById('startBtn');
