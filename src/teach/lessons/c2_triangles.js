@@ -1,17 +1,6 @@
 import * as THREE from 'three';
-import { getVariant, variantCount } from '../../zombies/model.js';
+import { variantCount } from '../../zombies/model.js';
 import { fmt, rnd, std, dummy, line, tween } from './_util.js';
-
-// 遊戲殭屍的「靜止」網格:複製一份幾何(可以改 drawRange,不影響遊戲),材質共用(不能改它)
-function zombieStatic(T, type = 'walker', k = 0) {
-  const v = getVariant(type, k);
-  const geo = v.geometry.clone();
-  const m = new THREE.Mesh(geo, v.materials);
-  m.userData.shared = true; // 材質是遊戲的,離開時不要釋放
-  m.castShadow = true;
-  T.onDispose(() => geo.dispose());
-  return m;
-}
 
 const VCOL = 0xffcf5a;
 function handle(color = VCOL, r = 0.13) {
@@ -140,37 +129,6 @@ export default [
   },
   // ---------------------------------------------------------------- 13
   {
-    id: 'ztris', title: '一隻殭屍有幾個三角形?', say: '先猜猜看,再拉動下面的拉桿,看它一片一片長出來。',
-    task: '猜對這隻殭屍的三角形數量',
-    fact: '這些殭屍不是美術用軟體捏的,是程式「算」出來的,所以每次開遊戲都能變出不同的長相。',
-    studio: { cam: [0.4, 1.5, 3.4], target: [0, 1.05, 0] },
-    run(T) {
-      const z = T.add(zombieStatic(T, 'walker', 2));
-      z.rotation.y = -0.3;
-      const total = T.tris(z);
-      const wire = new THREE.Mesh(z.geometry, new THREE.MeshBasicMaterial({ color: 0x5fe0a8, wireframe: true, transparent: true, opacity: 0.35 }));
-      wire.visible = false;
-      z.add(wire);
-      const gun = T.gun('m4a1');
-      gun.scale.setScalar(1.4);
-      gun.position.set(1.2, 1.0, 0.2);
-      gun.rotation.set(0, Math.PI / 2 - 0.3, 0);
-      T.add(gun);
-      const gunTris = T.tris(gun);
-      T.label(gun, `M4A1:${fmt(gunTris)} 個`, { cls: 'blu', dy: 0.3 });
-      const idx = z.geometry.index ? z.geometry.index.count : z.geometry.attributes.position.count;
-      const ans = total > 10000 ? 2 : total > 1000 ? 1 : 0;
-      T.quiz({ q: '你猜?', options: ['大約 100 個', '大約 1,000 個', '超過 10,000 個'], answer: ans, why: `答對了!這隻殭屍有 <b>${fmt(total)}</b> 個三角形` });
-      T.row();
-      let k = 1;
-      T.slider({ label: '長出來', min: 0, max: 100, step: 1, value: 100, unit: '%', on: (v) => { k = v / 100; const c = Math.floor((idx * k) / 3) * 3; z.geometry.setDrawRange(0, c); } });
-      T.toggle({ label: '線框', on: (v) => { wire.visible = v; } });
-      T.stat('畫了', () => `${fmt(total * k)} 個`);
-      return { update(dt, t) { z.rotation.y = -0.3 + Math.sin(t * 0.4) * 0.5; } };
-    },
-  },
-  // ---------------------------------------------------------------- 14
-  {
     id: 'build', title: '用形狀拼一隻殭屍', say: '遊戲裡的殭屍,也是程式用一塊一塊的形狀拼出來的。按按鈕,一塊一塊加上去。',
     task: '把 7 個部位都加上去,讓它活過來',
     fact: '真正的殭屍程式(src/zombies/model.js)有 1500 行:決定胖瘦、駝背、斷手、衣服破洞、傷口位置。',
@@ -210,7 +168,7 @@ export default [
       return { update(dt, t) { if (alive) { root.rotation.z = Math.sin(t * 2.2) * 0.06; root.position.z = Math.sin(t * 1.1) * 0.15; root.rotation.y = Math.sin(t * 0.5) * 0.3; } } };
     },
   },
-  // ---------------------------------------------------------------- 15
+  // ---------------------------------------------------------------- 14
   {
     id: 'seed', title: '同一份程式,不同的殭屍', say: '換一個<b>種子</b>數字,程式就算出一隻長得不一樣的殭屍。',
     task: '看過 <b>5 隻</b>不一樣的殭屍',
@@ -242,7 +200,7 @@ export default [
       return { update(dt, t) { if (cur) cur.mesh.rotation.y = -0.2 + Math.sin(t * 0.5) * 0.6; } };
     },
   },
-  // ---------------------------------------------------------------- 16
+  // ---------------------------------------------------------------- 15
   {
     id: 'back', title: '背面不畫', say: '每個三角形分<b>正面</b>和<b>背面</b>。為了省力,遊戲通常只畫正面。',
     task: '用滾輪把相機<b>鑽進盒子裡</b>,看看牆跑去哪了',
