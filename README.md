@@ -139,9 +139,9 @@ Windows 版 Chrome 預設用 ANGLE 的 Direct3D 11 後端:畫面上第一次出�
 
 HUD、字幕、提示等網頁元素刻意不用 CSS `filter` / `backdrop-filter` / `mask`(會在瀏覽器合成器每幀重新套用,並觸發上述的 shader 編譯);需要模糊、褪色的畫面效果請寫在 `src/game/post.js` 的 uniform。
 
-### 部署(Zeabur)
+### 部署(Mac 上自架的 Zeabur)
 
-`zbpack.json` 已設定 `build_command: npm run build`、`start_command: node server/index.js`;平台提供的 `PORT` 會自動使用。推送到追蹤的分支即會重新部署。
+正式站 https://zombie.iosoftware.ai 跑在 Mac 上自架的 Zeabur(K3s),用 railpack 建置:照 `package.json` 的 `build`(`npm run build`)與 `start`(`node server/index.js`)建置與啟動;平台提供的 `PORT` 會自動使用。`zbpack.json` 是舊的 Zeabur 雲端(zbpack)用的設定,現在的建置不靠它。推送到 `main`、CI 通過後會把 `production` 分支快轉過去,Mac 跟著 `production` 自動部署;流程與維運指令見 `CLAUDE.md`。
 
 ## 多人連線
 
@@ -163,7 +163,7 @@ HUD、字幕、提示等網頁元素刻意不用 CSS `filter` / `backdrop-filter
 | 變數 | 說明 |
 |---|---|
 | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` | Google Cloud Console 的 OAuth 用戶端(網頁應用程式)。沒設定時不顯示登入按鈕,`/api/me` 回 `{ enabled: false }`,遊戲照常可玩(存檔只在瀏覽器) |
-| `PUBLIC_URL` | 選填。網站的正式網址(例 `https://zombies.zeabur.app`);不設定時依請求的 Host 與 `x-forwarded-proto` 組出重新導向 URI |
+| `PUBLIC_URL` | 選填。網站的正式網址(例 `https://zombie.iosoftware.ai`);不設定時依請求的 Host 與 `x-forwarded-proto` 組出重新導向 URI |
 | `DATA_DIR` | 帳號、session、存檔的 JSON 檔放哪裡(預設 `<repo>/data`,已加進 .gitignore) |
 | `AUTH_DEV` | 只給測試用:設成 `1` 才開放 `/auth/dev?name=xxx` 假登入。**正式環境不要設** |
 

@@ -6,4 +6,4 @@
 - Check what is running: `limactl shell mac-a -- sudo k3s kubectl -n zombie get builds.builder.zeabur.com,buildruns.builder.zeabur.com,deploy,pods` (the Build's REVISION and the Deployment's image tag end in the deployed commit).
 - Emergency deploy that skips CI: `git push origin <commit>:production`. Roll back: Zeabur UI → service → restart and roll back, or `kubectl -n zombie set image deploy/zombie zombie=zot.zot.svc:5000/zombie/zombie:<old tag>`.
 - Accounts and saves live on the PVC `zombie-data`, which the `vol-daily` CronJob backs up every day at 03:45 (restic to R2).
-- The full ops handover (backups and restore, alerts, admin UI, tokens) is in `~/migration/HANDOVER.md`.
+- The full ops handover (backups and restore, alerts, admin UI, tokens) is in `~/migration/docs/03-mac-a技術參考手冊.pdf`.
